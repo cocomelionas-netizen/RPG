@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="lt">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Begalinis Kelias</title>
+<title>Endless Road</title>
 <style>
   :root {
     --bg: #14121c;
@@ -94,34 +94,34 @@
 </head>
 <body>
 <header>
-  <h1>🗺️ Begalinis Kelias</h1>
-  <span class="stat" id="gold">Auksas: <b>0</b></span>
-  <span class="stat" id="cmb">Mūšio lygis: <b>1</b></span>
-  <span class="stat" id="dist">Nueita: <b>0 m</b></span>
+  <h1>🗺️ Endless Road</h1>
+  <span class="stat" id="gold">Gold: <b>0</b></span>
+  <span class="stat" id="cmb">Combat level: <b>1</b></span>
+  <span class="stat" id="dist">Distance: <b>0 m</b></span>
 </header>
 <div class="wrap">
   <canvas id="scene"></canvas>
   <main>
     <section class="card">
       <nav class="tabs">
-        <button data-tab="activity" class="sel">🧭 Veikla</button>
-        <button data-tab="skills">📈 Įgūdžiai</button>
-        <button data-tab="inventory">🎒 Inventorius</button>
-        <button data-tab="smithing">🔨 Kalvė</button>
-        <button data-tab="cooking">🍳 Virtuvė</button>
-        <button data-tab="shop">🏪 Parduotuvė</button>
+        <button data-tab="activity" class="sel">🧭 Activity</button>
+        <button data-tab="skills">📈 Skills</button>
+        <button data-tab="inventory">🎒 Inventory</button>
+        <button data-tab="smithing">🔨 Smithing</button>
+        <button data-tab="cooking">🍳 Cooking</button>
+        <button data-tab="shop">🏪 Shop</button>
       </nav>
       <div id="tab-content"></div>
     </section>
     <aside>
       <div class="card" id="hero"></div>
       <div class="card">
-        <h3>Žurnalas</h3>
+        <h3>Log</h3>
         <div id="log"></div>
       </div>
       <div class="card row">
-        <button data-a="save">💾 Išsaugoti</button>
-        <button data-a="reset">🗑️ Pradėti iš naujo</button>
+        <button data-a="save">💾 Save</button>
+        <button data-a="reset">🗑️ Reset</button>
       </div>
     </aside>
   </main>
@@ -134,50 +134,50 @@
 /* ================= DUOMENYS ================= */
 
 const SKILLS = {
-  attack:      { name: 'Ataka',      icon: '⚔️' },
-  defence:     { name: 'Gynyba',     icon: '🛡️' },
-  hitpoints:   { name: 'Gyvybė',     icon: '❤️' },
-  woodcutting: { name: 'Kirtimas',   icon: '🪓' },
-  mining:      { name: 'Kasyba',     icon: '⛏️' },
-  fishing:     { name: 'Žvejyba',    icon: '🎣' },
-  smithing:    { name: 'Kalvystė',   icon: '🔨' },
-  cooking:     { name: 'Kulinarija', icon: '🍳' },
+  attack:      { name: 'Attack',     icon: '⚔️' },
+  defence:     { name: 'Defence',    icon: '🛡️' },
+  hitpoints:   { name: 'Hitpoints',  icon: '❤️' },
+  woodcutting: { name: 'Woodcutting',icon: '🪓' },
+  mining:      { name: 'Mining',     icon: '⛏️' },
+  fishing:     { name: 'Fishing',    icon: '🎣' },
+  smithing:    { name: 'Smithing',   icon: '🔨' },
+  cooking:     { name: 'Cooking',    icon: '🍳' },
 };
 
-// RuneScape/Melvor stiliaus XP kreivė
+// RuneScape/Melvor style XP curve
 const XP_TABLE = [0, 0];
 { let pts = 0; for (let l = 1; l < 99; l++) { pts += Math.floor(l + 300 * Math.pow(2, l / 7)); XP_TABLE[l + 1] = Math.floor(pts / 4); } }
 function levelFromXp(xp) { let l = 1; while (l < 99 && xp >= XP_TABLE[l + 1]) l++; return l; }
 
 const TIER_COLORS = ['#c87533', '#9aa0a8', '#dfe3ee', '#f2c94c', '#4fd6e8'];
 const CANOPY = ['#8ccf6b', '#3f8f3a', '#d0702f', '#2f6b45', '#b06be0'];
-const METAL = ['Vario', 'Geležies', 'Sidabro', 'Aukso', 'Mitrilo'];
-const TREE_N = ['Beržas', 'Ąžuolas', 'Klevas', 'Kukmedis', 'Magiškas medis'];
-const LOG_N = ['Beržo rąstas', 'Ąžuolo rąstas', 'Klevo rąstas', 'Kukmedžio rąstas', 'Magiškas rąstas'];
-const FISH_N = ['Kuoja', 'Ešerys', 'Lydeka', 'Lašiša', 'Ungurys'];
-const COOKED_N = ['Kepta kuoja', 'Keptas ešerys', 'Kepta lydeka', 'Kepta lašiša', 'Keptas ungurys'];
+const METAL = ['Copper', 'Iron', 'Silver', 'Gold', 'Mithril'];
+const TREE_N = ['Birch', 'Oak', 'Maple', 'Yew', 'Magic Tree'];
+const LOG_N = ['Birch Logs', 'Oak Logs', 'Maple Logs', 'Yew Logs', 'Magic Logs'];
+const FISH_N = ['Roach', 'Perch', 'Pike', 'Salmon', 'Eel'];
+const COOKED_N = ['Cooked Roach', 'Cooked Perch', 'Cooked Pike', 'Cooked Salmon', 'Cooked Eel'];
 const GATHER_REQ = [1, 10, 20, 30, 40];
 const GATHER_TIME = [2.4, 2.8, 3.2, 3.6, 4.0];
 const GATHER_XP = [10, 20, 35, 55, 80];
 const TOOL_COST = [100, 500, 2000, 8000];
-const TOOL_NAMES = { axe: 'Kirvis', pick: 'Kirtiklis', rod: 'Meškerė' };
+const TOOL_NAMES = { axe: 'Axe', pick: 'Pickaxe', rod: 'Fishing Rod' };
 const TOOL_OF = { woodcutting: 'axe', mining: 'pick', fishing: 'rod' };
 
 const ITEMS = {};
 function defItem(id, o) { ITEMS[id] = Object.assign({ id }, o); }
 for (let t = 0; t < 5; t++) {
-  defItem('log' + t,    { name: LOG_N[t], icon: '🪵', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Ištekliai' });
-  defItem('ore' + t,    { name: METAL[t] + ' rūda', icon: '🪨', tier: t, value: [3, 7, 14, 28, 55][t], type: 'Ištekliai' });
-  defItem('fish' + t,   { name: FISH_N[t] + ' (žalia)', icon: '🐟', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Ištekliai' });
-  defItem('cooked' + t, { name: COOKED_N[t], icon: '🍽️', tier: t, value: [5, 12, 25, 50, 100][t], heal: [12, 20, 32, 46, 65][t], type: 'Maistas' });
-  defItem('sword' + t,  { name: METAL[t] + ' kardas', icon: '🗡️', tier: t, value: [30, 90, 250, 600, 1500][t], slot: 'weapon', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Įranga' });
-  defItem('armor' + t,  { name: METAL[t] + ' šarvai', icon: '🥋', tier: t, value: [50, 150, 400, 1000, 2500][t], slot: 'armor', armor: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Įranga' });
+  defItem('log' + t,    { name: LOG_N[t], icon: '🪵', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Resources' });
+  defItem('ore' + t,    { name: METAL[t] + ' Ore', icon: '🪨', tier: t, value: [3, 7, 14, 28, 55][t], type: 'Resources' });
+  defItem('fish' + t,   { name: 'Raw ' + FISH_N[t], icon: '🐟', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Resources' });
+  defItem('cooked' + t, { name: COOKED_N[t], icon: '🍽️', tier: t, value: [5, 12, 25, 50, 100][t], heal: [12, 20, 32, 46, 65][t], type: 'Food' });
+  defItem('sword' + t,  { name: METAL[t] + ' Sword', icon: '🗡️', tier: t, value: [30, 90, 250, 600, 1500][t], slot: 'weapon', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Equipment' });
+  defItem('armor' + t,  { name: METAL[t] + ' Armour', icon: '🥋', tier: t, value: [50, 150, 400, 1000, 2500][t], slot: 'armor', armor: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Equipment' });
 }
-defItem('bread', { name: 'Duona', icon: '🍞', value: 2, heal: 8, type: 'Maistas' });
-defItem('burnt', { name: 'Sudegusi žuvis', icon: '⚫', value: 1, type: 'Kita' });
-defItem('bones', { name: 'Kaulai', icon: '🦴', value: 3, type: 'Kita' });
-defItem('gem',   { name: 'Brangakmenis', icon: '💎', value: 150, type: 'Kita' });
-defItem('scale', { name: 'Drakono žvynas', icon: '🐉', value: 600, type: 'Kita' });
+defItem('bread', { name: 'Bread', icon: '🍞', value: 2, heal: 8, type: 'Food' });
+defItem('burnt', { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
+defItem('bones', { name: 'Bones', icon: '🦴', value: 3, type: 'Misc' });
+defItem('gem',   { name: 'Gem', icon: '💎', value: 150, type: 'Misc' });
+defItem('scale', { name: 'Dragon Scale', icon: '🐉', value: 600, type: 'Misc' });
 const FOOD_ORDER = ['cooked4', 'cooked3', 'cooked2', 'cooked1', 'cooked0', 'bread'];
 
 const RECIPES = [];
@@ -186,41 +186,41 @@ for (let t = 0; t < 5; t++) {
   RECIPES.push({ out: 'armor' + t, req: [5, 15, 25, 35, 45][t], xp: [25, 50, 90, 150, 230][t], mats: { ['ore' + t]: 5 } });
 }
 
-// drops: [daiktas, tikimybė, min, max]
+// drops: [item, chance, min, max]
 const ENEMIES = {
-  slime:    { name: 'Gleivė',         hp: 12,   maxHit: 2,  atk: 1,  def: 1,  speed: 2.6, gold: [1, 3],     shape: 'blob',     size: 1,   color: '#5fd35f', drops: [] },
-  rat:      { name: 'Žiurkė',         hp: 18,   maxHit: 3,  atk: 3,  def: 2,  speed: 2.2, gold: [1, 4],     shape: 'quad',     size: .6,  color: '#8a7f75', drops: [['bones', .5, 1, 1]] },
-  goblin:   { name: 'Goblinas',       hp: 40,   maxHit: 5,  atk: 7,  def: 6,  speed: 2.4, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#7a5a3a', drops: [['bones', .6, 1, 1], ['ore0', .25, 2, 4]] },
-  wolf:     { name: 'Vilkas',         hp: 55,   maxHit: 7,  atk: 9,  def: 8,  speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
-  bat:      { name: 'Šikšnosparnis',  hp: 80,   maxHit: 9,  atk: 13, def: 12, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
-  skeleton: { name: 'Skeletas',       hp: 120,  maxHit: 12, atk: 17, def: 16, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['ore1', .25, 2, 4]] },
-  orc:      { name: 'Orkas',          hp: 200,  maxHit: 17, atk: 24, def: 24, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bones', 1, 1, 2], ['ore2', .25, 2, 4], ['gem', .03, 1, 1]] },
-  troll:    { name: 'Trolis',         hp: 320,  maxHit: 22, atk: 28, def: 30, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bones', 1, 2, 4], ['ore3', .2, 2, 4], ['gem', .05, 1, 1]] },
-  lizard:   { name: 'Ugnies driežas', hp: 450,  maxHit: 28, atk: 36, def: 38, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', drops: [['bones', 1, 1, 2], ['ore4', .2, 1, 3], ['gem', .06, 1, 1]] },
-  dragon:   { name: 'Drakonas',       hp: 1200, maxHit: 45, atk: 48, def: 50, speed: 3.2, gold: [200, 400], shape: 'dragon',   size: 1,   color: '#9b2222', drops: [['scale', 1, 1, 1], ['gem', .3, 1, 2]] },
+  slime:    { name: 'Slime',          hp: 12,   maxHit: 2,  atk: 1,  def: 1,  speed: 2.6, gold: [1, 3],     shape: 'blob',     size: 1,   color: '#5fd35f', drops: [] },
+  rat:      { name: 'Rat',            hp: 18,   maxHit: 3,  atk: 3,  def: 2,  speed: 2.2, gold: [1, 4],     shape: 'quad',     size: .6,  color: '#8a7f75', drops: [['bones', .5, 1, 1]] },
+  goblin:   { name: 'Goblin',         hp: 40,   maxHit: 5,  atk: 7,  def: 6,  speed: 2.4, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#7a5a3a', drops: [['bones', .6, 1, 1], ['ore0', .25, 2, 4]] },
+  wolf:     { name: 'Wolf',           hp: 55,   maxHit: 7,  atk: 9,  def: 8,  speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
+  bat:      { name: 'Bat',            hp: 80,   maxHit: 9,  atk: 13, def: 12, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
+  skeleton: { name: 'Skeleton',       hp: 120,  maxHit: 12, atk: 17, def: 16, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['ore1', .25, 2, 4]] },
+  orc:      { name: 'Orc',            hp: 200,  maxHit: 17, atk: 24, def: 24, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bones', 1, 1, 2], ['ore2', .25, 2, 4], ['gem', .03, 1, 1]] },
+  troll:    { name: 'Troll',          hp: 320,  maxHit: 22, atk: 28, def: 30, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bones', 1, 2, 4], ['ore3', .2, 2, 4], ['gem', .05, 1, 1]] },
+  lizard:   { name: 'Fire Lizard',    hp: 450,  maxHit: 28, atk: 36, def: 38, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', drops: [['bones', 1, 1, 2], ['ore4', .2, 1, 3], ['gem', .06, 1, 1]] },
+  dragon:   { name: 'Dragon',         hp: 1200, maxHit: 45, atk: 48, def: 50, speed: 3.2, gold: [200, 400], shape: 'dragon',   size: 1,   color: '#9b2222', drops: [['scale', 1, 1, 1], ['gem', .3, 1, 2]] },
 };
 
 const ZONES = [
-  { name: 'Žalioji pieva',   req: 1,  enemies: ['slime', 'rat'],
+  { name: 'Green Meadow',    req: 1,  enemies: ['slime', 'rat'],
     th: { sky: ['#78c4ff', '#dff3ff'], far: '#a9cbe0', mid: '#79c062', near: '#4c9a3f', ground: '#5c9a3c', dirt: '#7a5a3a', sun: '#fff3a0', decor: 'tree' } },
-  { name: 'Tamsusis miškas', req: 5,  enemies: ['goblin', 'wolf'],
+  { name: 'Dark Forest',     req: 5,  enemies: ['goblin', 'wolf'],
     th: { sky: ['#3f6b7d', '#a5c6b2'], far: '#4f7366', mid: '#2f5d3a', near: '#1b3b24', ground: '#365f2b', dirt: '#4a3826', sun: '#e8f0c0', decor: 'pine' } },
-  { name: 'Šešėlių urvai',   req: 12, enemies: ['bat', 'skeleton'],
+  { name: 'Shadow Caves',    req: 12, enemies: ['bat', 'skeleton'],
     th: { sky: ['#140f1d', '#352841'], far: '#2a2134', mid: '#3a2e46', near: '#22192b', ground: '#4a3f4f', dirt: '#2a2230', sun: null, decor: 'stalag', cave: true } },
-  { name: 'Ledo kalnai',     req: 22, enemies: ['orc', 'troll'],
+  { name: 'Ice Mountains',   req: 22, enemies: ['orc', 'troll'],
     th: { sky: ['#8fa9cc', '#eef4fb'], far: '#d3deeb', mid: '#97aac0', near: '#5f7186', ground: '#e9eff6', dirt: '#a3b0be', sun: '#ffffff', decor: 'rock', snow: true } },
-  { name: 'Drakono lizdas',  req: 32, enemies: ['lizard', 'lizard', 'lizard', 'dragon'],
+  { name: 'Dragon\'s Lair',  req: 32, enemies: ['lizard', 'lizard', 'lizard', 'dragon'],
     th: { sky: ['#2a0808', '#c2481e'], far: '#5a1a14', mid: '#3a1410', near: '#1c0806', ground: '#2b1a17', dirt: '#140b09', sun: '#ffb347', decor: 'spike', lava: true } },
 ];
 
-/* ================= BŪSENA ================= */
+/* ================= STATE ================= */
 
 const SAVE_KEY = 'begalinis-kelias-v1';
 const OFFLINE_CAP = 12 * 3600;
-let S = null;          // išsaugoma būsena
-let LV = {};           // lygių talpykla
-let SIM = false;       // greita simuliacija (neprisijungus) - be vizualų
-const R = {            // vykdymo būsena (nesaugoma)
+let S = null;          // saved state
+let LV = {};           // level cache
+let SIM = false;       // fast simulation (offline) - no visuals
+const R = {            // runtime state (not saved)
   worldX: 0, phase: 'walk', ent: null, atkT: 0, deadT: 0, doneT: 0,
   swing: 0, eatFlash: 0,
 };
@@ -239,7 +239,7 @@ function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k
 
 function save() {
   S.last = Date.now();
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* saugykla nepasiekiama */ }
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ }
 }
 function load() {
   let data = null;
@@ -254,12 +254,12 @@ function load() {
   recalcLevels();
 }
 
-/* ================= PAGALBINĖS ================= */
+/* ================= HELPERS ================= */
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const randi = (a, b) => Math.floor(rand(a, b + 1));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const fmt = n => Math.floor(n).toLocaleString('lt-LT');
+const fmt = n => Math.floor(n).toLocaleString('en-US');
 
 function log(msg, cls = '') {
   if (SIM) return;
@@ -281,7 +281,7 @@ function addXp(skill, amt) {
   LV[skill] = levelFromXp(S.skills[skill]);
   if (LV[skill] > before) {
     if (skill === 'hitpoints') S.hp += (LV[skill] - before) * 10;
-    log(`${SKILLS[skill].icon} ${SKILLS[skill].name} pakilo iki ${LV[skill]} lygio!`, 'lg-xp');
+    log(`${SKILLS[skill].icon} ${SKILLS[skill].name} reached level ${LV[skill]}!`, 'lg-xp');
     floatText(HX, GY - 140, `${SKILLS[skill].name} ${LV[skill]}!`, '#6aa8ff', 1.6);
   }
   uiDirty = true;
@@ -304,7 +304,7 @@ function gatherTier(skill) {
 }
 function gatherTime(skill, tier) { return GATHER_TIME[tier] * (1 - 0.12 * S.tools[TOOL_OF[skill]]); }
 
-/* ================= ŽAIDIMO LOGIKA ================= */
+/* ================= GAME LOGIC ================= */
 
 const W = 960, H = 320, GY = 262, HX = 230, WALK = 230;
 
@@ -342,7 +342,7 @@ function tick(dt) {
     if (R.ent.kind === 'enemy') combatTick(dt); else gatherTick(dt);
   } else if (R.phase === 'dead') {
     R.deadT -= dt;
-    if (R.deadT <= 0) { S.hp = maxHp(); R.phase = 'walk'; R.ent = null; log('Atsikėlėte ir keliaujate toliau.'); }
+    if (R.deadT <= 0) { S.hp = maxHp(); R.phase = 'walk'; R.ent = null; log('You get back up and continue on.'); }
   } else if (R.phase === 'done') {
     R.doneT -= dt;
     if (R.doneT <= 0) { R.ent = null; R.phase = 'walk'; }
@@ -363,7 +363,7 @@ function combatTick(dt) {
       addXp('hitpoints', dmg * 1.33);
       floatText(entScreenX(e), GY - entHeight(e) - 10, '-' + dmg, '#ffd166');
       burst(entScreenX(e), GY - entHeight(e) * 0.55, '#ff5a5a', 6);
-    } else floatText(entScreenX(e), GY - entHeight(e) - 10, 'Nepataikė', '#bbbbbb');
+    } else floatText(entScreenX(e), GY - entHeight(e) - 10, 'Miss', '#bbbbbb');
   }
   if (e.hp <= 0) { killEnemy(e); return; }
   if (e.atkT <= 0) {
@@ -376,7 +376,7 @@ function combatTick(dt) {
       addXp('defence', S.style === 'defence' ? 0 : dmg * 0.5);
       floatText(HX, GY - 108, '-' + dmg, '#ff6b6b');
       burst(HX + 4, GY - 40, '#c22', 5);
-    } else floatText(HX, GY - 108, 'Išvengta', '#9ad');
+    } else floatText(HX, GY - 108, 'Dodge', '#9ad');
   }
   autoEat();
   if (S.hp <= 0) die();
@@ -396,18 +396,18 @@ function autoEat() {
 
 function die() {
   S.hp = 0; R.phase = 'dead'; R.deadT = 4;
-  log(`💀 Jus įveikė ${R.ent.d.name}. Atsigaunate...`, 'lg-bad');
+  log(`💀 You were defeated by ${R.ent.d.name}. Recovering...`, 'lg-bad');
   uiDirty = true;
 }
 
 function killEnemy(e) {
   const g = randi(e.d.gold[0], e.d.gold[1]);
   S.gold += g; S.kills++;
-  const got = [`${g} aukso`];
+  const got = [`${g} gold`];
   for (const [id, ch, mn, mx] of e.d.drops) {
     if (Math.random() < ch) { const n = randi(mn, mx); give(id, n); got.push(`${n}× ${ITEMS[id].name}`); }
   }
-  log(`⚔️ Įveikėte: ${e.d.name} (${got.join(', ')})`, 'lg-gold');
+  log(`⚔️ Defeated ${e.d.name} (${got.join(', ')})`, 'lg-gold');
   floatText(entScreenX(e), GY - entHeight(e) - 30, '+' + g + ' 🪙', '#f2c94c', 1.4);
   burst(entScreenX(e), GY - entHeight(e) * 0.5, e.d.color, 18);
   R.phase = 'done'; R.doneT = 0.6; e.dying = true;
@@ -447,7 +447,7 @@ function resetEncounter() {
   uiDirty = true;
 }
 
-/* ===== Gamyba, parduotuvė, inventorius ===== */
+/* ===== Crafting, shop, inventory ===== */
 
 function maxCraft(mats) { return Math.min(...Object.entries(mats).map(([id, n]) => Math.floor(has(id) / n))); }
 
@@ -459,7 +459,7 @@ function smith(i, n) {
   for (const [id, c] of Object.entries(r.mats)) take(id, c * n);
   give(r.out, n);
   addXp('smithing', r.xp * n);
-  log(`🔨 Nukalta: ${n}× ${ITEMS[r.out].name}`, 'lg-good');
+  log(`🔨 Smithed ${n}× ${ITEMS[r.out].name}`, 'lg-good');
 }
 
 function cook(t, n) {
@@ -473,7 +473,7 @@ function cook(t, n) {
     if (Math.random() < burnChance) { give('burnt'); burnt++; }
     else { give('cooked' + t); ok++; addXp('cooking', GATHER_XP[t]); }
   }
-  log(`🍳 Iškepta ${ok}× ${COOKED_N[t]}` + (burnt ? `, sudegė ${burnt}` : ''), 'lg-good');
+  log(`🍳 Cooked ${ok}× ${FISH_N[t]}` + (burnt ? `, burnt ${burnt}` : ''), 'lg-good');
 }
 
 function sell(id, n) {
@@ -482,18 +482,18 @@ function sell(id, n) {
   take(id, n);
   const g = ITEMS[id].value * n;
   S.gold += g;
-  log(`💰 Parduota ${n}× ${ITEMS[id].name} už ${fmt(g)} aukso`, 'lg-gold');
+  log(`💰 Sold ${n}× ${ITEMS[id].name} for ${fmt(g)} gold`, 'lg-gold');
 }
 
 function equip(id) {
   const it = ITEMS[id];
   if (!it.slot) return;
   const skill = it.slot === 'weapon' ? 'attack' : 'defence';
-  if (LV[skill] < it.req) { log(`Reikia ${SKILLS[skill].name} ${it.req} lygio.`, 'lg-bad'); return; }
+  if (LV[skill] < it.req) { log(`Requires ${SKILLS[skill].name} level ${it.req}.`, 'lg-bad'); return; }
   if (!take(id)) return;
   if (S.equip[it.slot]) give(S.equip[it.slot]);
   S.equip[it.slot] = id;
-  log(`Užsidėjote: ${it.name}`);
+  log(`Equipped ${it.name}`);
 }
 function unequip(slot) {
   if (!S.equip[slot]) return;
@@ -504,17 +504,17 @@ function buyTool(tool) {
   const lvl = S.tools[tool];
   if (lvl >= 4 || S.gold < TOOL_COST[lvl]) return;
   S.gold -= TOOL_COST[lvl]; S.tools[tool]++;
-  log(`🏪 Patobulinta: ${TOOL_NAMES[tool]} (${S.tools[tool]} lygis)`, 'lg-good');
+  log(`🏪 Upgraded ${TOOL_NAMES[tool]} to level ${S.tools[tool]}`, 'lg-good');
   uiDirty = true;
 }
 function buyBread(n) {
   n = Math.min(n, Math.floor(S.gold / 5));
   if (n <= 0) return;
   S.gold -= n * 5; give('bread', n);
-  log(`🏪 Nupirkta ${n}× Duona`);
+  log(`🏪 Bought ${n}× Bread`);
 }
 
-/* ================= NEPRISIJUNGUS ================= */
+/* ================= OFFLINE ================= */
 
 function snapshot() {
   return { skills: { ...S.skills }, lv: { ...LV }, inv: { ...S.inv }, gold: S.gold, kills: S.kills };
@@ -539,18 +539,18 @@ function showOfflineSummary(sec, before) {
     const d = (S.inv[id] || 0) - (before.inv[id] || 0);
     if (d) lines.push(`${ITEMS[id].icon} ${ITEMS[id].name}: <span class="${d > 0 ? 'have' : 'need'}">${d > 0 ? '+' : ''}${d}</span>`);
   }
-  if (S.gold !== before.gold) lines.push(`🪙 Auksas: +${fmt(S.gold - before.gold)}`);
-  if (S.kills !== before.kills) lines.push(`⚔️ Įveikta priešų: ${S.kills - before.kills}`);
+  if (S.gold !== before.gold) lines.push(`🪙 Gold: +${fmt(S.gold - before.gold)}`);
+  if (S.kills !== before.kills) lines.push(`⚔️ Enemies defeated: ${S.kills - before.kills}`);
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
-  openModal(`<h2>Sveiki sugrįžę!</h2>
-    <p class="muted">Kol jūsų nebuvo (${h ? h + ' val. ' : ''}${m} min.), herojus keliavo toliau:</p>
-    <ul>${lines.map(l => `<li>${l}</li>`).join('') || '<li>Nieko ypatingo nenutiko.</li>'}</ul>
-    <button data-a="close">Tęsti</button>`);
+  openModal(`<h2>Welcome back!</h2>
+    <p class="muted">While you were away (${h ? h + 'h ' : ''}${m}m), your hero kept travelling:</p>
+    <ul>${lines.map(l => `<li>${l}</li>`).join('') || '<li>Nothing much happened.</li>'}</ul>
+    <button data-a="close">Continue</button>`);
 }
 function openModal(html) { document.getElementById('modal-body').innerHTML = html; document.getElementById('modal').hidden = false; }
 function closeModal() { document.getElementById('modal').hidden = true; }
 
-/* ================= PIEŠIMAS ================= */
+/* ================= RENDERING ================= */
 
 const canvas = document.getElementById('scene');
 const ctx = canvas.getContext('2d');
@@ -608,7 +608,7 @@ function drawBackground(z) {
     circle(790, 70, 26, th.sun);
   }
   if (th.cave) {
-    // tolimi kristalai
+    // distant crystals
     for (let i = 0; i < 14; i++) {
       const x = ((hash(i) * 1400 - R.worldX * 0.05) % 1400 + 1400) % 1400 - 200;
       circle(x, 60 + hash(i + 50) * 120, 2 + hash(i + 9) * 2, `rgba(180,140,255,${0.25 + 0.25 * Math.sin(time * 2 + i)})`);
@@ -620,7 +620,7 @@ function drawBackground(z) {
   }
   ridge(0.22, th.mid, GY - 40, 70, 0.006, 4.2, false);
 
-  // artimos dekoracijos
+  // near decorations
   const f = 0.55, off = R.worldX * f, sp = 95;
   const start = Math.floor(off / sp) - 2;
   for (let i = start; i < start + W / sp + 4; i++) {
@@ -636,7 +636,7 @@ function drawBackground(z) {
   }
 
   if (th.cave) {
-    // lubos su stalaktitais
+    // ceiling with stalactites
     ctx.fillStyle = th.near; ctx.beginPath(); ctx.moveTo(0, 0);
     const o2 = R.worldX * 0.7;
     for (let x = 0; x <= W + 10; x += 10) {
@@ -647,7 +647,7 @@ function drawBackground(z) {
     ctx.lineTo(W, 0); ctx.closePath(); ctx.fill();
   }
 
-  // žemė
+  // ground
   ctx.fillStyle = th.ground; ctx.fillRect(0, GY, W, H - GY);
   ctx.fillStyle = th.dirt; ctx.fillRect(0, GY + 14, W, H - GY - 14);
   const go = R.worldX;
@@ -683,7 +683,7 @@ function drawBackground(z) {
   }
 }
 
-/* --- herojus --- */
+/* --- hero --- */
 function heroTool() {
   const a = S.activity;
   if (a === 'combat') {
@@ -761,7 +761,7 @@ function drawHero() {
   }
 }
 
-/* --- priešai --- */
+/* --- enemies --- */
 function drawEnemy(e) {
   const d = e.d, s = d.size;
   let x = entScreenX(e) + e.lunge * -18;
@@ -781,7 +781,7 @@ function drawEnemy(e) {
     const c = d.color, dk = shade(c, -0.15), br = Math.sin(time * 4) * 1;
     const low = e.id === 'lizard' ? 0.6 : 1;
     ctx.save(); ctx.translate(x, GY); ctx.scale(s, s);
-    // uodega
+    // tail
     ctx.strokeStyle = e.id === 'rat' ? '#d9a3a3' : dk; ctx.lineWidth = e.id === 'rat' ? 2 : e.id === 'wolf' ? 7 : 9;
     ctx.beginPath(); ctx.moveTo(26, -20 * low); ctx.quadraticCurveTo(48, -30 * low + Math.sin(time * 6) * 5, 60, -12); ctx.stroke();
     for (const lx of [-18, -8, 10, 20]) rr(lx - 3, -16 * low, 6, 16 * low, 2, lx < 0 ? c : dk);
@@ -846,7 +846,7 @@ function fire(x, y, len, a) {
   ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x - len, y - 30 + Math.sin(time * 30) * 6); ctx.lineTo(x - len, y + 40); ctx.closePath(); ctx.fill();
 }
 
-/* --- ištekliai --- */
+/* --- resource nodes --- */
 function drawNode(e) {
   const x = entScreenX(e);
   const fade = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
@@ -899,7 +899,7 @@ function chips(e) {
   else burst(x - 12, GY + 6, '#bfe2ff', 6);
 }
 
-/* --- efektai --- */
+/* --- effects --- */
 function floatText(sx, y, text, color, life = 1) {
   if (SIM) return;
   floaters.push({ wx: R.worldX + sx - HX + rand(-6, 6), y, text, color, life, max: life });
@@ -925,13 +925,13 @@ function bar(x, y, w, h, frac, color) {
 
 function drawHud() {
   const z = ZONES[S.zone];
-  const act = { combat: '⚔️ Kova', woodcutting: '🪓 Kirtimas', mining: '⛏️ Kasyba', fishing: '🎣 Žvejyba' }[S.activity];
+  const act = { combat: '⚔️ Combat', woodcutting: '🪓 Woodcutting', mining: '⛏️ Mining', fishing: '🎣 Fishing' }[S.activity];
   ctx.font = '600 14px system-ui, sans-serif';
   const label = `${z.name} · ${act}`;
   rr(10, 10, ctx.measureText(label).width + 20, 26, 6, 'rgba(0,0,0,0.45)');
   ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, 20, 23);
 
-  // herojaus HP
+  // hero HP
   bar(HX - 25, GY - 92, 50, 6, S.hp / maxHp(), R.eatFlash > 0 ? '#b6ffb0' : '#5fd35f');
   const e = R.ent;
   if (e && !e.dying && R.phase !== 'walk') {
@@ -948,13 +948,13 @@ function drawHud() {
       const top = e.kind === 'tree' ? GY - 150 : e.kind === 'rock' ? GY - 72 : GY - 40;
       bar(ex - 30, top, 60, 6, e.t / gatherTime(e.skill, e.tier), '#6aa8ff');
       ctx.font = '11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
-      ctx.fillText(`${e.yields} liko`, ex, top - 9); ctx.textAlign = 'left';
+      ctx.fillText(`${e.yields} left`, ex, top - 9); ctx.textAlign = 'left';
     }
   }
   if (R.phase === 'dead') {
     ctx.fillStyle = 'rgba(80,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
     ctx.font = '700 28px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
-    ctx.fillText(`Pralaimėjote... ${Math.ceil(R.deadT)}`, W / 2, H / 2 - 30); ctx.textAlign = 'left';
+    ctx.fillText(`Defeated... ${Math.ceil(R.deadT)}`, W / 2, H / 2 - 30); ctx.textAlign = 'left';
   }
 }
 
@@ -988,36 +988,36 @@ function itemLabel(id) {
 }
 
 function htmlActivity() {
-  const acts = [['combat', '⚔️', 'Kova'], ['woodcutting', '🪓', 'Kirtimas'], ['mining', '⛏️', 'Kasyba'], ['fishing', '🎣', 'Žvejyba']];
-  let h = '<h3>Ką veikti kelionėje?</h3><div class="acts">' + acts.map(([id, ic, n]) =>
+  const acts = [['combat', '⚔️', 'Combat'], ['woodcutting', '🪓', 'Woodcutting'], ['mining', '⛏️', 'Mining'], ['fishing', '🎣', 'Fishing']];
+  let h = '<h3>What to do on the road?</h3><div class="acts">' + acts.map(([id, ic, n]) =>
     `<button class="act ${S.activity === id ? 'sel' : ''}" data-a="activity" data-id="${id}"><span class="big">${ic}</span>${n}
-     <small>${id === 'combat' ? 'Mūšio lygis ' + combatLevel() : 'Lygis ' + LV[id]}</small></button>`).join('') + '</div>';
-  h += '<h3>Vietovė</h3><div class="zones">' + ZONES.map((z, i) => {
+     <small>${id === 'combat' ? 'Combat level ' + combatLevel() : 'Level ' + LV[id]}</small></button>`).join('') + '</div>';
+  h += '<h3>Zone</h3><div class="zones">' + ZONES.map((z, i) => {
     const locked = S.activity === 'combat' && combatLevel() < z.req;
     const what = S.activity === 'combat' ? z.enemies.filter((v, k, a) => a.indexOf(v) === k).map(id => ENEMIES[id].name).join(', ')
-      : S.activity === 'woodcutting' ? TREE_N[i] : S.activity === 'mining' ? METAL[i] + ' rūda' : FISH_N[i];
+      : S.activity === 'woodcutting' ? TREE_N[i] : S.activity === 'mining' ? METAL[i] + ' Ore' : FISH_N[i];
     return `<button class="zone ${S.zone === i ? 'sel' : ''}" ${locked ? 'disabled' : ''} data-a="zone" data-id="${i}">
-      <b>${locked ? '🔒 ' : ''}${z.name}</b><small>${S.activity === 'combat' ? 'Reikia mūšio lygio ' + z.req : 'Ištekliai iki: ' + what}</small>
+      <b>${locked ? '🔒 ' : ''}${z.name}</b><small>${S.activity === 'combat' ? 'Requires combat level ' + z.req : 'Resources up to: ' + what}</small>
       ${S.activity === 'combat' ? `<small>${what}</small>` : ''}</button>`;
   }).join('') + '</div>';
 
   h += '<div class="info">';
   if (S.activity === 'combat') {
-    h += `<div class="row"><b>Kovos stilius:</b>
-      <button class="${S.style === 'attack' ? 'sel' : ''}" data-a="style" data-id="attack">⚔️ Ataka</button>
-      <button class="${S.style === 'defence' ? 'sel' : ''}" data-a="style" data-id="defence">🛡️ Gynyba</button></div>
-      <p class="muted">Pasirinktas įgūdis gauna patirtį už kiekvieną smūgį. Gyvybė visada gauna dalį patirties.
-      Kai gyvybės lieka mažiau nei 40%, herojus automatiškai valgo geriausią turimą maistą.</p>
-      <div class="row muted">Didžiausias smūgis: <b>${playerMaxHit()}</b> · Šarvai: <b>${armorValue()}</b> · Žalos sumažinimas: <b>${Math.round(damageReduction() * 100)}%</b></div>`;
+    h += `<div class="row"><b>Combat style:</b>
+      <button class="${S.style === 'attack' ? 'sel' : ''}" data-a="style" data-id="attack">⚔️ Attack</button>
+      <button class="${S.style === 'defence' ? 'sel' : ''}" data-a="style" data-id="defence">🛡️ Defence</button></div>
+      <p class="muted">The selected skill earns XP for every hit. Hitpoints always gets a share of XP.
+      When HP drops below 40%, the hero automatically eats the best food available.</p>
+      <div class="row muted">Max hit: <b>${playerMaxHit()}</b> · Armour: <b>${armorValue()}</b> · Damage reduction: <b>${Math.round(damageReduction() * 100)}%</b></div>`;
   } else {
     const sk = S.activity, t = gatherTier(sk);
-    const node = sk === 'woodcutting' ? TREE_N[t] : sk === 'mining' ? METAL[t] + ' rūdos uola' : 'Vandens telkinys (' + FISH_N[t] + ')';
+    const node = sk === 'woodcutting' ? TREE_N[t] : sk === 'mining' ? METAL[t] + ' Rock' : 'Fishing Spot (' + FISH_N[t] + ')';
     const nextT = GATHER_REQ.findIndex((r, i) => i > t && (LV[sk] < r || i > S.zone));
-    h += `<b>Taikinys:</b> ${node}<br><span class="muted">${gatherTime(sk, t).toFixed(2)} s už vienetą · ${GATHER_XP[t]} XP · įrankio lygis ${S.tools[TOOL_OF[sk]]}/4</span>`;
+    h += `<b>Target:</b> ${node}<br><span class="muted">${gatherTime(sk, t).toFixed(2)}s per item · ${GATHER_XP[t]} XP · tool level ${S.tools[TOOL_OF[sk]]}/4</span>`;
     if (nextT > 0) {
       const needLv = LV[sk] < GATHER_REQ[nextT], needZone = nextT > S.zone;
-      h += `<p class="muted">Kitas lygis (${sk === 'woodcutting' ? TREE_N[nextT] : sk === 'mining' ? METAL[nextT] + ' rūda' : FISH_N[nextT]}): ` +
-        [needLv ? `${SKILLS[sk].name} ${GATHER_REQ[nextT]} lygis` : '', needZone ? `vietovė „${ZONES[nextT].name}“` : ''].filter(Boolean).join(' ir ') + '</p>';
+      h += `<p class="muted">Next tier (${sk === 'woodcutting' ? TREE_N[nextT] : sk === 'mining' ? METAL[nextT] + ' Ore' : FISH_N[nextT]}): ` +
+        [needLv ? `${SKILLS[sk].name} level ${GATHER_REQ[nextT]}` : '', needZone ? `zone "${ZONES[nextT].name}"` : ''].filter(Boolean).join(' and ') + '</p>';
     }
   }
   return h + '</div>';
@@ -1036,21 +1036,21 @@ function htmlSkills() {
 
 function htmlInventory() {
   const ids = Object.keys(S.inv);
-  if (!ids.length) return '<p class="muted">Inventorius tuščias. Eikite rinkti išteklių ar kovoti!</p>';
+  if (!ids.length) return '<p class="muted">Your inventory is empty. Go gather resources or fight!</p>';
   const groups = {};
   for (const id of ids) (groups[ITEMS[id].type] = groups[ITEMS[id].type] || []).push(id);
   const total = ids.reduce((a, id) => a + ITEMS[id].value * S.inv[id], 0);
-  let h = `<div class="row" style="justify-content:space-between"><span class="muted">Bendra vertė: <b class="lg-gold">${fmt(total)}</b> aukso</span></div>`;
-  for (const g of ['Ištekliai', 'Maistas', 'Įranga', 'Kita']) {
+  let h = `<div class="row" style="justify-content:space-between"><span class="muted">Total value: <b class="lg-gold">${fmt(total)}</b> gold</span></div>`;
+  for (const g of ['Resources', 'Food', 'Equipment', 'Misc']) {
     if (!groups[g]) continue;
     h += `<h3>${g}</h3><div class="grid">` + groups[g].sort().map(id => {
       const it = ITEMS[id];
       return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${itemLabel(id)}<br>
-        <small>${it.value} 🪙${it.heal ? ' · gydo ' + it.heal : ''}${it.power ? ' · jėga +' + it.power : ''}${it.armor ? ' · šarvai +' + it.armor : ''}${it.req ? ' · Lv ' + it.req : ''}</small></span>
+        <small>${it.value} 🪙${it.heal ? ' · heals ' + it.heal : ''}${it.power ? ' · power +' + it.power : ''}${it.armor ? ' · armour +' + it.armor : ''}${it.req ? ' · Lv ' + it.req : ''}</small></span>
         <span class="ct">${fmt(S.inv[id])}</span></div>
-        <div class="btns">${it.slot ? `<button data-a="equip" data-id="${id}">Užsidėti</button>` : ''}
-        <button data-a="sell" data-id="${id}" data-n="1">Parduoti 1</button>
-        <button data-a="sell" data-id="${id}" data-n="999999">Visus</button></div></div>`;
+        <div class="btns">${it.slot ? `<button data-a="equip" data-id="${id}">Equip</button>` : ''}
+        <button data-a="sell" data-id="${id}" data-n="1">Sell 1</button>
+        <button data-a="sell" data-id="${id}" data-n="999999">Sell all</button></div></div>`;
     }).join('') + '</div>';
   }
   return h;
@@ -1061,44 +1061,44 @@ function matsHtml(mats) {
 }
 
 function htmlSmithing() {
-  return `<p class="muted">Kalkite ginklus ir šarvus iš surinktos rūdos ir rąstų. Kalvystės lygis: <b>${LV.smithing}</b></p><div class="grid">` +
+  return `<p class="muted">Smith weapons and armour from the ore and logs you gather. Smithing level: <b>${LV.smithing}</b></p><div class="grid">` +
     RECIPES.map((r, i) => {
       const it = ITEMS[r.out], locked = LV.smithing < r.req, mx = maxCraft(r.mats);
       return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${itemLabel(r.out)}<br>
-        <small>${it.power ? 'Jėga +' + it.power : 'Šarvai +' + it.armor} · ${r.xp} XP · ${locked ? '🔒 ' : ''}Kalvystė ${r.req}</small></span></div>
+        <small>${it.power ? 'Power +' + it.power : 'Armour +' + it.armor} · ${r.xp} XP · ${locked ? '🔒 ' : ''}Smithing ${r.req}</small></span></div>
         <small>${matsHtml(r.mats)}</small>
-        <div class="btns"><button data-a="smith" data-id="${i}" data-n="1" ${locked || !mx ? 'disabled' : ''}>Kalti 1</button>
+        <div class="btns"><button data-a="smith" data-id="${i}" data-n="1" ${locked || !mx ? 'disabled' : ''}>Smith 1</button>
         <button data-a="smith" data-id="${i}" data-n="10" ${locked || mx < 2 ? 'disabled' : ''}>×10</button>
-        <button data-a="smith" data-id="${i}" data-n="999999" ${locked || !mx ? 'disabled' : ''}>Visus (${mx})</button></div></div>`;
+        <button data-a="smith" data-id="${i}" data-n="999999" ${locked || !mx ? 'disabled' : ''}>All (${mx})</button></div></div>`;
     }).join('') + '</div>';
 }
 
 function htmlCooking() {
-  let h = `<p class="muted">Kepkite žuvį – keptas maistas gydo kovoje. Kuo aukštesnis lygis, tuo rečiau sudega. Kulinarijos lygis: <b>${LV.cooking}</b></p><div class="grid">`;
+  let h = `<p class="muted">Cook fish – cooked food heals you in combat. Higher level means less burning. Cooking level: <b>${LV.cooking}</b></p><div class="grid">`;
   for (let t = 0; t < 5; t++) {
     const locked = LV.cooking < GATHER_REQ[t], n = has('fish' + t);
     const burn = Math.max(0, 0.35 - (LV.cooking - GATHER_REQ[t]) * 0.02);
     h += `<div class="item"><div class="top"><span class="ic">🍽️</span><span class="nm">${itemLabel('cooked' + t)}<br>
-      <small>Gydo ${ITEMS['cooked' + t].heal} · ${GATHER_XP[t]} XP · ${locked ? '🔒 ' : ''}Kulinarija ${GATHER_REQ[t]}${locked ? '' : ' · sudegimo tikimybė ' + Math.round(burn * 100) + '%'}</small></span></div>
-      <small><span class="${n ? 'have' : 'need'}">${FISH_N[t]} (žalia): ${n}</span></small>
-      <div class="btns"><button data-a="cook" data-id="${t}" data-n="1" ${locked || !n ? 'disabled' : ''}>Kepti 1</button>
-      <button data-a="cook" data-id="${t}" data-n="999999" ${locked || !n ? 'disabled' : ''}>Visas (${n})</button></div></div>`;
+      <small>Heals ${ITEMS['cooked' + t].heal} · ${GATHER_XP[t]} XP · ${locked ? '🔒 ' : ''}Cooking ${GATHER_REQ[t]}${locked ? '' : ' · burn chance ' + Math.round(burn * 100) + '%'}</small></span></div>
+      <small><span class="${n ? 'have' : 'need'}">Raw ${FISH_N[t]}: ${n}</span></small>
+      <div class="btns"><button data-a="cook" data-id="${t}" data-n="1" ${locked || !n ? 'disabled' : ''}>Cook 1</button>
+      <button data-a="cook" data-id="${t}" data-n="999999" ${locked || !n ? 'disabled' : ''}>All (${n})</button></div></div>`;
   }
   return h + '</div>';
 }
 
 function htmlShop() {
-  let h = '<h3>Įrankiai</h3><p class="muted">Kiekvienas patobulinimas pagreitina rinkimą 12%.</p><div class="grid">';
+  let h = '<h3>Tools</h3><p class="muted">Each upgrade makes gathering 12% faster.</p><div class="grid">';
   for (const tool of ['axe', 'pick', 'rod']) {
     const l = S.tools[tool], cost = TOOL_COST[l];
     h += `<div class="item"><div class="top"><span class="ic">${{ axe: '🪓', pick: '⛏️', rod: '🎣' }[tool]}</span>
-      <span class="nm">${TOOL_NAMES[tool]}<br><small>Lygis ${l} / 4 · greitis +${l * 12}%</small></span></div>
-      <div class="btns">${l >= 4 ? '<button disabled>Maksimalus</button>' : `<button data-a="tool" data-id="${tool}" ${S.gold < cost ? 'disabled' : ''}>Tobulinti – ${fmt(cost)} 🪙</button>`}</div></div>`;
+      <span class="nm">${TOOL_NAMES[tool]}<br><small>Level ${l} / 4 · speed +${l * 12}%</small></span></div>
+      <div class="btns">${l >= 4 ? '<button disabled>Maxed</button>' : `<button data-a="tool" data-id="${tool}" ${S.gold < cost ? 'disabled' : ''}>Upgrade – ${fmt(cost)} 🪙</button>`}</div></div>`;
   }
-  h += `</div><h3>Maistas</h3><div class="grid"><div class="item"><div class="top"><span class="ic">🍞</span>
-    <span class="nm">Duona<br><small>Gydo 8 · kaina 5 🪙</small></span><span class="ct">${has('bread')}</span></div>
-    <div class="btns"><button data-a="bread" data-n="1" ${S.gold < 5 ? 'disabled' : ''}>Pirkti 1</button>
-    <button data-a="bread" data-n="10" ${S.gold < 50 ? 'disabled' : ''}>Pirkti 10</button></div></div></div>`;
+  h += `</div><h3>Food</h3><div class="grid"><div class="item"><div class="top"><span class="ic">🍞</span>
+    <span class="nm">Bread<br><small>Heals 8 · costs 5 🪙</small></span><span class="ct">${has('bread')}</span></div>
+    <div class="btns"><button data-a="bread" data-n="1" ${S.gold < 5 ? 'disabled' : ''}>Buy 1</button>
+    <button data-a="bread" data-n="10" ${S.gold < 50 ? 'disabled' : ''}>Buy 10</button></div></div></div>`;
   return h;
 }
 
@@ -1112,15 +1112,15 @@ function renderHero() {
   const mh = maxHp();
   const food = FOOD_ORDER.reduce((a, id) => a + has(id), 0);
   const eq = slot => S.equip[slot]
-    ? `<span>${itemLabel(S.equip[slot])}</span><button data-a="unequip" data-id="${slot}">Nusiimti</button>`
+    ? `<span>${itemLabel(S.equip[slot])}</span><button data-a="unequip" data-id="${slot}">Unequip</button>`
     : '<span class="muted">—</span>';
-  const html = `<h3>Herojus</h3>
-    <div class="row" style="justify-content:space-between"><span>❤️ ${Math.ceil(Math.max(0, S.hp))} / ${mh}</span><span class="muted">Mūšio lygis ${combatLevel()}</span></div>
+  const html = `<h3>Hero</h3>
+    <div class="row" style="justify-content:space-between"><span>❤️ ${Math.ceil(Math.max(0, S.hp))} / ${mh}</span><span class="muted">Combat level ${combatLevel()}</span></div>
     <div class="bar hp" style="margin:6px 0 10px"><i style="width:${(clamp(S.hp / mh, 0, 1) * 100).toFixed(1)}%"></i></div>
-    <div class="eq"><span class="muted">🗡️ Ginklas</span></div><div class="eq">${eq('weapon')}</div>
-    <div class="eq"><span class="muted">🥋 Šarvai</span></div><div class="eq">${eq('armor')}</div>
-    <div class="eq"><span class="muted">🍽️ Maisto</span><span>${food}</span></div>
-    <div class="eq"><span class="muted">⚔️ Įveikta priešų</span><span>${fmt(S.kills)}</span></div>`;
+    <div class="eq"><span class="muted">🗡️ Weapon</span></div><div class="eq">${eq('weapon')}</div>
+    <div class="eq"><span class="muted">🥋 Armour</span></div><div class="eq">${eq('armor')}</div>
+    <div class="eq"><span class="muted">🍽️ Food</span><span>${food}</span></div>
+    <div class="eq"><span class="muted">⚔️ Enemies defeated</span><span>${fmt(S.kills)}</span></div>`;
   if (html !== lastHero) { $('#hero').innerHTML = html; lastHero = html; }
   $('#gold b').textContent = fmt(S.gold);
   $('#cmb b').textContent = combatLevel();
@@ -1153,29 +1153,29 @@ document.addEventListener('click', ev => {
     case 'cook': cook(+id, n); break;
     case 'tool': buyTool(id); break;
     case 'bread': buyBread(n); break;
-    case 'save': save(); log('💾 Žaidimas išsaugotas.'); break;
+    case 'save': save(); log('💾 Game saved.'); break;
     case 'close': closeModal(); break;
     case 'reset':
-      openModal(`<h2>Pradėti iš naujo?</h2><p>Visa pažanga bus ištrinta negrįžtamai.</p>
-        <div class="row"><button data-a="reset-yes">Taip, ištrinti</button><button data-a="close">Atšaukti</button></div>`);
+      openModal(`<h2>Start over?</h2><p>All progress will be permanently deleted.</p>
+        <div class="row"><button data-a="reset-yes">Yes, delete</button><button data-a="close">Cancel</button></div>`);
       break;
     case 'reset-yes':
       S = newState(); recalcLevels(); R.phase = 'walk'; R.ent = null; R.worldX = 0;
-      logLines = []; renderLog(); save(); closeModal(); log('Nauja kelionė prasideda!');
+      logLines = []; renderLog(); save(); closeModal(); log('A new journey begins!');
       break;
   }
   uiDirty = true;
   renderTab(); renderHero();
 });
 
-/* ================= CIKLAS ================= */
+/* ================= LOOP ================= */
 
 let lastFrame = performance.now(), uiTimer = 0, saveTimer = 0;
 function frame(now) {
   let dt = (now - lastFrame) / 1000;
   lastFrame = now;
   if (dt > 1) {
-    // skirtukas buvo paslėptas – greitai prasukame praėjusį laiką
+    // tab was hidden – fast-forward the elapsed time
     const before = snapshot();
     const sec = simulate(dt);
     if (sec > 60) showOfflineSummary(sec, before);
@@ -1198,7 +1198,7 @@ function init() {
     const sec = simulate(away);
     showOfflineSummary(sec, before);
   }
-  log('Sveiki atvykę! Herojus leidžiasi į begalinį kelią.');
+  log('Welcome! Your hero sets off on the endless road.');
   renderTab(true); renderHero();
   window.addEventListener('beforeunload', save);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
