@@ -1,0 +1,1210 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Begalinis Kelias</title>
+<style>
+  :root {
+    --bg: #14121c;
+    --panel: #1f1c2b;
+    --panel2: #2a2639;
+    --line: #3a3550;
+    --text: #e9e6f2;
+    --muted: #9d97b3;
+    --accent: #f2c94c;
+    --good: #6fd27a;
+    --bad: #e86a6a;
+    --xp: #6aa8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  header .stat { color: var(--muted); }
+  header .stat b { color: var(--text); }
+  #gold b { color: var(--accent); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 12px 16px; }
+  #scene {
+    width: 100%; aspect-ratio: 3 / 1; display: block;
+    border-radius: 10px; border: 1px solid var(--line); background: #000;
+    image-rendering: auto;
+  }
+  main { display: grid; grid-template-columns: 1fr 320px; gap: 12px; margin-top: 12px; }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); }
+  nav.tabs button { flex: 1 1 auto; }
+  #tab-content { padding: 12px; min-height: 260px; }
+  button {
+    font: inherit; color: var(--text); background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: #5a5378; background: #332e46; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.sel { border-color: var(--accent); background: #3a3320; }
+  h3 { margin: 14px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  h3:first-child { margin-top: 0; }
+  .acts, .zones { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .act, .zone { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px; }
+  .act .big { font-size: 22px; }
+  small, .muted { color: var(--muted); font-size: 12px; }
+  .info { background: var(--panel2); border-radius: 8px; padding: 10px; margin-top: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .item { background: var(--panel2); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .item .top { display: flex; align-items: center; gap: 8px; }
+  .item .ic { font-size: 20px; width: 26px; text-align: center; }
+  .item .nm { flex: 1; }
+  .item .ct { font-weight: 700; }
+  .item .btns { display: flex; gap: 4px; flex-wrap: wrap; }
+  .item .btns button { padding: 3px 8px; font-size: 12px; }
+  .tier { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  .bar { height: 8px; background: #0e0c14; border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--xp); }
+  .bar.hp > i { background: var(--good); }
+  .skill { background: var(--panel2); border-radius: 8px; padding: 10px; }
+  .skill .top { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .skill .lv { font-weight: 700; color: var(--accent); }
+  aside .card { padding: 12px; margin-bottom: 12px; }
+  .eq { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+  .eq button { padding: 2px 8px; font-size: 12px; }
+  #log { max-height: 260px; overflow-y: auto; font-size: 12.5px; display: flex; flex-direction: column; gap: 2px; }
+  #log div { padding: 2px 0; border-bottom: 1px dashed #2c283b; }
+  .lg-good { color: var(--good); }
+  .lg-bad { color: var(--bad); }
+  .lg-gold { color: var(--accent); }
+  .lg-xp { color: var(--xp); }
+  .have { color: var(--good); } .need { color: var(--bad); }
+  #modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10;
+  }
+  #modal[hidden] { display: none; }
+  #modal .card { max-width: 440px; width: 100%; padding: 18px; max-height: 80vh; overflow-y: auto; }
+  #modal h2 { margin: 0 0 10px; font-size: 18px; }
+  #modal ul { padding-left: 18px; margin: 6px 0 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🗺️ Begalinis Kelias</h1>
+  <span class="stat" id="gold">Auksas: <b>0</b></span>
+  <span class="stat" id="cmb">Mūšio lygis: <b>1</b></span>
+  <span class="stat" id="dist">Nueita: <b>0 m</b></span>
+</header>
+<div class="wrap">
+  <canvas id="scene"></canvas>
+  <main>
+    <section class="card">
+      <nav class="tabs">
+        <button data-tab="activity" class="sel">🧭 Veikla</button>
+        <button data-tab="skills">📈 Įgūdžiai</button>
+        <button data-tab="inventory">🎒 Inventorius</button>
+        <button data-tab="smithing">🔨 Kalvė</button>
+        <button data-tab="cooking">🍳 Virtuvė</button>
+        <button data-tab="shop">🏪 Parduotuvė</button>
+      </nav>
+      <div id="tab-content"></div>
+    </section>
+    <aside>
+      <div class="card" id="hero"></div>
+      <div class="card">
+        <h3>Žurnalas</h3>
+        <div id="log"></div>
+      </div>
+      <div class="card row">
+        <button data-a="save">💾 Išsaugoti</button>
+        <button data-a="reset">🗑️ Pradėti iš naujo</button>
+      </div>
+    </aside>
+  </main>
+</div>
+<div id="modal" hidden><div class="card" id="modal-body"></div></div>
+
+<script>
+'use strict';
+
+/* ================= DUOMENYS ================= */
+
+const SKILLS = {
+  attack:      { name: 'Ataka',      icon: '⚔️' },
+  defence:     { name: 'Gynyba',     icon: '🛡️' },
+  hitpoints:   { name: 'Gyvybė',     icon: '❤️' },
+  woodcutting: { name: 'Kirtimas',   icon: '🪓' },
+  mining:      { name: 'Kasyba',     icon: '⛏️' },
+  fishing:     { name: 'Žvejyba',    icon: '🎣' },
+  smithing:    { name: 'Kalvystė',   icon: '🔨' },
+  cooking:     { name: 'Kulinarija', icon: '🍳' },
+};
+
+// RuneScape/Melvor stiliaus XP kreivė
+const XP_TABLE = [0, 0];
+{ let pts = 0; for (let l = 1; l < 99; l++) { pts += Math.floor(l + 300 * Math.pow(2, l / 7)); XP_TABLE[l + 1] = Math.floor(pts / 4); } }
+function levelFromXp(xp) { let l = 1; while (l < 99 && xp >= XP_TABLE[l + 1]) l++; return l; }
+
+const TIER_COLORS = ['#c87533', '#9aa0a8', '#dfe3ee', '#f2c94c', '#4fd6e8'];
+const CANOPY = ['#8ccf6b', '#3f8f3a', '#d0702f', '#2f6b45', '#b06be0'];
+const METAL = ['Vario', 'Geležies', 'Sidabro', 'Aukso', 'Mitrilo'];
+const TREE_N = ['Beržas', 'Ąžuolas', 'Klevas', 'Kukmedis', 'Magiškas medis'];
+const LOG_N = ['Beržo rąstas', 'Ąžuolo rąstas', 'Klevo rąstas', 'Kukmedžio rąstas', 'Magiškas rąstas'];
+const FISH_N = ['Kuoja', 'Ešerys', 'Lydeka', 'Lašiša', 'Ungurys'];
+const COOKED_N = ['Kepta kuoja', 'Keptas ešerys', 'Kepta lydeka', 'Kepta lašiša', 'Keptas ungurys'];
+const GATHER_REQ = [1, 10, 20, 30, 40];
+const GATHER_TIME = [2.4, 2.8, 3.2, 3.6, 4.0];
+const GATHER_XP = [10, 20, 35, 55, 80];
+const TOOL_COST = [100, 500, 2000, 8000];
+const TOOL_NAMES = { axe: 'Kirvis', pick: 'Kirtiklis', rod: 'Meškerė' };
+const TOOL_OF = { woodcutting: 'axe', mining: 'pick', fishing: 'rod' };
+
+const ITEMS = {};
+function defItem(id, o) { ITEMS[id] = Object.assign({ id }, o); }
+for (let t = 0; t < 5; t++) {
+  defItem('log' + t,    { name: LOG_N[t], icon: '🪵', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Ištekliai' });
+  defItem('ore' + t,    { name: METAL[t] + ' rūda', icon: '🪨', tier: t, value: [3, 7, 14, 28, 55][t], type: 'Ištekliai' });
+  defItem('fish' + t,   { name: FISH_N[t] + ' (žalia)', icon: '🐟', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Ištekliai' });
+  defItem('cooked' + t, { name: COOKED_N[t], icon: '🍽️', tier: t, value: [5, 12, 25, 50, 100][t], heal: [12, 20, 32, 46, 65][t], type: 'Maistas' });
+  defItem('sword' + t,  { name: METAL[t] + ' kardas', icon: '🗡️', tier: t, value: [30, 90, 250, 600, 1500][t], slot: 'weapon', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Įranga' });
+  defItem('armor' + t,  { name: METAL[t] + ' šarvai', icon: '🥋', tier: t, value: [50, 150, 400, 1000, 2500][t], slot: 'armor', armor: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Įranga' });
+}
+defItem('bread', { name: 'Duona', icon: '🍞', value: 2, heal: 8, type: 'Maistas' });
+defItem('burnt', { name: 'Sudegusi žuvis', icon: '⚫', value: 1, type: 'Kita' });
+defItem('bones', { name: 'Kaulai', icon: '🦴', value: 3, type: 'Kita' });
+defItem('gem',   { name: 'Brangakmenis', icon: '💎', value: 150, type: 'Kita' });
+defItem('scale', { name: 'Drakono žvynas', icon: '🐉', value: 600, type: 'Kita' });
+const FOOD_ORDER = ['cooked4', 'cooked3', 'cooked2', 'cooked1', 'cooked0', 'bread'];
+
+const RECIPES = [];
+for (let t = 0; t < 5; t++) {
+  RECIPES.push({ out: 'sword' + t, req: [1, 10, 20, 30, 40][t], xp: [15, 30, 55, 90, 140][t], mats: { ['ore' + t]: 3, ['log' + t]: 1 } });
+  RECIPES.push({ out: 'armor' + t, req: [5, 15, 25, 35, 45][t], xp: [25, 50, 90, 150, 230][t], mats: { ['ore' + t]: 5 } });
+}
+
+// drops: [daiktas, tikimybė, min, max]
+const ENEMIES = {
+  slime:    { name: 'Gleivė',         hp: 12,   maxHit: 2,  atk: 1,  def: 1,  speed: 2.6, gold: [1, 3],     shape: 'blob',     size: 1,   color: '#5fd35f', drops: [] },
+  rat:      { name: 'Žiurkė',         hp: 18,   maxHit: 3,  atk: 3,  def: 2,  speed: 2.2, gold: [1, 4],     shape: 'quad',     size: .6,  color: '#8a7f75', drops: [['bones', .5, 1, 1]] },
+  goblin:   { name: 'Goblinas',       hp: 40,   maxHit: 5,  atk: 7,  def: 6,  speed: 2.4, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#7a5a3a', drops: [['bones', .6, 1, 1], ['ore0', .25, 2, 4]] },
+  wolf:     { name: 'Vilkas',         hp: 55,   maxHit: 7,  atk: 9,  def: 8,  speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
+  bat:      { name: 'Šikšnosparnis',  hp: 80,   maxHit: 9,  atk: 13, def: 12, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
+  skeleton: { name: 'Skeletas',       hp: 120,  maxHit: 12, atk: 17, def: 16, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['ore1', .25, 2, 4]] },
+  orc:      { name: 'Orkas',          hp: 200,  maxHit: 17, atk: 24, def: 24, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bones', 1, 1, 2], ['ore2', .25, 2, 4], ['gem', .03, 1, 1]] },
+  troll:    { name: 'Trolis',         hp: 320,  maxHit: 22, atk: 28, def: 30, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bones', 1, 2, 4], ['ore3', .2, 2, 4], ['gem', .05, 1, 1]] },
+  lizard:   { name: 'Ugnies driežas', hp: 450,  maxHit: 28, atk: 36, def: 38, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', drops: [['bones', 1, 1, 2], ['ore4', .2, 1, 3], ['gem', .06, 1, 1]] },
+  dragon:   { name: 'Drakonas',       hp: 1200, maxHit: 45, atk: 48, def: 50, speed: 3.2, gold: [200, 400], shape: 'dragon',   size: 1,   color: '#9b2222', drops: [['scale', 1, 1, 1], ['gem', .3, 1, 2]] },
+};
+
+const ZONES = [
+  { name: 'Žalioji pieva',   req: 1,  enemies: ['slime', 'rat'],
+    th: { sky: ['#78c4ff', '#dff3ff'], far: '#a9cbe0', mid: '#79c062', near: '#4c9a3f', ground: '#5c9a3c', dirt: '#7a5a3a', sun: '#fff3a0', decor: 'tree' } },
+  { name: 'Tamsusis miškas', req: 5,  enemies: ['goblin', 'wolf'],
+    th: { sky: ['#3f6b7d', '#a5c6b2'], far: '#4f7366', mid: '#2f5d3a', near: '#1b3b24', ground: '#365f2b', dirt: '#4a3826', sun: '#e8f0c0', decor: 'pine' } },
+  { name: 'Šešėlių urvai',   req: 12, enemies: ['bat', 'skeleton'],
+    th: { sky: ['#140f1d', '#352841'], far: '#2a2134', mid: '#3a2e46', near: '#22192b', ground: '#4a3f4f', dirt: '#2a2230', sun: null, decor: 'stalag', cave: true } },
+  { name: 'Ledo kalnai',     req: 22, enemies: ['orc', 'troll'],
+    th: { sky: ['#8fa9cc', '#eef4fb'], far: '#d3deeb', mid: '#97aac0', near: '#5f7186', ground: '#e9eff6', dirt: '#a3b0be', sun: '#ffffff', decor: 'rock', snow: true } },
+  { name: 'Drakono lizdas',  req: 32, enemies: ['lizard', 'lizard', 'lizard', 'dragon'],
+    th: { sky: ['#2a0808', '#c2481e'], far: '#5a1a14', mid: '#3a1410', near: '#1c0806', ground: '#2b1a17', dirt: '#140b09', sun: '#ffb347', decor: 'spike', lava: true } },
+];
+
+/* ================= BŪSENA ================= */
+
+const SAVE_KEY = 'begalinis-kelias-v1';
+const OFFLINE_CAP = 12 * 3600;
+let S = null;          // išsaugoma būsena
+let LV = {};           // lygių talpykla
+let SIM = false;       // greita simuliacija (neprisijungus) - be vizualų
+const R = {            // vykdymo būsena (nesaugoma)
+  worldX: 0, phase: 'walk', ent: null, atkT: 0, deadT: 0, doneT: 0,
+  swing: 0, eatFlash: 0,
+};
+let time = 0;
+let floaters = [], particles = [], logLines = [];
+let uiDirty = true;
+
+function newState() {
+  return {
+    v: 1, gold: 25, skills: Object.fromEntries(Object.keys(SKILLS).map(k => [k, 0])),
+    inv: { bread: 5 }, equip: { weapon: null, armor: null }, tools: { axe: 0, pick: 0, rod: 0 },
+    activity: 'combat', zone: 0, style: 'attack', hp: 50, kills: 0, dist: 0, last: Date.now(),
+  };
+}
+function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
+
+function save() {
+  S.last = Date.now();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* saugykla nepasiekiama */ }
+}
+function load() {
+  let data = null;
+  try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { data = null; }
+  const base = newState();
+  if (data && data.v === 1) {
+    S = Object.assign(base, data);
+    S.skills = Object.assign(base.skills, data.skills);
+    S.tools = Object.assign({ axe: 0, pick: 0, rod: 0 }, data.tools);
+    S.equip = Object.assign({ weapon: null, armor: null }, data.equip);
+  } else S = base;
+  recalcLevels();
+}
+
+/* ================= PAGALBINĖS ================= */
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = n => Math.floor(n).toLocaleString('lt-LT');
+
+function log(msg, cls = '') {
+  if (SIM) return;
+  logLines.unshift({ msg, cls });
+  if (logLines.length > 60) logLines.pop();
+  renderLog();
+}
+function give(id, n = 1) { S.inv[id] = (S.inv[id] || 0) + n; uiDirty = true; }
+function take(id, n = 1) {
+  if ((S.inv[id] || 0) < n) return false;
+  S.inv[id] -= n; if (S.inv[id] <= 0) delete S.inv[id];
+  uiDirty = true; return true;
+}
+function has(id) { return S.inv[id] || 0; }
+
+function addXp(skill, amt) {
+  const before = LV[skill];
+  S.skills[skill] += amt;
+  LV[skill] = levelFromXp(S.skills[skill]);
+  if (LV[skill] > before) {
+    if (skill === 'hitpoints') S.hp += (LV[skill] - before) * 10;
+    log(`${SKILLS[skill].icon} ${SKILLS[skill].name} pakilo iki ${LV[skill]} lygio!`, 'lg-xp');
+    floatText(HX, GY - 140, `${SKILLS[skill].name} ${LV[skill]}!`, '#6aa8ff', 1.6);
+  }
+  uiDirty = true;
+}
+
+function combatLevel() { return Math.floor((LV.attack + LV.defence + LV.hitpoints) / 3); }
+function maxHp() { return 40 + LV.hitpoints * 10; }
+function weaponPower() { return S.equip.weapon ? ITEMS[S.equip.weapon].power : 0; }
+function armorValue() { return S.equip.armor ? ITEMS[S.equip.armor].armor : 0; }
+function playerMaxHit() { return Math.floor(4 + LV.attack * 0.7 + weaponPower()); }
+const PLAYER_SPEED = 1.8;
+function playerHitChance(e) { return clamp(0.6 + (LV.attack + weaponPower() * 0.5 - e.def) * 0.03, 0.1, 0.95); }
+function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue()) * 0.03, 0.05, 0.95); }
+function damageReduction() { return Math.min(0.6, armorValue() * 0.02 + LV.defence * 0.003); }
+
+function gatherTier(skill) {
+  let t = 0;
+  for (let i = 0; i < 5; i++) if (LV[skill] >= GATHER_REQ[i]) t = i;
+  return Math.min(t, S.zone);
+}
+function gatherTime(skill, tier) { return GATHER_TIME[tier] * (1 - 0.12 * S.tools[TOOL_OF[skill]]); }
+
+/* ================= ŽAIDIMO LOGIKA ================= */
+
+const W = 960, H = 320, GY = 262, HX = 230, WALK = 230;
+
+function spawnEntity() {
+  const x = R.worldX + (W - HX) + 60 + Math.random() * 140;
+  const act = S.activity;
+  if (act === 'combat') {
+    const pool = ZONES[S.zone].enemies;
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    const d = ENEMIES[id];
+    const stop = d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size;
+    R.ent = { kind: 'enemy', id, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0 };
+  } else {
+    const tier = gatherTier(act);
+    const yields = randi(3, 6);
+    const kind = act === 'woodcutting' ? 'tree' : act === 'mining' ? 'rock' : 'pond';
+    const stop = kind === 'pond' ? 135 : kind === 'tree' ? 58 : 62;
+    R.ent = { kind, skill: act, tier, yields, maxYields: yields, t: 0, x, stop, hit: 0, swung: false };
+  }
+}
+
+function startAct() {
+  R.atkT = PLAYER_SPEED * 0.35;
+}
+
+function tick(dt) {
+  time += dt;
+  if (R.phase === 'walk') {
+    R.worldX += WALK * dt;
+    S.dist += WALK * dt / 40;
+    S.hp = Math.min(maxHp(), S.hp + maxHp() * 0.02 * dt);
+    if (!R.ent) spawnEntity();
+    if (R.ent.x - R.worldX <= R.ent.stop) { R.phase = 'act'; startAct(); }
+  } else if (R.phase === 'act') {
+    if (R.ent.kind === 'enemy') combatTick(dt); else gatherTick(dt);
+  } else if (R.phase === 'dead') {
+    R.deadT -= dt;
+    if (R.deadT <= 0) { S.hp = maxHp(); R.phase = 'walk'; R.ent = null; log('Atsikėlėte ir keliaujate toliau.'); }
+  } else if (R.phase === 'done') {
+    R.doneT -= dt;
+    if (R.doneT <= 0) { R.ent = null; R.phase = 'walk'; }
+  }
+  if (!SIM) updateVisuals(dt);
+}
+
+function combatTick(dt) {
+  const e = R.ent;
+  R.atkT -= dt; e.atkT -= dt;
+  if (R.atkT <= 0) {
+    R.atkT += PLAYER_SPEED;
+    R.swing = 1;
+    if (Math.random() < playerHitChance(e)) {
+      const dmg = Math.min(e.hp, 1 + Math.floor(Math.random() * playerMaxHit()));
+      e.hp -= dmg; e.hit = 1;
+      addXp(S.style, dmg * 4);
+      addXp('hitpoints', dmg * 1.33);
+      floatText(entScreenX(e), GY - entHeight(e) - 10, '-' + dmg, '#ffd166');
+      burst(entScreenX(e), GY - entHeight(e) * 0.55, '#ff5a5a', 6);
+    } else floatText(entScreenX(e), GY - entHeight(e) - 10, 'Nepataikė', '#bbbbbb');
+  }
+  if (e.hp <= 0) { killEnemy(e); return; }
+  if (e.atkT <= 0) {
+    e.atkT += e.d.speed;
+    e.lunge = 1;
+    if (Math.random() < enemyHitChance(e)) {
+      const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
+      const dmg = Math.max(1, Math.round(raw * (1 - damageReduction())));
+      S.hp -= dmg;
+      addXp('defence', S.style === 'defence' ? 0 : dmg * 0.5);
+      floatText(HX, GY - 108, '-' + dmg, '#ff6b6b');
+      burst(HX + 4, GY - 40, '#c22', 5);
+    } else floatText(HX, GY - 108, 'Išvengta', '#9ad');
+  }
+  autoEat();
+  if (S.hp <= 0) die();
+}
+
+function autoEat() {
+  let guard = 10;
+  while (S.hp < maxHp() * 0.4 && guard-- > 0) {
+    const food = FOOD_ORDER.find(id => has(id));
+    if (!food) return;
+    take(food);
+    S.hp = Math.min(maxHp(), S.hp + ITEMS[food].heal);
+    R.eatFlash = 1;
+    floatText(HX, GY - 124, '+' + ITEMS[food].heal, '#6fd27a');
+  }
+}
+
+function die() {
+  S.hp = 0; R.phase = 'dead'; R.deadT = 4;
+  log(`💀 Jus įveikė ${R.ent.d.name}. Atsigaunate...`, 'lg-bad');
+  uiDirty = true;
+}
+
+function killEnemy(e) {
+  const g = randi(e.d.gold[0], e.d.gold[1]);
+  S.gold += g; S.kills++;
+  const got = [`${g} aukso`];
+  for (const [id, ch, mn, mx] of e.d.drops) {
+    if (Math.random() < ch) { const n = randi(mn, mx); give(id, n); got.push(`${n}× ${ITEMS[id].name}`); }
+  }
+  log(`⚔️ Įveikėte: ${e.d.name} (${got.join(', ')})`, 'lg-gold');
+  floatText(entScreenX(e), GY - entHeight(e) - 30, '+' + g + ' 🪙', '#f2c94c', 1.4);
+  burst(entScreenX(e), GY - entHeight(e) * 0.5, e.d.color, 18);
+  R.phase = 'done'; R.doneT = 0.6; e.dying = true;
+  uiDirty = true;
+}
+
+function gatherTick(dt) {
+  const e = R.ent;
+  const need = gatherTime(e.skill, e.tier);
+  e.t += dt;
+  if (!e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; chips(e); }
+  if (e.t >= need) {
+    e.t -= need; e.swung = false; R.swing = 1; e.hit = 1; chips(e);
+    const item = (e.kind === 'tree' ? 'log' : e.kind === 'rock' ? 'ore' : 'fish') + e.tier;
+    give(item);
+    addXp(e.skill, GATHER_XP[e.tier]);
+    floatText(entScreenX(e), GY - 120, `+1 ${ITEMS[item].icon}`, '#ffffff');
+    e.yields--;
+    if (e.yields <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
+  }
+}
+
+function setActivity(a) {
+  if (S.activity === a) return;
+  S.activity = a;
+  if (a === 'combat' && combatLevel() < ZONES[S.zone].req) {
+    S.zone = ZONES.reduce((best, z, i) => combatLevel() >= z.req ? i : best, 0);
+  }
+  resetEncounter();
+}
+function setZone(i) {
+  if (S.activity === 'combat' && combatLevel() < ZONES[i].req) return;
+  S.zone = i; resetEncounter();
+}
+function resetEncounter() {
+  if (R.phase !== 'dead') { R.phase = 'walk'; R.ent = null; }
+  uiDirty = true;
+}
+
+/* ===== Gamyba, parduotuvė, inventorius ===== */
+
+function maxCraft(mats) { return Math.min(...Object.entries(mats).map(([id, n]) => Math.floor(has(id) / n))); }
+
+function smith(i, n) {
+  const r = RECIPES[i];
+  if (LV.smithing < r.req) return;
+  n = Math.min(n, maxCraft(r.mats));
+  if (n <= 0) return;
+  for (const [id, c] of Object.entries(r.mats)) take(id, c * n);
+  give(r.out, n);
+  addXp('smithing', r.xp * n);
+  log(`🔨 Nukalta: ${n}× ${ITEMS[r.out].name}`, 'lg-good');
+}
+
+function cook(t, n) {
+  if (LV.cooking < GATHER_REQ[t]) return;
+  n = Math.min(n, has('fish' + t));
+  if (n <= 0) return;
+  let ok = 0, burnt = 0;
+  for (let k = 0; k < n; k++) {
+    take('fish' + t);
+    const burnChance = Math.max(0, 0.35 - (LV.cooking - GATHER_REQ[t]) * 0.02);
+    if (Math.random() < burnChance) { give('burnt'); burnt++; }
+    else { give('cooked' + t); ok++; addXp('cooking', GATHER_XP[t]); }
+  }
+  log(`🍳 Iškepta ${ok}× ${COOKED_N[t]}` + (burnt ? `, sudegė ${burnt}` : ''), 'lg-good');
+}
+
+function sell(id, n) {
+  n = Math.min(n, has(id));
+  if (n <= 0) return;
+  take(id, n);
+  const g = ITEMS[id].value * n;
+  S.gold += g;
+  log(`💰 Parduota ${n}× ${ITEMS[id].name} už ${fmt(g)} aukso`, 'lg-gold');
+}
+
+function equip(id) {
+  const it = ITEMS[id];
+  if (!it.slot) return;
+  const skill = it.slot === 'weapon' ? 'attack' : 'defence';
+  if (LV[skill] < it.req) { log(`Reikia ${SKILLS[skill].name} ${it.req} lygio.`, 'lg-bad'); return; }
+  if (!take(id)) return;
+  if (S.equip[it.slot]) give(S.equip[it.slot]);
+  S.equip[it.slot] = id;
+  log(`Užsidėjote: ${it.name}`);
+}
+function unequip(slot) {
+  if (!S.equip[slot]) return;
+  give(S.equip[slot]); S.equip[slot] = null; uiDirty = true;
+}
+
+function buyTool(tool) {
+  const lvl = S.tools[tool];
+  if (lvl >= 4 || S.gold < TOOL_COST[lvl]) return;
+  S.gold -= TOOL_COST[lvl]; S.tools[tool]++;
+  log(`🏪 Patobulinta: ${TOOL_NAMES[tool]} (${S.tools[tool]} lygis)`, 'lg-good');
+  uiDirty = true;
+}
+function buyBread(n) {
+  n = Math.min(n, Math.floor(S.gold / 5));
+  if (n <= 0) return;
+  S.gold -= n * 5; give('bread', n);
+  log(`🏪 Nupirkta ${n}× Duona`);
+}
+
+/* ================= NEPRISIJUNGUS ================= */
+
+function snapshot() {
+  return { skills: { ...S.skills }, lv: { ...LV }, inv: { ...S.inv }, gold: S.gold, kills: S.kills };
+}
+function simulate(sec) {
+  sec = Math.min(sec, OFFLINE_CAP);
+  SIM = true;
+  const step = 0.2;
+  for (let t = 0; t < sec; t += step) tick(step);
+  SIM = false;
+  floaters = []; particles = [];
+  return sec;
+}
+function showOfflineSummary(sec, before) {
+  const lines = [];
+  for (const k in SKILLS) {
+    const d = S.skills[k] - before.skills[k];
+    if (d >= 1) lines.push(`${SKILLS[k].icon} ${SKILLS[k].name}: +${fmt(d)} XP` + (LV[k] > before.lv[k] ? ` <b>(${before.lv[k]} → ${LV[k]})</b>` : ''));
+  }
+  const ids = new Set([...Object.keys(S.inv), ...Object.keys(before.inv)]);
+  for (const id of ids) {
+    const d = (S.inv[id] || 0) - (before.inv[id] || 0);
+    if (d) lines.push(`${ITEMS[id].icon} ${ITEMS[id].name}: <span class="${d > 0 ? 'have' : 'need'}">${d > 0 ? '+' : ''}${d}</span>`);
+  }
+  if (S.gold !== before.gold) lines.push(`🪙 Auksas: +${fmt(S.gold - before.gold)}`);
+  if (S.kills !== before.kills) lines.push(`⚔️ Įveikta priešų: ${S.kills - before.kills}`);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
+  openModal(`<h2>Sveiki sugrįžę!</h2>
+    <p class="muted">Kol jūsų nebuvo (${h ? h + ' val. ' : ''}${m} min.), herojus keliavo toliau:</p>
+    <ul>${lines.map(l => `<li>${l}</li>`).join('') || '<li>Nieko ypatingo nenutiko.</li>'}</ul>
+    <button data-a="close">Tęsti</button>`);
+}
+function openModal(html) { document.getElementById('modal-body').innerHTML = html; document.getElementById('modal').hidden = false; }
+function closeModal() { document.getElementById('modal').hidden = true; }
+
+/* ================= PIEŠIMAS ================= */
+
+const canvas = document.getElementById('scene');
+const ctx = canvas.getContext('2d');
+function resizeCanvas() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+const hash = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = c => clamp(Math.round(c + amt * 255), 0, 255);
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+function rr(x, y, w, h, r, c) {
+  ctx.fillStyle = c; ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+  ctx.fill();
+}
+function circle(x, y, r, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+function ellipse(x, y, rx, ry, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, Math.PI * 2); ctx.fill(); }
+function poly(pts, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); ctx.fill(); }
+function limb(px, py, w, h, a, c) { ctx.save(); ctx.translate(px, py); ctx.rotate(a); rr(-w / 2, 0, w, h, w / 2, c); ctx.restore(); }
+
+function entScreenX(e) { return e.x - R.worldX + HX; }
+function entHeight(e) {
+  const d = e.d;
+  if (!d) return 100;
+  return { blob: 50, quad: 50, flyer: 110, humanoid: 80, dragon: 170 }[d.shape] * (d.shape === 'dragon' ? 1 : d.size);
+}
+
+function ridge(f, color, base, amp, freq, seed, peaky) {
+  const off = R.worldX * f;
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, H);
+  for (let x = 0; x <= W + 8; x += 8) {
+    const wx = x + off;
+    let n = Math.sin(wx * freq + seed) * 0.6 + Math.sin(wx * freq * 2.3 + seed * 2) * 0.3 + Math.sin(wx * freq * 5.1 + seed * 3) * 0.1;
+    if (peaky) n = 1 - Math.abs(n) * 2;
+    ctx.lineTo(x, base - amp * (0.5 + 0.5 * n));
+  }
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+}
+
+function drawBackground(z) {
+  const th = z.th;
+  const g = ctx.createLinearGradient(0, 0, 0, GY);
+  g.addColorStop(0, th.sky[0]); g.addColorStop(1, th.sky[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  if (th.sun) {
+    const sg = ctx.createRadialGradient(790, 70, 5, 790, 70, 90);
+    sg.addColorStop(0, th.sun); sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sg; ctx.fillRect(690, 0, 200, 170);
+    circle(790, 70, 26, th.sun);
+  }
+  if (th.cave) {
+    // tolimi kristalai
+    for (let i = 0; i < 14; i++) {
+      const x = ((hash(i) * 1400 - R.worldX * 0.05) % 1400 + 1400) % 1400 - 200;
+      circle(x, 60 + hash(i + 50) * 120, 2 + hash(i + 9) * 2, `rgba(180,140,255,${0.25 + 0.25 * Math.sin(time * 2 + i)})`);
+    }
+  }
+  ridge(0.08, th.far, GY - 110, 110, 0.0035, 1.7, th.snow);
+  if (th.snow) {
+    ctx.save(); ctx.globalAlpha = 0.7; ridge(0.08, '#ffffff', GY - 165, 50, 0.0035, 1.7, true); ctx.restore();
+  }
+  ridge(0.22, th.mid, GY - 40, 70, 0.006, 4.2, false);
+
+  // artimos dekoracijos
+  const f = 0.55, off = R.worldX * f, sp = 95;
+  const start = Math.floor(off / sp) - 2;
+  for (let i = start; i < start + W / sp + 4; i++) {
+    const r = hash(i);
+    if (r < 0.4) continue;
+    const x = i * sp - off + r * 50, s = 0.6 + hash(i + 7) * 0.7, c = th.near;
+    const by = GY + 4;
+    if (th.decor === 'tree') { rr(x - 4 * s, by - 50 * s, 8 * s, 50 * s, 2, c); circle(x, by - 60 * s, 24 * s, c); circle(x - 14 * s, by - 48 * s, 16 * s, c); circle(x + 14 * s, by - 50 * s, 16 * s, c); }
+    else if (th.decor === 'pine') { for (let k = 0; k < 3; k++) poly([x - (26 - k * 6) * s, by - (20 + k * 26) * s, x + (26 - k * 6) * s, by - (20 + k * 26) * s, x, by - (60 + k * 28) * s], c); rr(x - 4 * s, by - 22 * s, 8 * s, 22 * s, 1, c); }
+    else if (th.decor === 'stalag') poly([x - 16 * s, by, x + 16 * s, by, x + 2 * s, by - 70 * s], c);
+    else if (th.decor === 'rock') { poly([x - 34 * s, by, x - 20 * s, by - 30 * s, x + 6 * s, by - 42 * s, x + 30 * s, by - 18 * s, x + 36 * s, by], c); poly([x - 8 * s, by - 36 * s, x + 6 * s, by - 42 * s, x + 20 * s, by - 29 * s], '#f4f8fc'); }
+    else if (th.decor === 'spike') { poly([x - 12 * s, by, x + 12 * s, by, x - 4 * s, by - 80 * s], c); poly([x + 6 * s, by, x + 24 * s, by, x + 18 * s, by - 45 * s], c); }
+  }
+
+  if (th.cave) {
+    // lubos su stalaktitais
+    ctx.fillStyle = th.near; ctx.beginPath(); ctx.moveTo(0, 0);
+    const o2 = R.worldX * 0.7;
+    for (let x = 0; x <= W + 10; x += 10) {
+      const wx = x + o2, k = Math.floor(wx / 30);
+      const spike = hash(k) > 0.6 ? (1 - Math.abs((wx % 30) / 15 - 1)) * 50 * hash(k + 3) : 0;
+      ctx.lineTo(x, 22 + Math.sin(wx * 0.01) * 8 + spike);
+    }
+    ctx.lineTo(W, 0); ctx.closePath(); ctx.fill();
+  }
+
+  // žemė
+  ctx.fillStyle = th.ground; ctx.fillRect(0, GY, W, H - GY);
+  ctx.fillStyle = th.dirt; ctx.fillRect(0, GY + 14, W, H - GY - 14);
+  const go = R.worldX;
+  for (let i = Math.floor(go / 36) - 1; i < Math.floor(go / 36) + W / 36 + 2; i++) {
+    const x = i * 36 - go;
+    ctx.fillStyle = shade(th.dirt.length === 7 ? th.dirt : '#333333', -0.06);
+    ctx.fillRect(x + hash(i) * 20, GY + 24 + hash(i + 1) * 30, 6 + hash(i + 2) * 8, 3);
+    if (!th.cave && !th.lava && hash(i + 5) > 0.5) {
+      ctx.fillStyle = th.snow ? '#ffffff' : shade(th.ground, 0.08);
+      poly([x, GY + 2, x + 4, GY - 6, x + 8, GY + 2], ctx.fillStyle);
+    }
+    if (th.lava && hash(i + 3) > 0.7) {
+      ctx.fillStyle = `rgba(255,${120 + 60 * Math.sin(time * 3 + i)},40,0.8)`;
+      ctx.fillRect(x, GY + 16 + hash(i + 4) * 30, 14 + hash(i) * 14, 3);
+    }
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(0, GY + 12, W, 3);
+
+  if (th.snow) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    for (let i = 0; i < 50; i++) {
+      const x = ((hash(i) * W - time * 30 - R.worldX * 0.3) % W + W) % W;
+      const y = ((hash(i + 99) * H + time * (25 + hash(i) * 25)) % H);
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }
+  if (th.lava) {
+    for (let i = 0; i < 25; i++) {
+      const y = H - ((hash(i + 5) * H + time * (30 + hash(i) * 30)) % H);
+      const x = ((hash(i) * W - R.worldX * 0.4) % W + W) % W + Math.sin(time + i) * 10;
+      circle(x, y, 1.5, `rgba(255,170,60,${y / H})`);
+    }
+  }
+}
+
+/* --- herojus --- */
+function heroTool() {
+  const a = S.activity;
+  if (a === 'combat') {
+    const t = S.equip.weapon ? ITEMS[S.equip.weapon].tier : -1;
+    const blade = t >= 0 ? TIER_COLORS[t] : '#8a6a4a';
+    return () => {
+      rr(-1.5, 15, 3, 8, 1, '#5a3a22');
+      rr(-6, 22, 12, 3, 1, '#c9a43a');
+      ctx.fillStyle = blade; ctx.beginPath(); ctx.moveTo(-2.5, 25); ctx.lineTo(2.5, 25); ctx.lineTo(2, 50); ctx.lineTo(0, 55); ctx.lineTo(-2, 50); ctx.closePath(); ctx.fill();
+    };
+  }
+  const tc = TIER_COLORS[Math.min(4, S.tools[TOOL_OF[a]])];
+  if (a === 'woodcutting') return () => { rr(-1.5, 12, 3, 30, 1, '#7a4e2a'); poly([1, 34, 12, 28, 13, 44, 1, 41], tc); };
+  if (a === 'mining') return () => {
+    rr(-1.5, 12, 3, 30, 1, '#7a4e2a');
+    ctx.strokeStyle = tc; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 52, 16, -Math.PI * 0.85, -Math.PI * 0.15); ctx.stroke();
+  };
+  return () => { ctx.strokeStyle = '#7a4e2a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, 80); ctx.stroke(); };
+}
+
+function drawHumanoid(o) {
+  ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.face * o.s, o.s);
+  if (o.rot) ctx.rotate(o.rot);
+  const sw = o.walk || 0;
+  limb(-3, -26, 7, 26, sw, shade(o.leg, -0.1));
+  limb(3, -26, 7, 26, -sw, o.leg);
+  limb(-5, -46, 6, 20, -sw * 0.8 + 0.2, shade(o.body, -0.15));
+  rr(-10, -50, 20, 27, 5, o.body);
+  if (o.ribs) { ctx.fillStyle = '#9a9483'; for (let k = 0; k < 3; k++) ctx.fillRect(-7, -44 + k * 6, 14, 2); }
+  rr(-10, -27, 20, 4, 1, shade(o.body, -0.3));
+  circle(0, -59, 10, o.skin);
+  if (o.headExtra) o.headExtra();
+  ctx.fillStyle = o.eye || '#222'; ctx.fillRect(4, -62, 3, 3);
+  ctx.save(); ctx.translate(5, -46); ctx.rotate(o.arm);
+  if (o.tool) o.tool();
+  rr(-3, 0, 6, 19, 3, shade(o.body, 0.08));
+  circle(0, 19, 3.5, o.skin);
+  ctx.restore();
+  ctx.restore();
+}
+
+function heroArmAngle() {
+  if (R.phase === 'walk') return Math.sin(time * 13) * 0.6;
+  if (R.phase === 'dead') return 0.3;
+  if (S.activity === 'fishing') return -2.05 - R.swing * 0.4;
+  return -0.6 - 1.9 * R.swing;
+}
+
+function drawHero() {
+  const armor = S.equip.armor ? ITEMS[S.equip.armor] : null;
+  const body = armor ? TIER_COLORS[armor.tier] : '#3f6fb5';
+  const walking = R.phase === 'walk';
+  const bob = walking ? Math.abs(Math.sin(time * 13)) * -2 : 0;
+  const dead = R.phase === 'dead';
+  ellipse(HX, GY + 2, 18, 4, 'rgba(0,0,0,0.25)');
+  drawHumanoid({
+    x: dead ? HX - 30 : HX, y: GY + bob - (dead ? 6 : 0), s: 1, face: 1,
+    rot: dead ? -Math.PI / 2 : 0,
+    walk: walking ? Math.sin(time * 13) * 0.6 : 0,
+    arm: heroArmAngle(), body, leg: '#3b3550', skin: '#f1c27d',
+    headExtra: () => {
+      if (armor) { ctx.fillStyle = shade(body, -0.1); ctx.beginPath(); ctx.arc(0, -61, 11, Math.PI, 0); ctx.fill(); ctx.fillRect(-11, -62, 22, 3); }
+      else { ctx.fillStyle = '#6b3e1f'; ctx.beginPath(); ctx.arc(-1, -62, 10.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
+    },
+    tool: heroTool(),
+  });
+  if (S.activity === 'fishing' && R.phase === 'act' && R.ent && R.ent.kind === 'pond') {
+    const a = heroArmAngle();
+    const sx = HX + 5, sy = GY - 46;
+    const tx = sx - Math.sin(a) * 80, ty = sy + Math.cos(a) * 80;
+    const bx = entScreenX(R.ent) - 12 + Math.sin(time * 2) * 3, by = GY + 6 + Math.sin(time * 4) * 1.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo((tx + bx) / 2, ty + 10, bx, by); ctx.stroke();
+    circle(bx, by, 3, '#e84a4a'); ctx.fillStyle = '#fff'; ctx.fillRect(bx - 3, by - 1, 6, 1);
+  }
+}
+
+/* --- priešai --- */
+function drawEnemy(e) {
+  const d = e.d, s = d.size;
+  let x = entScreenX(e) + e.lunge * -18;
+  const dying = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
+  ctx.save();
+  ctx.globalAlpha = dying;
+  if (e.hit > 0.5) ctx.filter = 'brightness(2.2)';
+  if (d.shape !== 'flyer') ellipse(x, GY + 2, 26 * s * (d.shape === 'dragon' ? 3 : 1), 5, 'rgba(0,0,0,0.25)');
+  if (d.shape === 'blob') {
+    const q = 1 + 0.08 * Math.sin(time * 5);
+    const w = 26 * q, h = 22 / q;
+    ellipse(x, GY - h, w, h, d.color);
+    ellipse(x - 6, GY - h - 8, 8, 4, 'rgba(255,255,255,0.35)');
+    circle(x - 9, GY - h - 2, 5, '#fff'); circle(x + 4, GY - h - 2, 5, '#fff');
+    circle(x - 11, GY - h - 1, 2.4, '#111'); circle(x + 2, GY - h - 1, 2.4, '#111');
+  } else if (d.shape === 'quad') {
+    const c = d.color, dk = shade(c, -0.15), br = Math.sin(time * 4) * 1;
+    const low = e.id === 'lizard' ? 0.6 : 1;
+    ctx.save(); ctx.translate(x, GY); ctx.scale(s, s);
+    // uodega
+    ctx.strokeStyle = e.id === 'rat' ? '#d9a3a3' : dk; ctx.lineWidth = e.id === 'rat' ? 2 : e.id === 'wolf' ? 7 : 9;
+    ctx.beginPath(); ctx.moveTo(26, -20 * low); ctx.quadraticCurveTo(48, -30 * low + Math.sin(time * 6) * 5, 60, -12); ctx.stroke();
+    for (const lx of [-18, -8, 10, 20]) rr(lx - 3, -16 * low, 6, 16 * low, 2, lx < 0 ? c : dk);
+    ellipse(0, -22 * low + br, 30, 13 * low, c);
+    if (e.id === 'lizard') for (let k = 0; k < 5; k++) poly([-16 + k * 8, -32 * low, -12 + k * 8, -40 * low, -8 + k * 8, -32 * low], '#ffb04a');
+    circle(-32, -28 * low + br, 11, c);
+    ellipse(-42, -24 * low + br, 9, 6, c);
+    if (e.id !== 'lizard') poly([-34, -36 * low, -28, -46 * low, -24, -34 * low], dk);
+    circle(-36, -30 * low + br, 2.2, e.id === 'wolf' ? '#ffd24a' : '#111');
+    circle(-50, -25 * low + br, 2, '#222');
+    ctx.restore();
+    if (e.id === 'lizard' && e.lunge > 0.4) fire(x - 50 * s, GY - 25 * s, 80, e.lunge);
+  } else if (d.shape === 'flyer') {
+    const cy = GY - 75 + Math.sin(time * 4) * 8, fl = Math.sin(time * 16);
+    poly([x - 6, cy, x - 40, cy - 16 - fl * 14, x - 30, cy + 4, x - 20, cy - 2, x - 12, cy + 8], shade(d.color, -0.1));
+    poly([x + 6, cy, x + 40, cy - 16 - fl * 14, x + 30, cy + 4, x + 20, cy - 2, x + 12, cy + 8], shade(d.color, -0.1));
+    ellipse(x, cy, 12, 14, d.color);
+    poly([x - 9, cy - 9, x - 6, cy - 22, x - 2, cy - 11], d.color);
+    poly([x + 9, cy - 9, x + 6, cy - 22, x + 2, cy - 11], d.color);
+    circle(x - 4, cy - 3, 2.2, '#ff3b3b'); circle(x + 4, cy - 3, 2.2, '#ff3b3b');
+  } else if (d.shape === 'humanoid') {
+    const sk = e.id === 'skeleton';
+    drawHumanoid({
+      x, y: GY, s, face: -1, walk: 0, arm: -0.5 - 1.6 * e.lunge,
+      body: d.body, leg: sk ? '#d8d3c0' : shade(d.body, -0.2), skin: d.color, ribs: sk,
+      eye: sk ? '#111' : e.id === 'orc' ? '#ffdd33' : '#331',
+      headExtra: () => {
+        if (e.id === 'goblin') { poly([-8, -62, -18, -70, -6, -56], d.color); poly([6, -62, 16, -70, 4, -56], d.color); }
+        if (e.id === 'orc') { ctx.fillStyle = '#fff'; ctx.fillRect(4, -53, 2, 4); }
+        if (e.id === 'troll') { ellipse(9, -57, 5, 4, shade(d.color, -0.1)); }
+      },
+      tool: () => {
+        if (sk) { rr(-1.5, 15, 3, 6, 1, '#5a3a22'); rr(-2, 21, 4, 26, 1, '#8b7d6b'); }
+        else if (e.id === 'orc') { rr(-1.5, 12, 3, 30, 1, '#5a3a22'); poly([1, 32, 14, 24, 15, 46, 1, 42], '#888'); }
+        else { ctx.fillStyle = '#6b4a2a'; ctx.beginPath(); ctx.moveTo(-2, 14); ctx.lineTo(2, 14); ctx.lineTo(5, 44); ctx.lineTo(-5, 44); ctx.closePath(); ctx.fill(); }
+      },
+    });
+  } else if (d.shape === 'dragon') {
+    const c = d.color, dk = shade(c, -0.15), fl = Math.sin(time * 3) * 18;
+    const bx = x + 40;
+    ctx.strokeStyle = c; ctx.lineWidth = 16; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(bx + 50, GY - 50); ctx.quadraticCurveTo(bx + 110, GY - 30, bx + 140, GY - 70 + Math.sin(time * 2) * 8); ctx.stroke();
+    ctx.lineCap = 'butt';
+    poly([bx + 10, GY - 80, bx - 20, GY - 190 + fl, bx + 50, GY - 165 + fl, bx + 100, GY - 150 + fl * 0.7, bx + 60, GY - 80], shade(c, -0.25));
+    rr(bx - 30, GY - 42, 16, 42, 5, dk); rr(bx + 30, GY - 42, 16, 42, 5, dk);
+    ellipse(bx + 10, GY - 62, 60, 30, c);
+    ellipse(bx + 5, GY - 50, 40, 14, '#d9a35a');
+    poly([bx - 40, GY - 70, bx - 30, GY - 85, bx - 70, GY - 130, bx - 85, GY - 115], c);
+    ellipse(bx - 90, GY - 128, 26, 14, c);
+    poly([bx - 80, GY - 140, bx - 70, GY - 165, bx - 66, GY - 138], '#e8d8b0');
+    poly([bx - 95, GY - 140, bx - 90, GY - 162, bx - 82, GY - 140], '#e8d8b0');
+    circle(bx - 96, GY - 131, 3, '#ffe04a');
+    for (let k = 0; k < 6; k++) poly([bx - 20 + k * 14, GY - 90, bx - 13 + k * 14, GY - 104, bx - 6 + k * 14, GY - 90], dk);
+    if (e.lunge > 0.3) fire(bx - 112, GY - 122, 150, e.lunge);
+  }
+  ctx.restore();
+}
+
+function fire(x, y, len, a) {
+  const g = ctx.createLinearGradient(x, y, x - len, y);
+  g.addColorStop(0, `rgba(255,240,120,${a})`); g.addColorStop(0.5, `rgba(255,120,30,${a * 0.8})`); g.addColorStop(1, 'rgba(200,30,0,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x - len, y - 30 + Math.sin(time * 30) * 6); ctx.lineTo(x - len, y + 40); ctx.closePath(); ctx.fill();
+}
+
+/* --- ištekliai --- */
+function drawNode(e) {
+  const x = entScreenX(e);
+  const fade = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
+  const shake = Math.sin(time * 70) * e.hit * 3;
+  ctx.save();
+  if (e.kind === 'tree') {
+    ctx.translate(x + shake, GY);
+    if (e.dying) ctx.rotate((1 - fade) * 1.45);
+    ctx.globalAlpha = e.dying ? Math.min(1, fade * 2) : 1;
+    rr(-9, -78, 18, 78, 3, '#6b4426');
+    ctx.fillStyle = '#4e3019'; ctx.fillRect(-2, -60, 2, 30);
+    const c = CANOPY[e.tier];
+    circle(0, -100, 36, c); circle(-24, -80, 26, shade(c, -0.06)); circle(24, -82, 26, shade(c, -0.04));
+    circle(-8, -112, 16, shade(c, 0.08));
+    if (e.tier === 4) for (let k = 0; k < 5; k++) circle(Math.sin(time * 2 + k * 1.3) * 30, -95 + Math.cos(time * 1.7 + k) * 25, 2.5, '#f6e3ff');
+    if (e.tier === 2) for (let k = 0; k < 6; k++) circle(-26 + hash(k) * 52, -120 + hash(k + 3) * 50, 4, '#f0a040');
+  } else if (e.kind === 'rock') {
+    const s = 0.55 + 0.45 * (e.yields / e.maxYields);
+    ctx.translate(x + shake, GY);
+    ctx.globalAlpha = fade;
+    ctx.scale(s, s);
+    poly([-46, 0, -38, -32, -14, -52, 20, -46, 42, -24, 48, 0], '#6e6e78');
+    poly([-14, -52, 20, -46, 8, -30, -20, -34], '#868692');
+    const oc = TIER_COLORS[e.tier];
+    for (const [ox, oy, r] of [[-22, -18, 6], [6, -36, 5], [24, -14, 7], [-4, -12, 4], [-28, -36, 4]]) circle(ox, oy, r, oc);
+  } else if (e.kind === 'pond') {
+    ctx.globalAlpha = fade;
+    ellipse(x, GY + 10, 78, 13, '#245b91');
+    ellipse(x, GY + 9, 70, 10, '#3d82c9');
+    for (let k = 0; k < 2; k++) {
+      const p = (time * 0.6 + k * 0.5) % 1;
+      ctx.strokeStyle = `rgba(255,255,255,${0.5 * (1 - p)})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(x - 12, GY + 8, 6 + p * 30, 2 + p * 5, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (e.hit > 0.2) {
+      const p = 1 - e.hit;
+      ctx.save(); ctx.translate(x - 12 - p * 50, GY + 4 - Math.sin(p * Math.PI) * 50); ctx.rotate(-1 + p * 2);
+      ellipse(0, 0, 10, 4, TIER_COLORS[e.tier]); poly([8, 0, 15, -5, 15, 5], TIER_COLORS[e.tier]);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+function chips(e) {
+  if (SIM) return;
+  const x = entScreenX(e);
+  if (e.kind === 'tree') burst(x - 12, GY - 40, '#c89a5a', 5);
+  else if (e.kind === 'rock') { burst(x - 20, GY - 25, '#9a9aa5', 5); burst(x - 20, GY - 25, TIER_COLORS[e.tier], 2); }
+  else burst(x - 12, GY + 6, '#bfe2ff', 6);
+}
+
+/* --- efektai --- */
+function floatText(sx, y, text, color, life = 1) {
+  if (SIM) return;
+  floaters.push({ wx: R.worldX + sx - HX + rand(-6, 6), y, text, color, life, max: life });
+}
+function burst(sx, y, color, n) {
+  if (SIM) return;
+  for (let i = 0; i < n; i++) particles.push({ wx: R.worldX + sx - HX, y, vx: rand(-90, 90), vy: rand(-160, -40), life: rand(0.4, 0.8), color });
+}
+function updateVisuals(dt) {
+  R.swing = Math.max(0, R.swing - dt * 3.2);
+  R.eatFlash = Math.max(0, R.eatFlash - dt * 2);
+  if (R.ent) { R.ent.hit = Math.max(0, R.ent.hit - dt * 3); if (R.ent.lunge !== undefined) R.ent.lunge = Math.max(0, R.ent.lunge - dt * 3); }
+  for (const f of floaters) { f.life -= dt; f.y -= 30 * dt; }
+  floaters = floaters.filter(f => f.life > 0);
+  for (const p of particles) { p.life -= dt; p.wx += p.vx * dt; p.y += p.vy * dt; p.vy += 420 * dt; if (p.y > GY + 4) { p.y = GY + 4; p.vy *= -0.3; p.vx *= 0.6; } }
+  particles = particles.filter(p => p.life > 0);
+}
+
+function bar(x, y, w, h, frac, color) {
+  rr(x - 1, y - 1, w + 2, h + 2, 3, 'rgba(0,0,0,0.6)');
+  rr(x, y, Math.max(0, w * clamp(frac, 0, 1)), h, 2, color);
+}
+
+function drawHud() {
+  const z = ZONES[S.zone];
+  const act = { combat: '⚔️ Kova', woodcutting: '🪓 Kirtimas', mining: '⛏️ Kasyba', fishing: '🎣 Žvejyba' }[S.activity];
+  ctx.font = '600 14px system-ui, sans-serif';
+  const label = `${z.name} · ${act}`;
+  rr(10, 10, ctx.measureText(label).width + 20, 26, 6, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, 20, 23);
+
+  // herojaus HP
+  bar(HX - 25, GY - 92, 50, 6, S.hp / maxHp(), R.eatFlash > 0 ? '#b6ffb0' : '#5fd35f');
+  const e = R.ent;
+  if (e && !e.dying && R.phase !== 'walk') {
+    const ex = entScreenX(e);
+    if (e.kind === 'enemy') {
+      const top = GY - entHeight(e) - 24;
+      ctx.font = '600 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.strokeText(e.d.name, ex, top - 10);
+      ctx.fillText(e.d.name, ex, top - 10);
+      bar(ex - 35, top, 70, 6, e.hp / e.maxHp, '#e85a5a');
+      ctx.textAlign = 'left';
+      bar(HX - 25, GY - 82, 50, 3, 1 - R.atkT / PLAYER_SPEED, '#f2c94c');
+    } else {
+      const top = e.kind === 'tree' ? GY - 150 : e.kind === 'rock' ? GY - 72 : GY - 40;
+      bar(ex - 30, top, 60, 6, e.t / gatherTime(e.skill, e.tier), '#6aa8ff');
+      ctx.font = '11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+      ctx.fillText(`${e.yields} liko`, ex, top - 9); ctx.textAlign = 'left';
+    }
+  }
+  if (R.phase === 'dead') {
+    ctx.fillStyle = 'rgba(80,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
+    ctx.font = '700 28px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+    ctx.fillText(`Pralaimėjote... ${Math.ceil(R.deadT)}`, W / 2, H / 2 - 30); ctx.textAlign = 'left';
+  }
+}
+
+function draw() {
+  const z = ZONES[S.zone];
+  drawBackground(z);
+  if (R.ent) { if (R.ent.kind === 'enemy') drawEnemy(R.ent); else drawNode(R.ent); }
+  drawHero();
+  for (const p of particles) { ctx.globalAlpha = clamp(p.life * 2, 0, 1); ctx.fillStyle = p.color; ctx.fillRect(p.wx - R.worldX + HX - 2, p.y - 2, 4, 4); }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.life / f.max * 1.5, 0, 1);
+    ctx.font = '700 15px system-ui, sans-serif';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    const x = f.wx - R.worldX + HX;
+    ctx.strokeText(f.text, x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.text, x, f.y);
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  drawHud();
+}
+
+/* ================= UI ================= */
+
+const $ = s => document.querySelector(s);
+let tab = 'activity', lastHtml = '', lastHero = '';
+
+function itemLabel(id) {
+  const it = ITEMS[id];
+  return `${it.tier !== undefined ? `<span class="tier" style="background:${TIER_COLORS[it.tier]}"></span>` : ''}${it.name}`;
+}
+
+function htmlActivity() {
+  const acts = [['combat', '⚔️', 'Kova'], ['woodcutting', '🪓', 'Kirtimas'], ['mining', '⛏️', 'Kasyba'], ['fishing', '🎣', 'Žvejyba']];
+  let h = '<h3>Ką veikti kelionėje?</h3><div class="acts">' + acts.map(([id, ic, n]) =>
+    `<button class="act ${S.activity === id ? 'sel' : ''}" data-a="activity" data-id="${id}"><span class="big">${ic}</span>${n}
+     <small>${id === 'combat' ? 'Mūšio lygis ' + combatLevel() : 'Lygis ' + LV[id]}</small></button>`).join('') + '</div>';
+  h += '<h3>Vietovė</h3><div class="zones">' + ZONES.map((z, i) => {
+    const locked = S.activity === 'combat' && combatLevel() < z.req;
+    const what = S.activity === 'combat' ? z.enemies.filter((v, k, a) => a.indexOf(v) === k).map(id => ENEMIES[id].name).join(', ')
+      : S.activity === 'woodcutting' ? TREE_N[i] : S.activity === 'mining' ? METAL[i] + ' rūda' : FISH_N[i];
+    return `<button class="zone ${S.zone === i ? 'sel' : ''}" ${locked ? 'disabled' : ''} data-a="zone" data-id="${i}">
+      <b>${locked ? '🔒 ' : ''}${z.name}</b><small>${S.activity === 'combat' ? 'Reikia mūšio lygio ' + z.req : 'Ištekliai iki: ' + what}</small>
+      ${S.activity === 'combat' ? `<small>${what}</small>` : ''}</button>`;
+  }).join('') + '</div>';
+
+  h += '<div class="info">';
+  if (S.activity === 'combat') {
+    h += `<div class="row"><b>Kovos stilius:</b>
+      <button class="${S.style === 'attack' ? 'sel' : ''}" data-a="style" data-id="attack">⚔️ Ataka</button>
+      <button class="${S.style === 'defence' ? 'sel' : ''}" data-a="style" data-id="defence">🛡️ Gynyba</button></div>
+      <p class="muted">Pasirinktas įgūdis gauna patirtį už kiekvieną smūgį. Gyvybė visada gauna dalį patirties.
+      Kai gyvybės lieka mažiau nei 40%, herojus automatiškai valgo geriausią turimą maistą.</p>
+      <div class="row muted">Didžiausias smūgis: <b>${playerMaxHit()}</b> · Šarvai: <b>${armorValue()}</b> · Žalos sumažinimas: <b>${Math.round(damageReduction() * 100)}%</b></div>`;
+  } else {
+    const sk = S.activity, t = gatherTier(sk);
+    const node = sk === 'woodcutting' ? TREE_N[t] : sk === 'mining' ? METAL[t] + ' rūdos uola' : 'Vandens telkinys (' + FISH_N[t] + ')';
+    const nextT = GATHER_REQ.findIndex((r, i) => i > t && (LV[sk] < r || i > S.zone));
+    h += `<b>Taikinys:</b> ${node}<br><span class="muted">${gatherTime(sk, t).toFixed(2)} s už vienetą · ${GATHER_XP[t]} XP · įrankio lygis ${S.tools[TOOL_OF[sk]]}/4</span>`;
+    if (nextT > 0) {
+      const needLv = LV[sk] < GATHER_REQ[nextT], needZone = nextT > S.zone;
+      h += `<p class="muted">Kitas lygis (${sk === 'woodcutting' ? TREE_N[nextT] : sk === 'mining' ? METAL[nextT] + ' rūda' : FISH_N[nextT]}): ` +
+        [needLv ? `${SKILLS[sk].name} ${GATHER_REQ[nextT]} lygis` : '', needZone ? `vietovė „${ZONES[nextT].name}“` : ''].filter(Boolean).join(' ir ') + '</p>';
+    }
+  }
+  return h + '</div>';
+}
+
+function htmlSkills() {
+  return '<div class="grid">' + Object.entries(SKILLS).map(([k, s]) => {
+    const l = LV[k], xp = S.skills[k];
+    const cur = XP_TABLE[l], nxt = l < 99 ? XP_TABLE[l + 1] : xp;
+    const frac = l < 99 ? (xp - cur) / (nxt - cur) : 1;
+    return `<div class="skill"><div class="top"><span>${s.icon} ${s.name}</span><span class="lv">${l} / 99</span></div>
+      <div class="bar"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
+      <small>${fmt(xp)} / ${fmt(nxt)} XP</small></div>`;
+  }).join('') + '</div>';
+}
+
+function htmlInventory() {
+  const ids = Object.keys(S.inv);
+  if (!ids.length) return '<p class="muted">Inventorius tuščias. Eikite rinkti išteklių ar kovoti!</p>';
+  const groups = {};
+  for (const id of ids) (groups[ITEMS[id].type] = groups[ITEMS[id].type] || []).push(id);
+  const total = ids.reduce((a, id) => a + ITEMS[id].value * S.inv[id], 0);
+  let h = `<div class="row" style="justify-content:space-between"><span class="muted">Bendra vertė: <b class="lg-gold">${fmt(total)}</b> aukso</span></div>`;
+  for (const g of ['Ištekliai', 'Maistas', 'Įranga', 'Kita']) {
+    if (!groups[g]) continue;
+    h += `<h3>${g}</h3><div class="grid">` + groups[g].sort().map(id => {
+      const it = ITEMS[id];
+      return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${itemLabel(id)}<br>
+        <small>${it.value} 🪙${it.heal ? ' · gydo ' + it.heal : ''}${it.power ? ' · jėga +' + it.power : ''}${it.armor ? ' · šarvai +' + it.armor : ''}${it.req ? ' · Lv ' + it.req : ''}</small></span>
+        <span class="ct">${fmt(S.inv[id])}</span></div>
+        <div class="btns">${it.slot ? `<button data-a="equip" data-id="${id}">Užsidėti</button>` : ''}
+        <button data-a="sell" data-id="${id}" data-n="1">Parduoti 1</button>
+        <button data-a="sell" data-id="${id}" data-n="999999">Visus</button></div></div>`;
+    }).join('') + '</div>';
+  }
+  return h;
+}
+
+function matsHtml(mats) {
+  return Object.entries(mats).map(([id, n]) => `<span class="${has(id) >= n ? 'have' : 'need'}">${n}× ${ITEMS[id].name} (${has(id)})</span>`).join(', ');
+}
+
+function htmlSmithing() {
+  return `<p class="muted">Kalkite ginklus ir šarvus iš surinktos rūdos ir rąstų. Kalvystės lygis: <b>${LV.smithing}</b></p><div class="grid">` +
+    RECIPES.map((r, i) => {
+      const it = ITEMS[r.out], locked = LV.smithing < r.req, mx = maxCraft(r.mats);
+      return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${itemLabel(r.out)}<br>
+        <small>${it.power ? 'Jėga +' + it.power : 'Šarvai +' + it.armor} · ${r.xp} XP · ${locked ? '🔒 ' : ''}Kalvystė ${r.req}</small></span></div>
+        <small>${matsHtml(r.mats)}</small>
+        <div class="btns"><button data-a="smith" data-id="${i}" data-n="1" ${locked || !mx ? 'disabled' : ''}>Kalti 1</button>
+        <button data-a="smith" data-id="${i}" data-n="10" ${locked || mx < 2 ? 'disabled' : ''}>×10</button>
+        <button data-a="smith" data-id="${i}" data-n="999999" ${locked || !mx ? 'disabled' : ''}>Visus (${mx})</button></div></div>`;
+    }).join('') + '</div>';
+}
+
+function htmlCooking() {
+  let h = `<p class="muted">Kepkite žuvį – keptas maistas gydo kovoje. Kuo aukštesnis lygis, tuo rečiau sudega. Kulinarijos lygis: <b>${LV.cooking}</b></p><div class="grid">`;
+  for (let t = 0; t < 5; t++) {
+    const locked = LV.cooking < GATHER_REQ[t], n = has('fish' + t);
+    const burn = Math.max(0, 0.35 - (LV.cooking - GATHER_REQ[t]) * 0.02);
+    h += `<div class="item"><div class="top"><span class="ic">🍽️</span><span class="nm">${itemLabel('cooked' + t)}<br>
+      <small>Gydo ${ITEMS['cooked' + t].heal} · ${GATHER_XP[t]} XP · ${locked ? '🔒 ' : ''}Kulinarija ${GATHER_REQ[t]}${locked ? '' : ' · sudegimo tikimybė ' + Math.round(burn * 100) + '%'}</small></span></div>
+      <small><span class="${n ? 'have' : 'need'}">${FISH_N[t]} (žalia): ${n}</span></small>
+      <div class="btns"><button data-a="cook" data-id="${t}" data-n="1" ${locked || !n ? 'disabled' : ''}>Kepti 1</button>
+      <button data-a="cook" data-id="${t}" data-n="999999" ${locked || !n ? 'disabled' : ''}>Visas (${n})</button></div></div>`;
+  }
+  return h + '</div>';
+}
+
+function htmlShop() {
+  let h = '<h3>Įrankiai</h3><p class="muted">Kiekvienas patobulinimas pagreitina rinkimą 12%.</p><div class="grid">';
+  for (const tool of ['axe', 'pick', 'rod']) {
+    const l = S.tools[tool], cost = TOOL_COST[l];
+    h += `<div class="item"><div class="top"><span class="ic">${{ axe: '🪓', pick: '⛏️', rod: '🎣' }[tool]}</span>
+      <span class="nm">${TOOL_NAMES[tool]}<br><small>Lygis ${l} / 4 · greitis +${l * 12}%</small></span></div>
+      <div class="btns">${l >= 4 ? '<button disabled>Maksimalus</button>' : `<button data-a="tool" data-id="${tool}" ${S.gold < cost ? 'disabled' : ''}>Tobulinti – ${fmt(cost)} 🪙</button>`}</div></div>`;
+  }
+  h += `</div><h3>Maistas</h3><div class="grid"><div class="item"><div class="top"><span class="ic">🍞</span>
+    <span class="nm">Duona<br><small>Gydo 8 · kaina 5 🪙</small></span><span class="ct">${has('bread')}</span></div>
+    <div class="btns"><button data-a="bread" data-n="1" ${S.gold < 5 ? 'disabled' : ''}>Pirkti 1</button>
+    <button data-a="bread" data-n="10" ${S.gold < 50 ? 'disabled' : ''}>Pirkti 10</button></div></div></div>`;
+  return h;
+}
+
+function renderTab(force) {
+  if (force) lastHtml = '';
+  const html = { activity: htmlActivity, skills: htmlSkills, inventory: htmlInventory, smithing: htmlSmithing, cooking: htmlCooking, shop: htmlShop }[tab]();
+  if (html !== lastHtml) { $('#tab-content').innerHTML = html; lastHtml = html; }
+}
+
+function renderHero() {
+  const mh = maxHp();
+  const food = FOOD_ORDER.reduce((a, id) => a + has(id), 0);
+  const eq = slot => S.equip[slot]
+    ? `<span>${itemLabel(S.equip[slot])}</span><button data-a="unequip" data-id="${slot}">Nusiimti</button>`
+    : '<span class="muted">—</span>';
+  const html = `<h3>Herojus</h3>
+    <div class="row" style="justify-content:space-between"><span>❤️ ${Math.ceil(Math.max(0, S.hp))} / ${mh}</span><span class="muted">Mūšio lygis ${combatLevel()}</span></div>
+    <div class="bar hp" style="margin:6px 0 10px"><i style="width:${(clamp(S.hp / mh, 0, 1) * 100).toFixed(1)}%"></i></div>
+    <div class="eq"><span class="muted">🗡️ Ginklas</span></div><div class="eq">${eq('weapon')}</div>
+    <div class="eq"><span class="muted">🥋 Šarvai</span></div><div class="eq">${eq('armor')}</div>
+    <div class="eq"><span class="muted">🍽️ Maisto</span><span>${food}</span></div>
+    <div class="eq"><span class="muted">⚔️ Įveikta priešų</span><span>${fmt(S.kills)}</span></div>`;
+  if (html !== lastHero) { $('#hero').innerHTML = html; lastHero = html; }
+  $('#gold b').textContent = fmt(S.gold);
+  $('#cmb b').textContent = combatLevel();
+  $('#dist b').textContent = fmt(S.dist) + ' m';
+}
+
+function renderLog() {
+  const el = document.getElementById('log');
+  if (el) el.innerHTML = logLines.map(l => `<div class="${l.cls}">${l.msg}</div>`).join('');
+}
+
+document.addEventListener('click', ev => {
+  const tb = ev.target.closest('[data-tab]');
+  if (tb) {
+    tab = tb.dataset.tab;
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('sel', b === tb));
+    renderTab(true); return;
+  }
+  const b = ev.target.closest('[data-a]');
+  if (!b || b.disabled) return;
+  const id = b.dataset.id, n = +b.dataset.n || 1;
+  switch (b.dataset.a) {
+    case 'activity': setActivity(id); break;
+    case 'zone': setZone(+id); break;
+    case 'style': S.style = id; break;
+    case 'sell': sell(id, n); break;
+    case 'equip': equip(id); break;
+    case 'unequip': unequip(id); break;
+    case 'smith': smith(+id, n); break;
+    case 'cook': cook(+id, n); break;
+    case 'tool': buyTool(id); break;
+    case 'bread': buyBread(n); break;
+    case 'save': save(); log('💾 Žaidimas išsaugotas.'); break;
+    case 'close': closeModal(); break;
+    case 'reset':
+      openModal(`<h2>Pradėti iš naujo?</h2><p>Visa pažanga bus ištrinta negrįžtamai.</p>
+        <div class="row"><button data-a="reset-yes">Taip, ištrinti</button><button data-a="close">Atšaukti</button></div>`);
+      break;
+    case 'reset-yes':
+      S = newState(); recalcLevels(); R.phase = 'walk'; R.ent = null; R.worldX = 0;
+      logLines = []; renderLog(); save(); closeModal(); log('Nauja kelionė prasideda!');
+      break;
+  }
+  uiDirty = true;
+  renderTab(); renderHero();
+});
+
+/* ================= CIKLAS ================= */
+
+let lastFrame = performance.now(), uiTimer = 0, saveTimer = 0;
+function frame(now) {
+  let dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (dt > 1) {
+    // skirtukas buvo paslėptas – greitai prasukame praėjusį laiką
+    const before = snapshot();
+    const sec = simulate(dt);
+    if (sec > 60) showOfflineSummary(sec, before);
+    uiDirty = true;
+  } else tick(dt);
+  draw();
+  uiTimer += dt; saveTimer += dt;
+  if (uiTimer > 0.25) { uiTimer = 0; renderHero(); if (uiDirty) { uiDirty = false; renderTab(); } }
+  if (saveTimer > 10) { saveTimer = 0; save(); }
+  requestAnimationFrame(frame);
+}
+
+function init() {
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  load();
+  const away = (Date.now() - (S.last || Date.now())) / 1000;
+  if (away > 60) {
+    const before = snapshot();
+    const sec = simulate(away);
+    showOfflineSummary(sec, before);
+  }
+  log('Sveiki atvykę! Herojus leidžiasi į begalinį kelią.');
+  renderTab(true); renderHero();
+  window.addEventListener('beforeunload', save);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  requestAnimationFrame(t => { lastFrame = t; requestAnimationFrame(frame); });
+}
+init();
+</script>
+</body>
+</html>
