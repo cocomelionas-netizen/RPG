@@ -34,6 +34,12 @@
   header .stat { color: var(--muted); display: inline-block; }
   header .stat b { color: var(--text); }
   #gold b { color: var(--accent); }
+  #renown b { color: #d9c0ff; }
+  .ach { border: 1px solid transparent; }
+  .ach.done { border-color: #6b5a24; background: #2e2a1c; }
+  .ach:not(.done) { opacity: .62; }
+  .ach .bonus { color: var(--good); font-size: 12px; }
+  .bonuses { display: flex; flex-wrap: wrap; gap: 6px 16px; }
   .wrap { max-width: 1200px; margin: 0 auto; padding: 12px 16px; }
   #scene {
     width: 100%; aspect-ratio: 3 / 1; display: block;
@@ -142,6 +148,7 @@
   <span class="stat" id="gold">Gold: <b>0</b></span>
   <span class="stat" id="cmb">Combat level: <b>1</b></span>
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
+  <span class="stat" id="renown" hidden>Renown: <b>0</b></span>
 </header>
 <div class="wrap">
   <div id="stage">
@@ -157,6 +164,7 @@
         <button data-tab="smithing">🔨 Smithing</button>
         <button data-tab="cooking">🍳 Cooking</button>
         <button data-tab="shop">🏪 Shop</button>
+        <button data-tab="progress">🏆 Progress</button>
       </nav>
       <div id="tab-content"></div>
     </section>
@@ -196,7 +204,7 @@ const XP_TABLE = [0, 0];
 { let pts = 0; for (let l = 1; l < 99; l++) { pts += Math.floor(l + 300 * Math.pow(2, l / 7)); XP_TABLE[l + 1] = Math.floor(pts / 4); } }
 function levelFromXp(xp) { let l = 1; while (l < 99 && xp >= XP_TABLE[l + 1]) l++; return l; }
 
-const TIER_COLORS = ['#c87533', '#9aa0a8', '#dfe3ee', '#f2c94c', '#4fd6e8'];
+const TIER_COLORS = ['#c87533', '#9aa0a8', '#dfe3ee', '#f2c94c', '#4fd6e8', '#e0453a'];
 const CANOPY = ['#8ccf6b', '#3f8f3a', '#d0702f', '#2f6b45', '#b06be0'];
 const METAL = ['Copper', 'Iron', 'Silver', 'Gold', 'Mithril'];
 const TREE_N = ['Birch', 'Oak', 'Maple', 'Yew', 'Magic Tree'];
@@ -222,6 +230,9 @@ for (let t = 0; t < 5; t++) {
   defItem('sword' + t,  { name: METAL[t] + ' Sword', icon: '🗡️', tier: t, value: [30, 90, 250, 600, 1500][t], slot: 'weapon', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Equipment' });
   defItem('armor' + t,  { name: METAL[t] + ' Armour', icon: '🥋', tier: t, value: [50, 150, 400, 1000, 2500][t], slot: 'armor', armor: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Equipment' });
 }
+// endgame set made from Dragon drops
+defItem('sword5', { name: 'Dragon Sword', icon: '🗡️', tier: 5, value: 5000, slot: 'weapon', power: 36, req: 80, type: 'Equipment' });
+defItem('armor5', { name: 'Dragon Armour', icon: '🥋', tier: 5, value: 8000, slot: 'armor', armor: 28, req: 80, type: 'Equipment' });
 defItem('bread', { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
 defItem('burnt', { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
 defItem('bones', { name: 'Bones', icon: '🦴', value: 3, type: 'Misc' });
@@ -234,6 +245,8 @@ for (let t = 0; t < 5; t++) {
   RECIPES.push({ out: 'sword' + t, req: GATHER_REQ[t], xp: [15, 30, 55, 90, 140][t], mats: { ['ore' + t]: 3, ['log' + t]: 1 } });
   RECIPES.push({ out: 'armor' + t, req: GATHER_REQ[t] + 5, xp: [25, 50, 90, 150, 230][t], mats: { ['ore' + t]: 5 } });
 }
+RECIPES.push({ out: 'sword5', req: 80, xp: 400, mats: { ore4: 10, gem: 2, scale: 1 } });
+RECIPES.push({ out: 'armor5', req: 85, xp: 600, mats: { ore4: 15, scale: 3 } });
 
 // drops: [item, chance, min, max]
 const ENEMIES = {
@@ -271,7 +284,39 @@ const ZONES = [
 /* ================= STATE ================= */
 
 const SAVE_KEY = 'begalinis-kelias-v1';
-const OFFLINE_CAP = 12 * 3600;
+const BOSS_ACH = ['Slime Royalty', 'Chief Toppler', 'Bone Breaker', 'Frostbite', 'Dragonslayer'];
+const SKILL_ACH = { attack: 'Duelist', defence: 'Bulwark', hitpoints: 'Iron Body', woodcutting: 'Lumberjack',
+  mining: 'Prospector', fishing: 'Angler', smithing: 'Blacksmith', cooking: 'Chef' };
+// bonus: [type, percent] – xp: all XP, gold: gold from enemies and chests, gather: gathering speed
+const ACH = [
+  { id: 'kill1', name: 'First Blood', desc: 'Defeat an enemy', bonus: ['gold', 1], test: () => S.kills >= 1 },
+  { id: 'kill100', name: 'Monster Hunter', desc: 'Defeat 100 enemies', bonus: ['gold', 2], test: () => S.kills >= 100 },
+  { id: 'kill1k', name: 'Slayer', desc: 'Defeat 1,000 enemies', bonus: ['gold', 3], test: () => S.kills >= 1000 },
+  { id: 'kill10k', name: 'Legend of the Road', desc: 'Defeat 10,000 enemies', bonus: ['gold', 5], test: () => S.kills >= 10000 },
+  ...BOSS_ACH.map((name, i) => ({ id: 'boss' + i, name, desc: () => `Defeat ${ENEMIES[ZONES[i].boss].name}`, bonus: ['xp', i === 4 ? 5 : 2], test: () => S.bosses[i] })),
+  { id: 'dist1k', name: 'Wanderer', desc: 'Walk 1,000 m', bonus: ['gather', 2], test: () => S.dist >= 1000 },
+  { id: 'dist10k', name: 'Pilgrim', desc: 'Walk 10,000 m', bonus: ['gather', 3], test: () => S.dist >= 10000 },
+  { id: 'dist100k', name: 'The Endless Road', desc: 'Walk 100,000 m', bonus: ['gather', 5], test: () => S.dist >= 100000 },
+  ...Object.entries(SKILL_ACH).map(([k, name]) => ({ id: 'lv50' + k, name, desc: () => `Reach level 50 in ${SKILLS[k].name}`, bonus: ['xp', 1], test: () => LV[k] >= 50 })),
+  { id: 'lv99', name: 'Mastery', desc: 'Reach level 99 in any skill', bonus: ['xp', 5], test: () => Object.values(LV).some(l => l >= 99) },
+  { id: 'total100', name: 'Apprentice', desc: 'Reach total level 100', bonus: ['xp', 2], test: () => totalLevel() >= 100 },
+  { id: 'total250', name: 'Journeyman', desc: 'Reach total level 250', bonus: ['xp', 3], test: () => totalLevel() >= 250 },
+  { id: 'total500', name: 'Grandmaster', desc: 'Reach total level 500', bonus: ['xp', 5], test: () => totalLevel() >= 500 },
+  { id: 'ev10', name: 'Curious', desc: 'Collect 10 road finds', bonus: ['gold', 2], test: () => S.stats.events >= 10 },
+  { id: 'ev100', name: 'Treasure Hunter', desc: 'Collect 100 road finds', bonus: ['gold', 3], test: () => S.stats.events >= 100 },
+  { id: 'smith100', name: 'Hammer Time', desc: 'Smith 100 items', bonus: ['gather', 2], test: () => S.stats.smithed >= 100 },
+  { id: 'cook100', name: 'Hearty Meals', desc: 'Cook 100 fish', bonus: ['gather', 2], test: () => S.stats.cooked >= 100 },
+  { id: 'dragongear', name: 'Dragonforged', desc: 'Smith a piece of Dragon gear', bonus: ['xp', 5], test: () => S.stats.dragonGear >= 1 },
+  { id: 'death1', name: 'Learning Experience', desc: 'Get defeated once', bonus: ['xp', 1], test: () => S.deaths >= 1 },
+  { id: 'journey1', name: 'New Beginnings', desc: 'Start a New Journey', bonus: ['xp', 5], test: () => S.journeys >= 1 },
+];
+const RUP = {
+  wisdom:    { name: 'Wisdom', icon: '📜', desc: '+10% XP', max: 10, cost: 5 },
+  fortune:   { name: 'Fortune', icon: '💰', desc: '+10% gold from enemies and chests', max: 10, cost: 4 },
+  boots:     { name: 'Swift Boots', icon: '🥾', desc: '+5% walking speed', max: 6, cost: 5 },
+  patience:  { name: 'Patience', icon: '⏳', desc: '+2h offline progress (base 12h)', max: 6, cost: 6 },
+  headstart: { name: 'Head Start', icon: '🧰', desc: 'Start each journey with +1 tool level', max: 4, cost: 10 },
+};
 let S = null;          // saved state
 let LV = {};           // level cache
 let SIM = false;       // fast simulation (offline) - no visuals
@@ -290,6 +335,8 @@ function newState() {
     inv: { bread: 5 }, equip: { weapon: null, armor: null }, tools: { axe: 0, pick: 0, rod: 0 },
     activity: 'combat', zone: 0, style: 'attack', hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
     zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], smithSel: 0, cookSel: -1, tipEvent: false,
+    ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0 }, renown: 0, journeys: 0,
+    rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -307,8 +354,10 @@ function load() {
     S.skills = Object.assign(base.skills, data.skills);
     S.tools = Object.assign({ axe: 0, pick: 0, rod: 0 }, data.tools);
     S.equip = Object.assign({ weapon: null, armor: null }, data.equip);
+    S.stats = Object.assign(base.stats, data.stats);
+    S.rup = Object.assign(base.rup, data.rup);
   } else S = base;
-  recalcLevels();
+  recalcLevels(); recalcBonuses();
   if (S.activity === 'combat' && !zoneOpen(S.zone)) S.zone = bestZone();
 }
 
@@ -334,7 +383,7 @@ function take(id, n = 1) {
 function has(id) { return S.inv[id] || 0; }
 
 function addXp(skill, amt) {
-  if (R.buff > 0) amt *= 1.5;
+  amt *= xpMult() * (R.buff > 0 ? 1.5 : 1);
   const before = LV[skill];
   S.skills[skill] += amt;
   LV[skill] = levelFromXp(S.skills[skill]);
@@ -365,7 +414,54 @@ function gatherTier(skill) {
   for (let i = 0; i < 5; i++) if (LV[skill] >= GATHER_REQ[i]) t = i;
   return t;
 }
-function gatherTime(skill, tier) { return GATHER_TIME[tier] * (1 - 0.12 * S.tools[TOOL_OF[skill]]); }
+function gatherTime(skill, tier) { return GATHER_TIME[tier] * (1 - 0.12 * S.tools[TOOL_OF[skill]]) / (1 + BON.gather / 100); }
+
+/* ===== Achievements, Renown and permanent bonuses ===== */
+const BON = { xp: 0, gold: 0, gather: 0 };
+function recalcBonuses() {
+  BON.xp = BON.gold = BON.gather = 0;
+  for (const a of ACH) if (S.ach[a.id]) BON[a.bonus[0]] += a.bonus[1];
+}
+function xpMult() { return 1 + BON.xp / 100 + 0.1 * S.rup.wisdom; }
+function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune; }
+function walkSpeed() { return WALK * (1 + 0.05 * S.rup.boots); }
+function offlineCap() { return (12 + 2 * S.rup.patience) * 3600; }
+function totalLevel() { return Object.values(LV).reduce((a, l) => a + l, 0); }
+function achDesc(a) { return typeof a.desc === 'function' ? a.desc() : a.desc; }
+function bonusText(b) { return `+${b[1]}% ${{ xp: 'XP', gold: 'gold', gather: 'gathering speed' }[b[0]]}`; }
+function checkAch() {
+  for (const a of ACH) {
+    if (S.ach[a.id] || !a.test()) continue;
+    S.ach[a.id] = true;
+    recalcBonuses();
+    log(`🏆 Achievement: ${a.name} (${bonusText(a.bonus)})`, 'lg-xp');
+    showBanner(`🏆 ${a.name}`);
+    uiDirty = true;
+  }
+}
+function renownGain() { return 10 + Math.floor(totalLevel() / 20); }
+function rupCost(k) { return RUP[k].cost * (S.rup[k] + 1); }
+function buyRup(k) {
+  if (S.rup[k] >= RUP[k].max || S.renown < rupCost(k)) return;
+  S.renown -= rupCost(k); S.rup[k]++;
+  log(`🌟 ${RUP[k].name} upgraded to level ${S.rup[k]}`, 'lg-good');
+}
+function newJourney() {
+  if (!S.bosses[4]) return;
+  const gain = renownGain();
+  // keep achievements, lifetime stats and Renown; everything else starts over
+  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup,
+    renown: S.renown + gain, journeys: S.journeys + 1, tipEvent: true };
+  S = Object.assign(newState(), keep);
+  const hs = S.rup.headstart;
+  S.tools = { axe: hs, pick: hs, rod: hs };
+  recalcLevels(); recalcBonuses();
+  S.hp = maxHp();
+  R.phase = 'walk'; R.ent = null; R.events = []; R.buff = 0; R.worldX = 0;
+  log(`🌟 A New Journey begins! +${gain} Renown`, 'lg-xp');
+  showBanner(`🌟 New Journey · +${gain} Renown`);
+  uiDirty = true;
+}
 
 /* ================= GAME LOGIC ================= */
 
@@ -405,9 +501,9 @@ function evScreen(ev) {
 function collectEvent(ev) {
   R.events.splice(R.events.indexOf(ev), 1);
   const { x, y } = evScreen(ev);
-  S.tipEvent = true;
+  S.tipEvent = true; S.stats.events++;
   if (ev.type === 'chest') {
-    const g = Math.round(rand(15, 30) * (1 + bestZone()) ** 2);
+    const g = Math.round(rand(15, 30) * (1 + bestZone()) ** 2 * goldMult());
     S.gold += g;
     coinsFly(x, y, 8); burst(x, y, '#f2c94c', 14);
     floatText(x, y - 30, `+${g} 🪙`, '#f2c94c', 1.4, 1.2);
@@ -439,8 +535,9 @@ function startAct() {
 function tick(dt) {
   time += dt;
   if (R.phase === 'walk') {
-    R.worldX += WALK * dt;
-    S.dist += WALK * dt / 40;
+    const w = walkSpeed();
+    R.worldX += w * dt;
+    S.dist += w * dt / 40;
     S.hp = Math.min(maxHp(), S.hp + maxHp() * 0.005 * dt);
     if (!R.ent) spawnEntity();
     if (R.ent.x - R.worldX <= R.ent.stop) {
@@ -536,7 +633,7 @@ function die() {
 }
 
 function killEnemy(e) {
-  const g = randi(e.d.gold[0], e.d.gold[1]);
+  const g = Math.round(randi(e.d.gold[0], e.d.gold[1]) * goldMult());
   S.gold += g; S.kills++; R.deathStreak = 0;
   const got = [`${g} gold`];
   const ex = entScreenX(e), ey = GY - entHeight(e) * 0.5;
@@ -607,6 +704,7 @@ function smithOnce(i) {
   for (const [id, c] of Object.entries(r.mats)) take(id, c);
   give(r.out);
   addXp('smithing', r.xp);
+  S.stats.smithed++; if (ITEMS[r.out].tier === 5) S.stats.dragonGear++;
   if (isUpgrade(r.out)) { equip(r.out); showBanner(`⬆️ Equipped ${ITEMS[r.out].name}`); }
   return r.out;
 }
@@ -620,7 +718,7 @@ function cookTarget() {
 function cookOnce(t) {
   take('fish' + t);
   if (Math.random() < burnChance(t)) { give('burnt'); return 'burnt'; }
-  give('cooked' + t); addXp('cooking', GATHER_XP[t]);
+  give('cooked' + t); addXp('cooking', GATHER_XP[t]); S.stats.cooked++;
   return 'cooked' + t;
 }
 
@@ -707,15 +805,16 @@ function buyBread(n) {
 /* ================= OFFLINE ================= */
 
 function snapshot() {
-  return { skills: { ...S.skills }, lv: { ...LV }, inv: { ...S.inv }, gold: S.gold, kills: S.kills, deaths: S.deaths, bosses: [...S.bosses] };
+  return { skills: { ...S.skills }, lv: { ...LV }, inv: { ...S.inv }, gold: S.gold, kills: S.kills, deaths: S.deaths, bosses: [...S.bosses], ach: { ...S.ach } };
 }
 function simulate(sec) {
-  sec = Math.min(sec, OFFLINE_CAP);
+  sec = Math.min(sec, offlineCap());
   SIM = true;
   const step = 0.2;
   for (let t = 0; t < sec; t += step) tick(step);
   SIM = false;
   floaters = []; particles = []; coins = [];
+  checkAch();
   R.shake = R.freeze = R.ring = 0; R.banner = null; R.events = [];
   return sec;
 }
@@ -733,6 +832,7 @@ function showOfflineSummary(sec, before) {
   if (S.gold !== before.gold) lines.push(`🪙 Gold: ${S.gold > before.gold ? '+' : '−'}${fmt(Math.abs(S.gold - before.gold))}`);
   if (S.deaths !== before.deaths) lines.push(`💀 Deaths: ${S.deaths - before.deaths}`);
   S.bosses.forEach((b, i) => { if (b && !before.bosses[i]) lines.push(`👑 Defeated ${ENEMIES[ZONES[i].boss].name}!`); });
+  for (const a of ACH) if (S.ach[a.id] && !before.ach[a.id]) lines.push(`🏆 Achievement: ${a.name}`);
   if (S.kills !== before.kills) lines.push(`⚔️ Enemies defeated: ${S.kills - before.kills}`);
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
   openModal(`<h2>Welcome back!</h2>
@@ -1477,9 +1577,32 @@ function htmlShop() {
   return h;
 }
 
+function htmlProgress() {
+  const pct = m => Math.round((m - 1) * 100);
+  let h = `<h3>Permanent bonuses</h3><div class="info bonuses">
+    <span>✨ XP <b>+${pct(xpMult())}%</b></span><span>🪙 Gold <b>+${pct(goldMult())}%</b></span>
+    <span>⏱️ Gathering <b>+${BON.gather}%</b></span><span>🥾 Walking <b>+${S.rup.boots * 5}%</b></span>
+    <span>⏳ Offline <b>${offlineCap() / 3600}h</b></span></div>`;
+  h += '<h3>🌟 New Journey</h3><div class="info">';
+  h += S.bosses[4]
+    ? `<p>Start again from level 1 and earn <b>${renownGain()} Renown</b> (10 + 1 per 20 total levels). You keep achievements, Renown, upgrades and lifetime stats.</p>
+       <button data-a="journey">🌟 Start a New Journey</button>`
+    : `<p class="muted">Defeat the Dragon to unlock. Each journey earns Renown to spend on permanent upgrades below${S.journeys ? ` · Journeys completed: ${S.journeys}` : ''}.</p>`;
+  h += `</div><h3>Renown upgrades · 🌟 ${S.renown}</h3><div class="grid">` + Object.entries(RUP).map(([k, u]) => {
+    const l = S.rup[k], max = l >= u.max, cost = rupCost(k);
+    return `<div class="item"><div class="top"><span class="ic">${u.icon}</span><span class="nm">${u.name}<br><small>${u.desc} · level ${l}/${u.max}</small></span></div>
+      <div class="btns">${max ? '<button disabled>Maxed</button>' : `<button data-a="rup" data-id="${k}" ${S.renown < cost ? 'disabled' : ''}>Upgrade – ${cost} 🌟</button>`}</div></div>`;
+  }).join('') + '</div>';
+  const done = ACH.filter(a => S.ach[a.id]).length;
+  h += `<h3>Achievements · ${done} / ${ACH.length}</h3><div class="grid">` + ACH.map(a => `
+    <div class="item ach ${S.ach[a.id] ? 'done' : ''}"><div class="top"><span class="ic">${S.ach[a.id] ? '🏆' : '🔒'}</span>
+      <span class="nm"><b>${a.name}</b><br><small>${achDesc(a)}</small><br><span class="bonus">${bonusText(a.bonus)}</span></span></div></div>`).join('') + '</div>';
+  return h;
+}
+
 function renderTab(force) {
   if (force) lastHtml = '';
-  const html = { activity: htmlActivity, skills: htmlSkills, inventory: htmlInventory, smithing: htmlSmithing, cooking: htmlCooking, shop: htmlShop }[tab]();
+  const html = { activity: htmlActivity, skills: htmlSkills, inventory: htmlInventory, smithing: htmlSmithing, cooking: htmlCooking, shop: htmlShop, progress: htmlProgress }[tab]();
   if (html !== lastHtml) { $('#tab-content').innerHTML = html; lastHtml = html; }
 }
 
@@ -1500,6 +1623,7 @@ function renderHero() {
   $('#gold b').textContent = fmt(S.gold);
   $('#cmb b').textContent = combatLevel();
   $('#dist b').textContent = fmt(S.dist) + ' m';
+  const rn = $('#renown'); rn.hidden = !(S.renown || S.journeys); rn.querySelector('b').textContent = S.renown;
 }
 
 function nextGoal() {
@@ -1526,10 +1650,11 @@ function nextGoal() {
   if (!S.bosses[best]) return { t: `Defeat ${ENEMIES[ZONES[best].boss].name} in ${ZONES[best].name} (appears after ${BOSS_EVERY} kills: ${S.zk[best]}/${BOSS_EVERY})`, tab: 'activity' };
   const nz = best + 1;
   if (nz < ZONES.length) return { t: `Reach combat level ${ZONES[nz].req} to enter ${ZONES[nz].name} (now ${combatLevel()})`, tab: 'skills' };
-  return { t: 'You beat the Dragon! Now master every skill to 99', tab: 'skills' };
+  return { t: `You beat the Dragon! Start a 🌟 New Journey for ${renownGain()} Renown`, tab: 'progress' };
 }
 let lastGoal = '';
 function renderGoal() {
+  checkAch();
   const g = nextGoal();
   const html = `<b>🎯 Goal</b><span>${g.t}</span>`;
   const el = document.getElementById('goal');
@@ -1540,6 +1665,7 @@ function renderGoal() {
     cooking: S.activity !== 'cooking' && [0, 1, 2, 3, 4].some(t => has('fish' + t) && LV.cooking >= GATHER_REQ[t]),
     shop: ['axe', 'pick', 'rod'].some(t => S.tools[t] < 4 && S.gold >= TOOL_COST[S.tools[t]]),
     inventory: Object.keys(S.inv).some(id => ITEMS[id].slot && isUpgrade(id)),
+    progress: S.bosses[4] || Object.keys(RUP).some(k => S.rup[k] < RUP[k].max && S.renown >= rupCost(k)),
   };
   document.querySelectorAll('nav.tabs [data-tab]').forEach(b => b.classList.toggle('alert', !!alerts[b.dataset.tab] && b.dataset.tab !== tab));
 }
@@ -1577,6 +1703,13 @@ document.addEventListener('click', ev => {
     case 'cook': S.cookSel = +id; setActivity('cooking'); break;
     case 'tool': buyTool(id); break;
     case 'bread': buyBread(n); break;
+    case 'rup': buyRup(id); break;
+    case 'journey':
+      openModal(`<h2>🌟 Start a New Journey?</h2>
+        <p>Your skills, items, gold and zones reset to the start. You earn <b>${renownGain()} Renown</b> and keep achievements, Renown and upgrades.</p>
+        <div class="row"><button data-a="journey-yes">Begin the journey</button><button data-a="close">Not yet</button></div>`);
+      break;
+    case 'journey-yes': newJourney(); closeModal(); openTab('activity'); break;
     case 'save': save(); log('💾 Game saved.'); break;
     case 'close': closeModal(); break;
     case 'reset':
@@ -1584,7 +1717,7 @@ document.addEventListener('click', ev => {
         <div class="row"><button data-a="reset-yes">Yes, delete</button><button data-a="close">Cancel</button></div>`);
       break;
     case 'reset-yes':
-      S = newState(); recalcLevels(); R.phase = 'walk'; R.ent = null; R.worldX = 0;
+      S = newState(); recalcLevels(); recalcBonuses(); R.phase = 'walk'; R.ent = null; R.worldX = 0;
       logLines = []; renderLog(); save(); closeModal(); log('A new journey begins!');
       break;
   }
