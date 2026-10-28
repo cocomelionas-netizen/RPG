@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14121c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Endless Road</title>
 <style>
   :root {
@@ -17,7 +20,8 @@
     --bad: #e86a6a;
     --xp: #6aa8ff;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -27,7 +31,7 @@
     padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
   }
   header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
-  header .stat { color: var(--muted); }
+  header .stat { color: var(--muted); display: inline-block; }
   header .stat b { color: var(--text); }
   #gold b { color: var(--accent); }
   .wrap { max-width: 1200px; margin: 0 auto; padding: 12px 16px; }
@@ -36,8 +40,40 @@
     border-radius: 10px; border: 1px solid var(--line); background: #000;
     image-rendering: auto;
   }
+  #stage { position: relative; }
+  #goal {
+    margin-top: 8px; padding: 8px 12px; border-radius: 8px; cursor: pointer;
+    background: #2b2540; border: 1px solid #4a3f6e; display: flex; gap: 8px; align-items: center;
+  }
+  #goal b { color: var(--accent); white-space: nowrap; }
+  nav.tabs button.alert { position: relative; }
+  nav.tabs button.alert::after {
+    content: ''; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent);
+  }
   main { display: grid; grid-template-columns: 1fr 320px; gap: 12px; margin-top: 12px; }
   @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) {
+    header { padding: 8px 12px; gap: 10px; font-size: 13px; }
+    header h1 { font-size: 16px; width: 100%; }
+    .wrap { padding: 0 0 16px; }
+    #stage {
+      position: sticky; top: 0; z-index: 5; background: var(--bg);
+      padding: 8px 10px 6px; padding-top: max(8px, env(safe-area-inset-top));
+    }
+    #scene { border-radius: 8px; }
+    #goal { margin-top: 6px; font-size: 13px; padding: 6px 10px; }
+    main { padding: 0 10px; margin-top: 6px; }
+    #tab-content { padding: 10px; }
+    .acts { grid-template-columns: 1fr 1fr; }
+    .zones { grid-template-columns: 1fr 1fr; }
+    #log { max-height: 160px; }
+  }
+  @media (pointer: coarse) {
+    button { min-height: 40px; padding: 8px 12px; }
+    .item .btns button { padding: 6px 10px; font-size: 13px; }
+    .eq button { padding: 4px 10px; }
+  }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
   nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); }
   nav.tabs button { flex: 1 1 auto; }
@@ -100,7 +136,10 @@
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
 </header>
 <div class="wrap">
-  <canvas id="scene"></canvas>
+  <div id="stage">
+    <canvas id="scene"></canvas>
+    <div id="goal"></div>
+  </div>
   <main>
     <section class="card">
       <nav class="tabs">
@@ -156,10 +195,10 @@ const TREE_N = ['Birch', 'Oak', 'Maple', 'Yew', 'Magic Tree'];
 const LOG_N = ['Birch Logs', 'Oak Logs', 'Maple Logs', 'Yew Logs', 'Magic Logs'];
 const FISH_N = ['Roach', 'Perch', 'Pike', 'Salmon', 'Eel'];
 const COOKED_N = ['Cooked Roach', 'Cooked Perch', 'Cooked Pike', 'Cooked Salmon', 'Cooked Eel'];
-const GATHER_REQ = [1, 10, 20, 30, 40];
-const GATHER_TIME = [2.4, 2.8, 3.2, 3.6, 4.0];
+const GATHER_REQ = [1, 15, 30, 50, 70];
+const GATHER_TIME = [3, 3.5, 4, 4.5, 5];
 const GATHER_XP = [10, 20, 35, 55, 80];
-const TOOL_COST = [100, 500, 2000, 8000];
+const TOOL_COST = [200, 1500, 8000, 40000];
 const TOOL_NAMES = { axe: 'Axe', pick: 'Pickaxe', rod: 'Fishing Rod' };
 const TOOL_OF = { woodcutting: 'axe', mining: 'pick', fishing: 'rod' };
 
@@ -169,11 +208,11 @@ for (let t = 0; t < 5; t++) {
   defItem('log' + t,    { name: LOG_N[t], icon: '🪵', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Resources' });
   defItem('ore' + t,    { name: METAL[t] + ' Ore', icon: '🪨', tier: t, value: [3, 7, 14, 28, 55][t], type: 'Resources' });
   defItem('fish' + t,   { name: 'Raw ' + FISH_N[t], icon: '🐟', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Resources' });
-  defItem('cooked' + t, { name: COOKED_N[t], icon: '🍽️', tier: t, value: [5, 12, 25, 50, 100][t], heal: [12, 20, 32, 46, 65][t], type: 'Food' });
+  defItem('cooked' + t, { name: COOKED_N[t], icon: '🍽️', tier: t, value: [5, 12, 25, 50, 100][t], heal: [20, 45, 80, 120, 170][t], type: 'Food' });
   defItem('sword' + t,  { name: METAL[t] + ' Sword', icon: '🗡️', tier: t, value: [30, 90, 250, 600, 1500][t], slot: 'weapon', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Equipment' });
   defItem('armor' + t,  { name: METAL[t] + ' Armour', icon: '🥋', tier: t, value: [50, 150, 400, 1000, 2500][t], slot: 'armor', armor: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Equipment' });
 }
-defItem('bread', { name: 'Bread', icon: '🍞', value: 2, heal: 8, type: 'Food' });
+defItem('bread', { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
 defItem('burnt', { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
 defItem('bones', { name: 'Bones', icon: '🦴', value: 3, type: 'Misc' });
 defItem('gem',   { name: 'Gem', icon: '💎', value: 150, type: 'Misc' });
@@ -182,34 +221,34 @@ const FOOD_ORDER = ['cooked4', 'cooked3', 'cooked2', 'cooked1', 'cooked0', 'brea
 
 const RECIPES = [];
 for (let t = 0; t < 5; t++) {
-  RECIPES.push({ out: 'sword' + t, req: [1, 10, 20, 30, 40][t], xp: [15, 30, 55, 90, 140][t], mats: { ['ore' + t]: 3, ['log' + t]: 1 } });
-  RECIPES.push({ out: 'armor' + t, req: [5, 15, 25, 35, 45][t], xp: [25, 50, 90, 150, 230][t], mats: { ['ore' + t]: 5 } });
+  RECIPES.push({ out: 'sword' + t, req: GATHER_REQ[t], xp: [15, 30, 55, 90, 140][t], mats: { ['ore' + t]: 3, ['log' + t]: 1 } });
+  RECIPES.push({ out: 'armor' + t, req: GATHER_REQ[t] + 5, xp: [25, 50, 90, 150, 230][t], mats: { ['ore' + t]: 5 } });
 }
 
 // drops: [item, chance, min, max]
 const ENEMIES = {
   slime:    { name: 'Slime',          hp: 12,   maxHit: 2,  atk: 1,  def: 1,  speed: 2.6, gold: [1, 3],     shape: 'blob',     size: 1,   color: '#5fd35f', drops: [] },
   rat:      { name: 'Rat',            hp: 18,   maxHit: 3,  atk: 3,  def: 2,  speed: 2.2, gold: [1, 4],     shape: 'quad',     size: .6,  color: '#8a7f75', drops: [['bones', .5, 1, 1]] },
-  goblin:   { name: 'Goblin',         hp: 40,   maxHit: 5,  atk: 7,  def: 6,  speed: 2.4, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#7a5a3a', drops: [['bones', .6, 1, 1], ['ore0', .25, 2, 4]] },
-  wolf:     { name: 'Wolf',           hp: 55,   maxHit: 7,  atk: 9,  def: 8,  speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
-  bat:      { name: 'Bat',            hp: 80,   maxHit: 9,  atk: 13, def: 12, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
-  skeleton: { name: 'Skeleton',       hp: 120,  maxHit: 12, atk: 17, def: 16, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['ore1', .25, 2, 4]] },
-  orc:      { name: 'Orc',            hp: 200,  maxHit: 17, atk: 24, def: 24, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bones', 1, 1, 2], ['ore2', .25, 2, 4], ['gem', .03, 1, 1]] },
-  troll:    { name: 'Troll',          hp: 320,  maxHit: 22, atk: 28, def: 30, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bones', 1, 2, 4], ['ore3', .2, 2, 4], ['gem', .05, 1, 1]] },
-  lizard:   { name: 'Fire Lizard',    hp: 450,  maxHit: 28, atk: 36, def: 38, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', drops: [['bones', 1, 1, 2], ['ore4', .2, 1, 3], ['gem', .06, 1, 1]] },
-  dragon:   { name: 'Dragon',         hp: 1200, maxHit: 45, atk: 48, def: 50, speed: 3.2, gold: [200, 400], shape: 'dragon',   size: 1,   color: '#9b2222', drops: [['scale', 1, 1, 1], ['gem', .3, 1, 2]] },
+  goblin:   { name: 'Goblin',         hp: 60,   maxHit: 7,  atk: 11, def: 10, speed: 2.4, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#7a5a3a', drops: [['bones', .6, 1, 1], ['ore0', .25, 2, 4]] },
+  wolf:     { name: 'Wolf',           hp: 75,   maxHit: 9,  atk: 13, def: 12, speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
+  bat:      { name: 'Bat',            hp: 180,  maxHit: 16, atk: 27, def: 25, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
+  skeleton: { name: 'Skeleton',       hp: 260,  maxHit: 20, atk: 31, def: 30, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['ore1', .25, 2, 4]] },
+  orc:      { name: 'Orc',            hp: 520,  maxHit: 32, atk: 48, def: 47, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bones', 1, 1, 2], ['ore2', .25, 2, 4], ['gem', .03, 1, 1]] },
+  troll:    { name: 'Troll',          hp: 800,  maxHit: 40, atk: 54, def: 54, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bones', 1, 2, 4], ['ore3', .2, 2, 4], ['gem', .05, 1, 1]] },
+  lizard:   { name: 'Fire Lizard',    hp: 1200, maxHit: 50, atk: 68, def: 68, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', drops: [['bones', 1, 1, 2], ['ore4', .2, 1, 3], ['gem', .06, 1, 1]] },
+  dragon:   { name: 'Dragon',         hp: 4000, maxHit: 75, atk: 80, def: 80, speed: 3.2, gold: [200, 400], shape: 'dragon',   size: 1,   color: '#9b2222', drops: [['scale', 1, 1, 1], ['gem', .3, 1, 2]] },
 };
 
 const ZONES = [
   { name: 'Green Meadow',    req: 1,  enemies: ['slime', 'rat'],
     th: { sky: ['#78c4ff', '#dff3ff'], far: '#a9cbe0', mid: '#79c062', near: '#4c9a3f', ground: '#5c9a3c', dirt: '#7a5a3a', sun: '#fff3a0', decor: 'tree' } },
-  { name: 'Dark Forest',     req: 5,  enemies: ['goblin', 'wolf'],
+  { name: 'Dark Forest',     req: 10, enemies: ['goblin', 'wolf'],
     th: { sky: ['#3f6b7d', '#a5c6b2'], far: '#4f7366', mid: '#2f5d3a', near: '#1b3b24', ground: '#365f2b', dirt: '#4a3826', sun: '#e8f0c0', decor: 'pine' } },
-  { name: 'Shadow Caves',    req: 12, enemies: ['bat', 'skeleton'],
+  { name: 'Shadow Caves',    req: 25, enemies: ['bat', 'skeleton'],
     th: { sky: ['#140f1d', '#352841'], far: '#2a2134', mid: '#3a2e46', near: '#22192b', ground: '#4a3f4f', dirt: '#2a2230', sun: null, decor: 'stalag', cave: true } },
-  { name: 'Ice Mountains',   req: 22, enemies: ['orc', 'troll'],
+  { name: 'Ice Mountains',   req: 45, enemies: ['orc', 'troll'],
     th: { sky: ['#8fa9cc', '#eef4fb'], far: '#d3deeb', mid: '#97aac0', near: '#5f7186', ground: '#e9eff6', dirt: '#a3b0be', sun: '#ffffff', decor: 'rock', snow: true } },
-  { name: 'Dragon\'s Lair',  req: 32, enemies: ['lizard', 'lizard', 'lizard', 'dragon'],
+  { name: 'Dragon\'s Lair',  req: 65, enemies: ['lizard', 'lizard', 'lizard', 'lizard', 'dragon'],
     th: { sky: ['#2a0808', '#c2481e'], far: '#5a1a14', mid: '#3a1410', near: '#1c0806', ground: '#2b1a17', dirt: '#140b09', sun: '#ffb347', decor: 'spike', lava: true } },
 ];
 
@@ -222,7 +261,7 @@ let LV = {};           // level cache
 let SIM = false;       // fast simulation (offline) - no visuals
 const R = {            // runtime state (not saved)
   worldX: 0, phase: 'walk', ent: null, atkT: 0, deadT: 0, doneT: 0,
-  swing: 0, eatFlash: 0,
+  swing: 0, eatFlash: 0, pendingHit: 0, shake: 0, freeze: 0, heroHit: 0, ring: 0, banner: null,
 };
 let time = 0;
 let floaters = [], particles = [], logLines = [];
@@ -232,7 +271,7 @@ function newState() {
   return {
     v: 1, gold: 25, skills: Object.fromEntries(Object.keys(SKILLS).map(k => [k, 0])),
     inv: { bread: 5 }, equip: { weapon: null, armor: null }, tools: { axe: 0, pick: 0, rod: 0 },
-    activity: 'combat', zone: 0, style: 'attack', hp: 50, kills: 0, dist: 0, last: Date.now(),
+    activity: 'combat', zone: 0, style: 'attack', hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -282,7 +321,8 @@ function addXp(skill, amt) {
   if (LV[skill] > before) {
     if (skill === 'hitpoints') S.hp += (LV[skill] - before) * 10;
     log(`${SKILLS[skill].icon} ${SKILLS[skill].name} reached level ${LV[skill]}!`, 'lg-xp');
-    floatText(HX, GY - 140, `${SKILLS[skill].name} ${LV[skill]}!`, '#6aa8ff', 1.6);
+    showBanner(`${SKILLS[skill].icon} ${SKILLS[skill].name} level ${LV[skill]}!`);
+    if (!SIM) R.ring = 1;
   }
   uiDirty = true;
 }
@@ -300,16 +340,18 @@ function damageReduction() { return Math.min(0.6, armorValue() * 0.02 + LV.defen
 function gatherTier(skill) {
   let t = 0;
   for (let i = 0; i < 5; i++) if (LV[skill] >= GATHER_REQ[i]) t = i;
-  return Math.min(t, S.zone);
+  return t;
 }
 function gatherTime(skill, tier) { return GATHER_TIME[tier] * (1 - 0.12 * S.tools[TOOL_OF[skill]]); }
 
 /* ================= GAME LOGIC ================= */
 
-const W = 960, H = 320, GY = 262, HX = 230, WALK = 230;
+let W = 960, HX = 230, FS = 1;   // view width, hero x and font scale change on phones
+const H = 320, GY = 262, WALK = 230;
 
 function spawnEntity() {
-  const x = R.worldX + (W - HX) + 60 + Math.random() * 140;
+  // fixed distance so pacing (and offline progress) is the same on every screen size
+  const x = R.worldX + Math.max(790, W - HX + 60) + Math.random() * 140;
   const act = S.activity;
   if (act === 'combat') {
     const pool = ZONES[S.zone].enemies;
@@ -327,7 +369,7 @@ function spawnEntity() {
 }
 
 function startAct() {
-  R.atkT = PLAYER_SPEED * 0.35;
+  R.atkT = PLAYER_SPEED * 0.35; R.pendingHit = 0;
 }
 
 function tick(dt) {
@@ -335,7 +377,7 @@ function tick(dt) {
   if (R.phase === 'walk') {
     R.worldX += WALK * dt;
     S.dist += WALK * dt / 40;
-    S.hp = Math.min(maxHp(), S.hp + maxHp() * 0.02 * dt);
+    S.hp = Math.min(maxHp(), S.hp + maxHp() * 0.005 * dt);
     if (!R.ent) spawnEntity();
     if (R.ent.x - R.worldX <= R.ent.stop) { R.phase = 'act'; startAct(); }
   } else if (R.phase === 'act') {
@@ -353,18 +395,9 @@ function tick(dt) {
 function combatTick(dt) {
   const e = R.ent;
   R.atkT -= dt; e.atkT -= dt;
-  if (R.atkT <= 0) {
-    R.atkT += PLAYER_SPEED;
-    R.swing = 1;
-    if (Math.random() < playerHitChance(e)) {
-      const dmg = Math.min(e.hp, 1 + Math.floor(Math.random() * playerMaxHit()));
-      e.hp -= dmg; e.hit = 1;
-      addXp(S.style, dmg * 4);
-      addXp('hitpoints', dmg * 1.33);
-      floatText(entScreenX(e), GY - entHeight(e) - 10, '-' + dmg, '#ffd166');
-      burst(entScreenX(e), GY - entHeight(e) * 0.55, '#ff5a5a', 6);
-    } else floatText(entScreenX(e), GY - entHeight(e) - 10, 'Miss', '#bbbbbb');
-  }
+  if (R.atkT <= 0) { R.atkT += PLAYER_SPEED; R.swing = 1; R.pendingHit = 0.12; }
+  // damage lands when the swing connects, not when it starts
+  if (R.pendingHit > 0) { R.pendingHit -= dt; if (R.pendingHit <= 0) playerHit(e); }
   if (e.hp <= 0) { killEnemy(e); return; }
   if (e.atkT <= 0) {
     e.atkT += e.d.speed;
@@ -374,13 +407,32 @@ function combatTick(dt) {
       const dmg = Math.max(1, Math.round(raw * (1 - damageReduction())));
       S.hp -= dmg;
       addXp('defence', S.style === 'defence' ? 0 : dmg * 0.5);
-      floatText(HX, GY - 108, '-' + dmg, '#ff6b6b');
+      floatText(HX - 18, GY - 108, '-' + dmg, '#ff6b6b', 1, 1, true);
       burst(HX + 4, GY - 40, '#c22', 5);
-    } else floatText(HX, GY - 108, 'Dodge', '#9ad');
+      R.heroHit = 1;
+      R.shake = Math.max(R.shake, e.d.shape === 'dragon' ? 9 : 3);
+    } else floatText(HX - 18, GY - 108, 'Dodge', '#9ad', 1, 1, true);
   }
   autoEat();
   if (S.hp <= 0) die();
 }
+
+function playerHit(e) {
+  const ex = entScreenX(e), ey = GY - entHeight(e) - 10;
+  if (Math.random() >= playerHitChance(e)) { floatText(ex, ey, 'Miss', '#bbbbbb'); return; }
+  const mh = playerMaxHit();
+  const roll = 1 + Math.floor(Math.random() * mh);
+  const crit = roll >= Math.max(3, mh * 0.9);
+  const dmg = Math.min(e.hp, roll);
+  e.hp -= dmg; e.hit = 1;
+  addXp(S.style, dmg * 4);
+  addXp('hitpoints', dmg * 1.33);
+  floatText(ex, ey, crit ? dmg + '!' : '-' + dmg, crit ? '#ffe14a' : '#ffd166', 1, crit ? 1.6 : 1);
+  burst(ex, GY - entHeight(e) * 0.55, crit ? '#ffe14a' : '#ff5a5a', crit ? 12 : 6);
+  if (crit && !SIM) { R.shake = Math.max(R.shake, 5); R.freeze = 0.06; }
+}
+
+function foodCount() { return FOOD_ORDER.reduce((a, id) => a + has(id), 0); }
 
 function autoEat() {
   let guard = 10;
@@ -390,13 +442,18 @@ function autoEat() {
     take(food);
     S.hp = Math.min(maxHp(), S.hp + ITEMS[food].heal);
     R.eatFlash = 1;
-    floatText(HX, GY - 124, '+' + ITEMS[food].heal, '#6fd27a');
+    floatText(HX + 18, GY - 120, '+' + ITEMS[food].heal, '#6fd27a', 1, 1, true);
+    const left = foodCount();
+    if (left === 5) log('⚠️ Only 5 food left!', 'lg-bad');
+    if (left === 0) log('⚠️ Out of food! Fish and cook, or buy bread.', 'lg-bad');
   }
 }
 
 function die() {
-  S.hp = 0; R.phase = 'dead'; R.deadT = 4;
-  log(`💀 You were defeated by ${R.ent.d.name}. Recovering...`, 'lg-bad');
+  const lost = Math.floor(S.gold * 0.1);
+  S.gold -= lost; S.deaths++;
+  S.hp = 0; R.phase = 'dead'; R.deadT = 20;
+  log(`💀 You were defeated by ${R.ent.d.name} and dropped ${fmt(lost)} gold. Recovering...`, 'lg-bad');
   uiDirty = true;
 }
 
@@ -404,12 +461,18 @@ function killEnemy(e) {
   const g = randi(e.d.gold[0], e.d.gold[1]);
   S.gold += g; S.kills++;
   const got = [`${g} gold`];
+  const ex = entScreenX(e), ey = GY - entHeight(e) * 0.5;
   for (const [id, ch, mn, mx] of e.d.drops) {
-    if (Math.random() < ch) { const n = randi(mn, mx); give(id, n); got.push(`${n}× ${ITEMS[id].name}`); }
+    if (Math.random() < ch) {
+      const n = randi(mn, mx); give(id, n); got.push(`${n}× ${ITEMS[id].name}`);
+      if (ITEMS[id].value >= 150) { log(`✨ Rare drop: ${ITEMS[id].icon} ${ITEMS[id].name}!`, 'lg-xp'); showBanner(`✨ Rare drop: ${ITEMS[id].name}!`); }
+    }
   }
   log(`⚔️ Defeated ${e.d.name} (${got.join(', ')})`, 'lg-gold');
-  floatText(entScreenX(e), GY - entHeight(e) - 30, '+' + g + ' 🪙', '#f2c94c', 1.4);
-  burst(entScreenX(e), GY - entHeight(e) * 0.5, e.d.color, 18);
+  floatText(ex, GY - entHeight(e) - 30, '+' + g + ' 🪙', '#f2c94c', 1.4);
+  burst(ex, ey, e.d.color, 18);
+  coinsFly(ex, ey, Math.min(12, 3 + Math.floor(g / 10)));
+  if (!SIM) { R.shake = Math.max(R.shake, e.d.shape === 'dragon' ? 12 : 4); R.freeze = 0.08; }
   R.phase = 'done'; R.doneT = 0.6; e.dying = true;
   uiDirty = true;
 }
@@ -460,6 +523,7 @@ function smith(i, n) {
   give(r.out, n);
   addXp('smithing', r.xp * n);
   log(`🔨 Smithed ${n}× ${ITEMS[r.out].name}`, 'lg-good');
+  if (isUpgrade(r.out)) equip(r.out);
 }
 
 function cook(t, n) {
@@ -495,6 +559,14 @@ function equip(id) {
   S.equip[it.slot] = id;
   log(`Equipped ${it.name}`);
 }
+function canEquip(id) {
+  const it = ITEMS[id];
+  return it.slot && LV[it.slot === 'weapon' ? 'attack' : 'defence'] >= it.req;
+}
+function isUpgrade(id) {
+  const it = ITEMS[id], cur = S.equip[it.slot];
+  return canEquip(id) && (!cur || ITEMS[cur].tier < it.tier);
+}
 function unequip(slot) {
   if (!S.equip[slot]) return;
   give(S.equip[slot]); S.equip[slot] = null; uiDirty = true;
@@ -517,7 +589,7 @@ function buyBread(n) {
 /* ================= OFFLINE ================= */
 
 function snapshot() {
-  return { skills: { ...S.skills }, lv: { ...LV }, inv: { ...S.inv }, gold: S.gold, kills: S.kills };
+  return { skills: { ...S.skills }, lv: { ...LV }, inv: { ...S.inv }, gold: S.gold, kills: S.kills, deaths: S.deaths };
 }
 function simulate(sec) {
   sec = Math.min(sec, OFFLINE_CAP);
@@ -525,7 +597,8 @@ function simulate(sec) {
   const step = 0.2;
   for (let t = 0; t < sec; t += step) tick(step);
   SIM = false;
-  floaters = []; particles = [];
+  floaters = []; particles = []; coins = [];
+  R.shake = R.freeze = R.ring = 0; R.banner = null;
   return sec;
 }
 function showOfflineSummary(sec, before) {
@@ -539,7 +612,8 @@ function showOfflineSummary(sec, before) {
     const d = (S.inv[id] || 0) - (before.inv[id] || 0);
     if (d) lines.push(`${ITEMS[id].icon} ${ITEMS[id].name}: <span class="${d > 0 ? 'have' : 'need'}">${d > 0 ? '+' : ''}${d}</span>`);
   }
-  if (S.gold !== before.gold) lines.push(`🪙 Gold: +${fmt(S.gold - before.gold)}`);
+  if (S.gold !== before.gold) lines.push(`🪙 Gold: ${S.gold > before.gold ? '+' : '−'}${fmt(Math.abs(S.gold - before.gold))}`);
+  if (S.deaths !== before.deaths) lines.push(`💀 Deaths: ${S.deaths - before.deaths}`);
   if (S.kills !== before.kills) lines.push(`⚔️ Enemies defeated: ${S.kills - before.kills}`);
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
   openModal(`<h2>Welcome back!</h2>
@@ -555,6 +629,10 @@ function closeModal() { document.getElementById('modal').hidden = true; }
 const canvas = document.getElementById('scene');
 const ctx = canvas.getContext('2d');
 function resizeCanvas() {
+  // phones get a narrower, zoomed-in view so the hero and text stay readable
+  const narrow = window.innerWidth < 700;
+  W = narrow ? 560 : 960; HX = narrow ? 140 : 230; FS = narrow ? 1.35 : 1;
+  canvas.style.aspectRatio = `${W} / ${H}`;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -602,10 +680,11 @@ function drawBackground(z) {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
   if (th.sun) {
-    const sg = ctx.createRadialGradient(790, 70, 5, 790, 70, 90);
+    const sx = W - 170;
+    const sg = ctx.createRadialGradient(sx, 70, 5, sx, 70, 90);
     sg.addColorStop(0, th.sun); sg.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = sg; ctx.fillRect(690, 0, 200, 170);
-    circle(790, 70, 26, th.sun);
+    ctx.fillStyle = sg; ctx.fillRect(sx - 100, 0, 200, 170);
+    circle(sx, 70, 26, th.sun);
   }
   if (th.cave) {
     // distant crystals
@@ -740,10 +819,10 @@ function drawHero() {
   const dead = R.phase === 'dead';
   ellipse(HX, GY + 2, 18, 4, 'rgba(0,0,0,0.25)');
   drawHumanoid({
-    x: dead ? HX - 30 : HX, y: GY + bob - (dead ? 6 : 0), s: 1, face: 1,
+    x: (dead ? HX - 30 : HX) - R.heroHit * 5, y: GY + bob - (dead ? 6 : 0), s: 1, face: 1,
     rot: dead ? -Math.PI / 2 : 0,
     walk: walking ? Math.sin(time * 13) * 0.6 : 0,
-    arm: heroArmAngle(), body, leg: '#3b3550', skin: '#f1c27d',
+    arm: heroArmAngle(), body: R.heroHit > 0.5 ? '#d84a4a' : body, leg: '#3b3550', skin: R.heroHit > 0.5 ? '#ff9a8a' : '#f1c27d',
     headExtra: () => {
       if (armor) { ctx.fillStyle = shade(body, -0.1); ctx.beginPath(); ctx.arc(0, -61, 11, Math.PI, 0); ctx.fill(); ctx.fillRect(-11, -62, 22, 3); }
       else { ctx.fillStyle = '#6b3e1f'; ctx.beginPath(); ctx.arc(-1, -62, 10.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
@@ -900,9 +979,19 @@ function chips(e) {
 }
 
 /* --- effects --- */
-function floatText(sx, y, text, color, life = 1) {
+let coins = [];
+function floatText(sx, y, text, color, life = 1, size = 1, screen = false) {
   if (SIM) return;
-  floaters.push({ wx: R.worldX + sx - HX + rand(-6, 6), y, text, color, life, max: life });
+  floaters.push({ sx: sx + rand(-6, 6), wx: R.worldX + sx - HX + rand(-6, 6), y, text, color, life, max: life, size, screen });
+}
+function showBanner(text) { if (!SIM) R.banner = { text, t: 2.2 }; }
+function coinsFly(sx, y, n) {
+  if (SIM) return;
+  for (let i = 0; i < n; i++) coins.push({ x0: sx, y0: y, cx: sx + rand(-80, 40), cy: y - rand(80, 160), t: -i * 0.04 });
+}
+function pulseGold() {
+  const el = document.getElementById('gold');
+  if (el.animate) el.animate([{ transform: 'scale(1.3)', color: '#f2c94c' }, { transform: 'scale(1)' }], { duration: 260 });
 }
 function burst(sx, y, color, n) {
   if (SIM) return;
@@ -911,6 +1000,14 @@ function burst(sx, y, color, n) {
 function updateVisuals(dt) {
   R.swing = Math.max(0, R.swing - dt * 3.2);
   R.eatFlash = Math.max(0, R.eatFlash - dt * 2);
+  R.shake = Math.max(0, R.shake - dt * 30);
+  R.heroHit = Math.max(0, R.heroHit - dt * 4);
+  R.ring = Math.max(0, R.ring - dt * 1.2);
+  if (R.banner && (R.banner.t -= dt) <= 0) R.banner = null;
+  let arrived = false;
+  for (const c of coins) { c.t += dt * 1.6; if (c.t >= 1) arrived = true; }
+  coins = coins.filter(c => c.t < 1);
+  if (arrived) pulseGold();
   if (R.ent) { R.ent.hit = Math.max(0, R.ent.hit - dt * 3); if (R.ent.lunge !== undefined) R.ent.lunge = Math.max(0, R.ent.lunge - dt * 3); }
   for (const f of floaters) { f.life -= dt; f.y -= 30 * dt; }
   floaters = floaters.filter(f => f.life > 0);
@@ -923,22 +1020,36 @@ function bar(x, y, w, h, frac, color) {
   rr(x, y, Math.max(0, w * clamp(frac, 0, 1)), h, 2, color);
 }
 
+function font(weight, px) { ctx.font = `${weight} ${Math.round(px * FS)}px system-ui, sans-serif`; }
+
 function drawHud() {
+  if (S.hp < maxHp() * 0.3 && R.phase === 'act') {
+    const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.6);
+    v.addColorStop(0, 'rgba(160,0,0,0)'); v.addColorStop(1, `rgba(160,0,0,${0.35 + 0.15 * Math.sin(time * 6)})`);
+    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  }
   const z = ZONES[S.zone];
   const act = { combat: '⚔️ Combat', woodcutting: '🪓 Woodcutting', mining: '⛏️ Mining', fishing: '🎣 Fishing' }[S.activity];
-  ctx.font = '600 14px system-ui, sans-serif';
+  font(600, 14);
   const label = `${z.name} · ${act}`;
-  rr(10, 10, ctx.measureText(label).width + 20, 26, 6, 'rgba(0,0,0,0.45)');
-  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, 20, 23);
+  const lh = 26 * FS;
+  rr(10, 10, ctx.measureText(label).width + 20, lh, 6, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(label, 20, 10 + lh / 2);
 
-  // hero HP
+  // hero HP + food left
   bar(HX - 25, GY - 92, 50, 6, S.hp / maxHp(), R.eatFlash > 0 ? '#b6ffb0' : '#5fd35f');
+  if (S.activity === 'combat') {
+    font(600, 11);
+    const fc = foodCount();
+    ctx.fillStyle = fc ? '#fff' : '#ff7070'; ctx.textAlign = 'right';
+    ctx.fillText(`🍞${fc}`, HX - 30, GY - 89); ctx.textAlign = 'left';
+  }
   const e = R.ent;
   if (e && !e.dying && R.phase !== 'walk') {
     const ex = entScreenX(e);
     if (e.kind === 'enemy') {
       const top = GY - entHeight(e) - 24;
-      ctx.font = '600 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+      font(600, 12); ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.strokeText(e.d.name, ex, top - 10);
       ctx.fillText(e.d.name, ex, top - 10);
       bar(ex - 35, top, 70, 6, e.hp / e.maxHp, '#e85a5a');
@@ -947,33 +1058,56 @@ function drawHud() {
     } else {
       const top = e.kind === 'tree' ? GY - 150 : e.kind === 'rock' ? GY - 72 : GY - 40;
       bar(ex - 30, top, 60, 6, e.t / gatherTime(e.skill, e.tier), '#6aa8ff');
-      ctx.font = '11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+      font(400, 11); ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
       ctx.fillText(`${e.yields} left`, ex, top - 9); ctx.textAlign = 'left';
     }
   }
   if (R.phase === 'dead') {
     ctx.fillStyle = 'rgba(80,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
-    ctx.font = '700 28px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+    font(700, 28); ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
     ctx.fillText(`Defeated... ${Math.ceil(R.deadT)}`, W / 2, H / 2 - 30); ctx.textAlign = 'left';
+  }
+  for (const c of coins) {
+    if (c.t < 0) continue;
+    const t = c.t, u = 1 - t, tx = 24, ty = -10;
+    const x = u * u * c.x0 + 2 * u * t * c.cx + t * t * tx, y = u * u * c.y0 + 2 * u * t * c.cy + t * t * ty;
+    circle(x, y, 5, '#f2c94c'); circle(x - 1, y - 1, 2.5, '#fff1a8');
+  }
+  if (R.banner) {
+    const a = clamp(R.banner.t * 2, 0, 1), pop = 1 + 0.3 * clamp((R.banner.t - 1.9) / 0.3, 0, 1);
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(W / 2, 62 * FS); ctx.scale(pop, pop);
+    font(800, 20); ctx.textAlign = 'center';
+    const bw = ctx.measureText(R.banner.text).width + 36;
+    rr(-bw / 2, -18 * FS, bw, 36 * FS, 10, 'rgba(20,16,32,0.8)');
+    ctx.fillStyle = '#f2c94c'; ctx.fillText(R.banner.text, 0, 1);
+    ctx.restore(); ctx.textAlign = 'left';
   }
 }
 
 function draw() {
   const z = ZONES[S.zone];
+  ctx.save();
+  if (R.shake > 0) ctx.translate(rand(-1, 1) * R.shake, rand(-1, 1) * R.shake);
   drawBackground(z);
   if (R.ent) { if (R.ent.kind === 'enemy') drawEnemy(R.ent); else drawNode(R.ent); }
   drawHero();
+  if (R.ring > 0) {
+    ctx.strokeStyle = `rgba(242,201,76,${R.ring})`; ctx.lineWidth = 4 * R.ring;
+    ctx.beginPath(); ctx.ellipse(HX, GY - 40, 30 + (1 - R.ring) * 90, 20 + (1 - R.ring) * 70, 0, 0, Math.PI * 2); ctx.stroke();
+  }
   for (const p of particles) { ctx.globalAlpha = clamp(p.life * 2, 0, 1); ctx.fillStyle = p.color; ctx.fillRect(p.wx - R.worldX + HX - 2, p.y - 2, 4, 4); }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const f of floaters) {
     ctx.globalAlpha = clamp(f.life / f.max * 1.5, 0, 1);
-    ctx.font = '700 15px system-ui, sans-serif';
+    const pop = 1 + 0.5 * clamp((f.life - f.max + 0.15) / 0.15, 0, 1);
+    font(700, 15 * f.size * pop);
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-    const x = f.wx - R.worldX + HX;
+    const x = f.screen ? f.sx : f.wx - R.worldX + HX;
     ctx.strokeText(f.text, x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.text, x, f.y);
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  ctx.restore();
   drawHud();
 }
 
@@ -997,7 +1131,7 @@ function htmlActivity() {
     const what = S.activity === 'combat' ? z.enemies.filter((v, k, a) => a.indexOf(v) === k).map(id => ENEMIES[id].name).join(', ')
       : S.activity === 'woodcutting' ? TREE_N[i] : S.activity === 'mining' ? METAL[i] + ' Ore' : FISH_N[i];
     return `<button class="zone ${S.zone === i ? 'sel' : ''}" ${locked ? 'disabled' : ''} data-a="zone" data-id="${i}">
-      <b>${locked ? '🔒 ' : ''}${z.name}</b><small>${S.activity === 'combat' ? 'Requires combat level ' + z.req : 'Resources up to: ' + what}</small>
+      <b>${locked ? '🔒 ' : ''}${z.name}</b><small>${S.activity === 'combat' ? 'Requires combat level ' + z.req : 'Scenery only'}</small>
       ${S.activity === 'combat' ? `<small>${what}</small>` : ''}</button>`;
   }).join('') + '</div>';
 
@@ -1012,10 +1146,10 @@ function htmlActivity() {
   } else {
     const sk = S.activity, t = gatherTier(sk);
     const node = sk === 'woodcutting' ? TREE_N[t] : sk === 'mining' ? METAL[t] + ' Rock' : 'Fishing Spot (' + FISH_N[t] + ')';
-    const nextT = GATHER_REQ.findIndex((r, i) => i > t && (LV[sk] < r || i > S.zone));
+    const nextT = t < 4 ? t + 1 : -1;
     h += `<b>Target:</b> ${node}<br><span class="muted">${gatherTime(sk, t).toFixed(2)}s per item · ${GATHER_XP[t]} XP · tool level ${S.tools[TOOL_OF[sk]]}/4</span>`;
     if (nextT > 0) {
-      const needLv = LV[sk] < GATHER_REQ[nextT], needZone = nextT > S.zone;
+      const needLv = true, needZone = false;
       h += `<p class="muted">Next tier (${sk === 'woodcutting' ? TREE_N[nextT] : sk === 'mining' ? METAL[nextT] + ' Ore' : FISH_N[nextT]}): ` +
         [needLv ? `${SKILLS[sk].name} level ${GATHER_REQ[nextT]}` : '', needZone ? `zone "${ZONES[nextT].name}"` : ''].filter(Boolean).join(' and ') + '</p>';
     }
@@ -1110,7 +1244,7 @@ function renderTab(force) {
 
 function renderHero() {
   const mh = maxHp();
-  const food = FOOD_ORDER.reduce((a, id) => a + has(id), 0);
+  const food = foodCount();
   const eq = slot => S.equip[slot]
     ? `<span>${itemLabel(S.equip[slot])}</span><button data-a="unequip" data-id="${slot}">Unequip</button>`
     : '<span class="muted">—</span>';
@@ -1127,6 +1261,47 @@ function renderHero() {
   $('#dist b').textContent = fmt(S.dist) + ' m';
 }
 
+function nextGoal() {
+  const ownsAny = pre => Object.keys(S.inv).some(id => id.startsWith(pre));
+  if (!S.equip.weapon) {
+    if (ownsAny('sword')) return { t: 'Equip your sword', tab: 'inventory' };
+    if (has('ore0') < 3) return { t: `Mine Copper Ore (${has('ore0')}/3)` + (S.activity === 'mining' ? '' : ' – choose ⛏️ Mining'), tab: 'activity' };
+    if (has('log0') < 1) return { t: 'Chop a Birch Log' + (S.activity === 'woodcutting' ? '' : ' – choose 🪓 Woodcutting'), tab: 'activity' };
+    return { t: 'Smith a Copper Sword', tab: 'smithing' };
+  }
+  const upg = Object.keys(S.inv).find(id => ITEMS[id].slot && isUpgrade(id));
+  if (upg) return { t: `Equip your ${ITEMS[upg].name}`, tab: 'inventory' };
+  if (foodCount() < 5) {
+    const raw = [0, 1, 2, 3, 4].some(t => has('fish' + t) && LV.cooking >= GATHER_REQ[t]);
+    return raw ? { t: 'Low on food – cook your fish', tab: 'cooking' } : { t: 'Low on food – go 🎣 Fishing, or buy Bread', tab: 'activity' };
+  }
+  const best = ZONES.reduce((b, z, i) => combatLevel() >= z.req ? i : b, 0);
+  if (S.activity === 'combat' && S.zone < best) return { t: `${ZONES[best].name} is unlocked – travel there`, tab: 'activity' };
+  const nz = ZONES.findIndex(z => combatLevel() < z.req);
+  if (nz >= 0) return { t: `Reach combat level ${ZONES[nz].req} to unlock ${ZONES[nz].name} (now ${combatLevel()})`, tab: 'activity' };
+  return { t: 'Defeat the Dragon and master every skill', tab: 'skills' };
+}
+let lastGoal = '';
+function renderGoal() {
+  const g = nextGoal();
+  const html = `<b>🎯 Goal</b><span>${g.t}</span>`;
+  const el = document.getElementById('goal');
+  if (html !== lastGoal) { el.innerHTML = html; lastGoal = html; }
+  el.dataset.goto = g.tab;
+  const alerts = {
+    smithing: RECIPES.some(r => LV.smithing >= r.req && maxCraft(r.mats) > 0),
+    cooking: [0, 1, 2, 3, 4].some(t => has('fish' + t) && LV.cooking >= GATHER_REQ[t]),
+    shop: ['axe', 'pick', 'rod'].some(t => S.tools[t] < 4 && S.gold >= TOOL_COST[S.tools[t]]),
+    inventory: Object.keys(S.inv).some(id => ITEMS[id].slot && isUpgrade(id)),
+  };
+  document.querySelectorAll('nav.tabs [data-tab]').forEach(b => b.classList.toggle('alert', !!alerts[b.dataset.tab] && b.dataset.tab !== tab));
+}
+function openTab(name) {
+  tab = name;
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('sel', b.dataset.tab === name));
+  renderTab(true);
+}
+
 function renderLog() {
   const el = document.getElementById('log');
   if (el) el.innerHTML = logLines.map(l => `<div class="${l.cls}">${l.msg}</div>`).join('');
@@ -1134,10 +1309,12 @@ function renderLog() {
 
 document.addEventListener('click', ev => {
   const tb = ev.target.closest('[data-tab]');
-  if (tb) {
-    tab = tb.dataset.tab;
-    document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('sel', b === tb));
-    renderTab(true); return;
+  if (tb) { openTab(tb.dataset.tab); return; }
+  const goal = ev.target.closest('#goal');
+  if (goal) {
+    openTab(goal.dataset.goto);
+    if (window.innerWidth < 700) document.querySelector('nav.tabs').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
   }
   const b = ev.target.closest('[data-a]');
   if (!b || b.disabled) return;
@@ -1180,10 +1357,11 @@ function frame(now) {
     const sec = simulate(dt);
     if (sec > 60) showOfflineSummary(sec, before);
     uiDirty = true;
-  } else tick(dt);
+  } else if (R.freeze > 0) R.freeze -= dt;   // hit-stop
+  else tick(dt);
   draw();
   uiTimer += dt; saveTimer += dt;
-  if (uiTimer > 0.25) { uiTimer = 0; renderHero(); if (uiDirty) { uiDirty = false; renderTab(); } }
+  if (uiTimer > 0.25) { uiTimer = 0; renderHero(); renderGoal(); if (uiDirty) { uiDirty = false; renderTab(); } }
   if (saveTimer > 10) { saveTimer = 0; save(); }
   requestAnimationFrame(frame);
 }
@@ -1199,8 +1377,9 @@ function init() {
     showOfflineSummary(sec, before);
   }
   log('Welcome! Your hero sets off on the endless road.');
-  renderTab(true); renderHero();
+  renderTab(true); renderHero(); renderGoal();
   window.addEventListener('beforeunload', save);
+  window.addEventListener('pagehide', save);   // iOS Safari does not fire beforeunload
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
   requestAnimationFrame(t => { lastFrame = t; requestAnimationFrame(frame); });
 }
