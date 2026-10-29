@@ -64,6 +64,14 @@
   }
   #goal b { color: var(--accent); white-space: nowrap; }
   #ticker { display: none; }
+  #toast {
+    position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%); z-index: 3; pointer-events: none;
+    padding: 8px 16px; border-radius: 12px; background: rgba(20, 16, 32, 0.88); border: 1px solid #6b5a24;
+    color: var(--accent); font-weight: 800; font-size: 18px; text-align: center; max-width: 92%;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); animation: toastIn 0.25s ease-out;
+  }
+  @keyframes toastIn { from { transform: translate(-50%, -50%) scale(1.25); opacity: 0; } }
+  @media (max-width: 700px) { #toast { font-size: 15px; top: 30%; } }
   nav.tabs button.alert { position: relative; }
   nav.tabs button.alert::after {
     content: ''; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
@@ -237,6 +245,7 @@
     <canvas id="scene"></canvas>
     <div id="goal"></div>
     <div id="ticker"></div>
+    <div id="toast" hidden></div>
   </div>
   <main>
     <section class="card">
@@ -289,6 +298,8 @@ const SKILLS = {
   cooking:      { name: 'Cooking',      icon: '🍳' },
   fletching:    { name: 'Fletching',    icon: '🪶' },
   runecrafting: { name: 'Runecrafting', icon: '🔮' },
+  thieving:     { name: 'Thieving',     icon: '🥷' },
+  firemaking:   { name: 'Firemaking',   icon: '🔥' },
 };
 
 // RuneScape/Melvor style XP curve
@@ -421,7 +432,41 @@ const CRAFT = {
   fletching:    { recipes: FLETCH,    time: 2.0, verb: 'Fletch', stat: 'fletched', spark: '#e8c890', place: 'workbenches' },
   runecrafting: { recipes: RUNECRAFT, time: 1.6, verb: 'Craft',  stat: 'rc',       spark: '#c58bff', place: 'rune altars' },
 };
-const CRAFTING = new Set(['smithing', 'cooking', 'fletching', 'runecrafting']);
+const CRAFTING = new Set(['smithing', 'cooking', 'fletching', 'runecrafting', 'firemaking']);
+
+/* ===== Thieving (Melvor-style: stealth vs perception, stunned on failure) ===== */
+const NPCS = {
+  man:      { name: 'Villager',     lvl: 1,  xp: 5,   perception: 50,  gold: [1, 4],     maxHit: 2,  skin: '#f1c27d', body: '#7a6a4a', drops: [['bread', .15, 1, 1]] },
+  farmer:   { name: 'Farmer',       lvl: 5,  xp: 10,  perception: 80,  gold: [2, 7],     maxHit: 3,  skin: '#e8b88a', body: '#5a7a3a', drops: [['log0', .2, 2, 4], ['cooked0', .1, 1, 2]] },
+  golbin:   { name: 'Golbin',       lvl: 15, xp: 18,  perception: 120, gold: [5, 12],    maxHit: 5,  skin: '#6fae46', body: '#5a4030', drops: [['ore_copper', .2, 2, 4], ['ore_tin', .2, 2, 4], ['arrow0', .15, 5, 10]] },
+  miner:    { name: 'Miner',        lvl: 25, xp: 28,  perception: 160, gold: [8, 18],    maxHit: 7,  skin: '#d8a880', body: '#6a5a4a', drops: [['ore_iron', .25, 2, 4], ['ore_coal', .25, 2, 5], ['gem', .01, 1, 1]] },
+  merchant: { name: 'Merchant',     lvl: 40, xp: 45,  perception: 220, gold: [20, 45],   maxHit: 9,  skin: '#f1c27d', body: '#8a3a6a', drops: [['gem', .02, 1, 1], ['bar2', .05, 1, 2]] },
+  guard:    { name: 'Town Guard',   lvl: 55, xp: 65,  perception: 280, gold: [30, 65],   maxHit: 14, skin: '#e8b88a', body: '#5a6a8a', drops: [['bar3', .05, 1, 2], ['cooked2', .1, 1, 2]] },
+  wizard:   { name: 'Wandering Wizard', lvl: 65, xp: 80, perception: 330, gold: [40, 80], maxHit: 16, skin: '#f1d0a8', body: '#3a3a9a', drops: [['rune', .5, 10, 30], ['essence', .3, 5, 15]] },
+  lord:     { name: 'Lord',         lvl: 80, xp: 110, perception: 420, gold: [100, 220], maxHit: 20, skin: '#f1c27d', body: '#8a1a2a', drops: [['gem', .05, 1, 1], ['amu_acc', .005, 1, 1]] },
+};
+const PICKPOCKET_TIME = 2.0, STUN_TIME = 3;
+
+/* ===== Firemaking: burn logs, light bonfires for a global XP bonus ===== */
+const FM_XP = [12, 20, 35, 55, 85];
+const BONFIRE_PCT = [3, 4, 5, 6, 8], BONFIRE_LOGS = 10, BONFIRE_TIME = 600, BURN_TIME = 2.0;
+
+/* ===== Pets: rare finds that follow the hero and give a small bonus ===== */
+const PETS = [
+  { id: 'beaver',  name: 'Beaver',      icon: '🦫', skill: 'woodcutting', desc: '+5% Woodcutting XP' },
+  { id: 'rocky',   name: 'Rocky',       icon: '🦔', skill: 'mining',      desc: '+5% Mining XP' },
+  { id: 'otter',   name: 'Otter',       icon: '🦦', skill: 'fishing',     desc: '+5% Fishing XP' },
+  { id: 'ember',   name: 'Ember',       icon: '🦎', skill: 'smithing',    desc: '+5% Smithing XP' },
+  { id: 'chick',   name: 'Chef Chick',  icon: '🐥', skill: 'cooking',     desc: '+5% Cooking XP' },
+  { id: 'parrot',  name: 'Feathers',    icon: '🦜', skill: 'fletching',   desc: '+5% Fletching XP' },
+  { id: 'owl',     name: 'Rune Owl',    icon: '🦉', skill: 'runecrafting', desc: '+5% Runecrafting XP' },
+  { id: 'cat',     name: 'Shadow',      icon: '🐈', skill: 'thieving',    desc: '+5% Thieving XP' },
+  { id: 'fox',     name: 'Blaze',       icon: '🦊', skill: 'firemaking',  desc: '+5% Firemaking XP' },
+  { id: 'wolf',    name: 'Fang',        icon: '🐺', skill: 'slayer',      desc: '+5% Slayer XP', from: 'Slayer tasks' },
+  { id: 'slimey',  name: 'Slimey',      icon: '🫧', gold: 5,  desc: '+5% gold', from: 'King Slime' },
+  { id: 'drake',   name: 'Baby Dragon', icon: '🐉', dmg: 0.05, desc: '+5% max hit', from: 'the Dragon' },
+];
+const PET_CHANCE = 1 / 3000;   // per skill action
 
 /* ===== Combat data ===== */
 const TYPE_ICON = { melee: '⚔️', ranged: '🏹', magic: '✨' };
@@ -528,6 +573,7 @@ const LOC = [
     res: { fishing: [0, 1, 2] }, stations: ['smithing', 'cooking', 'fletching', 'runecrafting'] },
 ];
 LOC.forEach((l, i) => Object.assign(ZONES[i], l));
+[[0, ['man', 'farmer']], [1, ['golbin']], [2, ['miner']], [3, ['wizard']], [TOWN, ['man', 'merchant', 'guard', 'lord']]].forEach(([i, n]) => { ZONES[i].npcs = n; });
 const GATHERING = ['woodcutting', 'mining', 'fishing'];
 
 /* ===== Shops ===== */
@@ -560,6 +606,8 @@ const QUESTS = [
   { id: 'q11', name: 'Into the Dark', req: 'q8', desc: 'Silence the Bone Lord in the Shadow Caves.', obj: [{ t: 'kill', id: 'cultist', n: 25 }, { t: 'boss', z: 2 }], rew: { gold: 3000, items: { gem: 3 } } },
   { id: 'q12', name: 'Frozen Peaks', req: 'q11', desc: 'Break the Frost Troll\'s hold on the mountains.', obj: [{ t: 'kill', id: 'icemage', n: 30 }, { t: 'boss', z: 3 }], rew: { gold: 10000, items: { scale: 1 } } },
   { id: 'q13', name: 'Master of Arms', req: 'q11', desc: 'Train every combat style.', obj: [{ t: 'level', skill: 'strength', n: 50 }, { t: 'level', skill: 'ranged', n: 50 }, { t: 'level', skill: 'magic', n: 50 }], rew: { gold: 20000, xp: { hitpoints: 5000 } } },
+  { id: 'q15', name: 'Light Fingers', req: 'q1', desc: 'The Riverbend fence wants proof you can lift a purse.', obj: [{ t: 'steal', n: 40 }], rew: { gold: 400, xp: { thieving: 400 } } },
+  { id: 'q16', name: 'Keep the Fires Burning', req: 'q1', desc: 'The road gets cold at night.', obj: [{ t: 'burn', n: 50 }], rew: { xp: { firemaking: 600 }, items: { log1: 30 } } },
   { id: 'q14', name: 'Dragonslayer', req: 'q12', desc: 'End the Dragon at the end of the road.', obj: [{ t: 'boss', z: 4 }], rew: { gold: 50000, items: { dragonbones: 10 } } },
 ];
 
@@ -569,7 +617,7 @@ const SAVE_KEY = 'begalinis-kelias-v1';
 const BOSS_ACH = ['Slime Royalty', 'Chief Toppler', 'Bone Breaker', 'Frostbite', 'Dragonslayer'];
 const SKILL_ACH = { attack: 'Duelist', strength: 'Brute', defence: 'Bulwark', hitpoints: 'Iron Body', ranged: 'Marksman',
   magic: 'Archmage', prayer: 'Devout', slayer: 'Hunter', woodcutting: 'Lumberjack', mining: 'Prospector', fishing: 'Angler',
-  smithing: 'Blacksmith', cooking: 'Chef', fletching: 'Fletcher', runecrafting: 'Runesmith' };
+  smithing: 'Blacksmith', cooking: 'Chef', fletching: 'Fletcher', runecrafting: 'Runesmith', thieving: 'Pickpocket', firemaking: 'Pyromancer' };
 // bonus: [type, percent] – xp: all XP, gold: gold from enemies and chests, gather: gathering speed
 const ACH = [
   { id: 'kill1', name: 'First Blood', desc: 'Defeat an enemy', bonus: ['gold', 1], test: () => S.kills >= 1 },
@@ -595,6 +643,10 @@ const ACH = [
   { id: 'quest5', name: 'Adventurer', desc: 'Complete 5 quests', bonus: ['xp', 3], test: () => questsDone() >= 5 },
   { id: 'questall', name: 'Hero of the Road', desc: 'Complete every quest', bonus: ['gold', 5], test: () => questsDone() >= QUESTS.length },
   { id: 'task10', name: 'Slayer Apprentice', desc: 'Complete 10 Slayer tasks', bonus: ['xp', 3], test: () => S.stats.tasks >= 10 },
+  { id: 'pet1', name: 'Best Friend', desc: 'Find a pet', bonus: ['gold', 2], test: () => Object.keys(S.pets).length >= 1 },
+  { id: 'pet5', name: 'Zookeeper', desc: 'Find 5 pets', bonus: ['xp', 3], test: () => Object.keys(S.pets).length >= 5 },
+  { id: 'steal500', name: 'Sticky Fingers', desc: 'Pickpocket 500 times', bonus: ['gold', 3], test: () => S.stats.stolen >= 500 },
+  { id: 'burn500', name: 'Firestarter', desc: 'Burn 500 logs', bonus: ['xp', 2], test: () => S.stats.burned >= 500 },
   { id: 'unique', name: 'Lucky Drop', desc: 'Find a rare Slayer weapon', bonus: ['gold', 3], test: () => S.stats.uniques >= 1 },
 ];
 const RUP = {
@@ -623,10 +675,10 @@ function newState() {
     activity: 'combat', zone: 0, hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
     styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: -1, prayer: null, pp: 0, autoBury: true,
     zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0 }, cookSel: -1, tipEvent: false,
-    ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, g: {} }, renown: 0, journeys: 0,
+    ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
-    smithV: 2, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {},
+    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {},
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -708,7 +760,7 @@ function take(id, n = 1) {
 function has(id) { return S.inv[id] || 0; }
 
 function addXp(skill, amt) {
-  amt *= xpMult() * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1);
+  amt *= xpMult() * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1);
   const before = LV[skill];
   S.skills[skill] += amt;
   LV[skill] = levelFromXp(S.skills[skill]);
@@ -734,6 +786,8 @@ function locTiers(skill, z = S.zone) { return (ZONES[z].res && ZONES[z].res[skil
 function locHas(i, act) {
   const z = ZONES[i];
   if (act === 'combat') return z.enemies.length > 0;
+  if (act === 'thieving') return !!(z.npcs && z.npcs.length);
+  if (act === 'firemaking') return true;
   if (CRAFTING.has(act)) return (z.stations || []).includes(act);
   return locTiers(act, i).length > 0 || (act === 'mining' && !!z.ess);
 }
@@ -777,7 +831,7 @@ function playerMaxHit() {
   const base = m === 'ranged' ? 4 + LV.ranged * 0.7 + p * 0.8 + ITEMS[bestArrow()].power
     : m === 'magic' ? curSpell().max + LV.magic * 0.35 + p
     : 4 + LV.strength * 0.7 + p;
-  return Math.floor(base * (1 + amu('dmg') + pray('dmg')));
+  return Math.floor(base * (1 + amu('dmg') + pray('dmg') + (S.pets.drake ? 0.05 : 0)));
 }
 function accuracyLevel() {
   const m = attackMode();
@@ -819,7 +873,7 @@ function gatherTime(skill, tier) {
 }
 function nodeTime(e) { return e.ess ? gatherTime('mining', 0) * ESSENCE_TIME / ORES[0].time : gatherTime(e.skill, e.tier); }
 function craftRecipe(skill) { return CRAFT[skill].recipes[S.csel[skill]]; }
-function stationTime(e) { return e.skill === 'cooking' ? COOK_TIME : craftRecipe(e.skill).time || CRAFT[e.skill].time; }
+function stationTime(e) { return e.skill === 'firemaking' ? BURN_TIME : e.skill === 'cooking' ? COOK_TIME : craftRecipe(e.skill).time || CRAFT[e.skill].time; }
 
 /* ===== Achievements, Renown and permanent bonuses ===== */
 const BON = { xp: 0, gold: 0, gather: 0 };
@@ -828,7 +882,18 @@ function recalcBonuses() {
   for (const a of ACH) if (S.ach[a.id]) BON[a.bonus[0]] += a.bonus[1];
 }
 function xpMult() { return 1 + BON.xp / 100 + 0.15 * S.rup.wisdom; }
-function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune; }
+function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune + (S.pets.slimey ? 0.05 : 0); }
+function petFor(skill) { return PETS.some(p => p.skill === skill && S.pets[p.id]); }
+function rollPet(id, chance) {
+  if (S.pets[id] || Math.random() >= chance) return;
+  const p = PETS.find(x => x.id === id);
+  S.pets[id] = true;
+  if (!S.pet) S.pet = id;
+  log(`🐾 A pet found you: ${p.icon} ${p.name}! (${p.desc})`, 'lg-xp');
+  showBanner(`🐾 New pet: ${p.icon} ${p.name}!`); sfx('level');
+  uiDirty = true;
+}
+function rollSkillPet(skill) { const p = PETS.find(x => x.skill === skill); if (p) rollPet(p.id, PET_CHANCE); }
 function walkSpeed() { return WALK * (1 + 0.05 * S.rup.boots); }
 function offlineCap() { return (12 + 2 * S.rup.patience) * 3600; }
 function totalLevel() { return Object.values(LV).reduce((a, l) => a + l, 0); }
@@ -856,7 +921,7 @@ function newJourney() {
   if (!S.bosses[4]) return;
   const gain = renownGain();
   // keep achievements, lifetime stats and Renown; everything else starts over
-  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted,
+  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet,
     renown: S.renown + gain, journeys: S.journeys + 1, tipEvent: true };
   S = Object.assign(newState(), keep);
   const hs = S.rup.headstart;
@@ -889,8 +954,12 @@ function spawnEntity() {
     // archers and mages keep their distance
     const stop = (d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0);
     R.ent = { kind: 'enemy', id, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0, pend: 0 };
+  } else if (act === 'thieving') {
+    const list = (ZONES[S.zone].npcs || []).filter(id => LV.thieving >= NPCS[id].lvl);
+    const id = S.tsel && list.includes(S.tsel) ? S.tsel : list[Math.floor(Math.random() * list.length)] || 'man';
+    R.ent = { kind: 'npc', skill: 'thieving', id, d: NPCS[id], tries: randi(4, 7), t: 0, stun: 0, x, stop: 48, hit: 0 };
   } else if (CRAFTING.has(act)) {
-    const kind = act === 'smithing' ? craftRecipe('smithing').station : { cooking: 'fire', fletching: 'bench', runecrafting: 'altar' }[act];
+    const kind = act === 'smithing' ? craftRecipe('smithing').station : { cooking: 'fire', fletching: 'bench', runecrafting: 'altar', firemaking: 'pyre' }[act];
     R.ent = { kind, skill: act, crafts: STATION_CRAFTS, t: 0, x, stop: 62, hit: 0, swung: false, blocked: false };
   } else {
     const ess = act === 'mining' && S.gsel.mining === -2 && !!ZONES[S.zone].ess;
@@ -901,13 +970,15 @@ function spawnEntity() {
     const stop = kind === 'pond' ? 135 : kind === 'tree' ? 58 : 62;
     R.ent = { kind, skill: act, tier, ess, yields, maxYields: yields, t: 0, x, stop, hit: 0, swung: false };
   }
-  if (!SIM && Math.random() < 0.3) spawnEvent(R.ent.x);
+  if (!SIM && Math.random() < 0.3) spawnEvent(R.ent);
 }
 
 /* ===== Road events: tap them before they scroll away ===== */
-function spawnEvent(entX) {
+// put the find just past whatever the hero will stop at, but never further than the right edge of the screen
+function spawnEvent(ent) {
   const r = Math.random() * 10;
-  R.events.push({ type: r < 5 ? 'chest' : r < 8 ? 'shrine' : 'star', x: entX - rand(150, 260), age: 0 });
+  const limit = ent.x - ent.stop + (W - HX) - 50;
+  R.events.push({ type: r < 5 ? 'chest' : r < 8 ? 'shrine' : 'star', x: Math.min(ent.x + rand(70, 150), limit), age: 0 });
 }
 function evScreen(ev) {
   return { x: ev.x - R.worldX + HX, y: ev.type === 'star' ? GY - 72 + Math.sin(time * 3 + ev.x) * 6 : GY - 22 };
@@ -960,7 +1031,7 @@ function tick(dt) {
     }
   } else if (R.phase === 'act') {
     const k = R.ent.kind;
-    if (k === 'enemy') combatTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
+    if (k === 'enemy') combatTick(dt); else if (k === 'npc') thieveTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
   } else if (R.phase === 'dead') {
     R.deadT -= dt;
     if (R.deadT <= 0) {
@@ -978,6 +1049,7 @@ function tick(dt) {
   }
   if (R.buff > 0) R.buff -= dt;
   if (R.rested > 0) R.rested -= dt;
+  if (S.bonfire && (S.bonfire.left -= dt) <= 0) { S.bonfire = null; log('🔥 Your bonfire has burned out.'); }
   for (const ev of R.events) ev.age += dt;
   R.events = R.events.filter(ev => ev.age < 25 && ev.x - R.worldX + HX > -60);
   if (!SIM) updateVisuals(dt);
@@ -1123,6 +1195,8 @@ function killEnemy(e) {
   if (!SIM) { R.shake = Math.max(R.shake, e.d.boss ? 12 : 4); R.freeze = e.d.boss ? 0.2 : 0.08; }
   if (onTask(e)) slayerKill(e);
   const z = S.zone;
+  if (e.id === 'kingslime') rollPet('slimey', 1 / 30);
+  if (e.id === 'dragon') rollPet('drake', 1 / 40);
   if (e.d.boss) {
     S.zk[z] = 0;
     if (!S.bosses[z]) {
@@ -1151,6 +1225,7 @@ function gatherTick(dt) {
     S.stats.g[key] = (S.stats.g[key] || 0) + 1;
     floatText(entScreenX(e), GY - 120, `+1 ${ITEMS[item].icon}`, '#ffffff');
     sfx('gather');
+    rollSkillPet(e.skill);
     e.yields--;
     if (e.yields <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
   }
@@ -1217,12 +1292,55 @@ function cookOnce(t) {
   return 'cooked' + t;
 }
 
+function stealChance(n) { return clamp((100 + 40 + LV.thieving * 1.5) / (100 + n.perception), 0.1, 0.95); }
+function thieveTick(dt) {
+  const e = R.ent, n = e.d, ex = entScreenX(e);
+  if (e.stun > 0) { e.stun -= dt; return; }
+  e.t += dt;
+  if (e.t < PICKPOCKET_TIME) return;
+  e.t = 0; R.swing = 1;
+  if (Math.random() < stealChance(n)) {
+    const g = Math.round(randi(n.gold[0], n.gold[1]) * goldMult());
+    S.gold += g; S.stats.stolen++;
+    addXp('thieving', n.xp);
+    for (const [id, ch, mn, mx] of n.drops) if (Math.random() < ch) { const k = randi(mn, mx); give(id, k); floatText(ex, GY - 125, `+${k} ${ITEMS[id].icon}`, '#ffffff'); }
+    floatText(ex, GY - 105, `+${g} 🪙`, '#f2c94c'); coinsFly(ex, GY - 50, 3); sfx('coin');
+    rollSkillPet('thieving');
+  } else {
+    // caught: stunned and slapped, but never knocked out by it
+    const dmg = Math.min(Math.max(0, Math.ceil(S.hp) - 1), randi(1, n.maxHit));
+    S.hp -= dmg; e.stun = STUN_TIME; e.hit = 1; R.heroHit = 1;
+    floatText(HX, GY - 108, dmg ? `Stunned! -${dmg}` : 'Stunned!', '#ffb0a0', 1.4, 1, true); sfx('hurt');
+  }
+  if (--e.tries <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
+}
+function fmTarget() {
+  const ok = t => has('log' + t) && LV.firemaking >= GATHER_REQ[t];
+  if (S.fmSel >= 0) return ok(S.fmSel) ? S.fmSel : -1;
+  for (let t = 4; t >= 0; t--) if (ok(t)) return t;
+  return -1;
+}
+function burnOnce(t) {
+  take('log' + t);
+  addXp('firemaking', FM_XP[t]); S.stats.burned++;
+  if (Math.random() < 0.1) give('ore_coal');   // like Melvor, burning now and then leaves coal
+  rollSkillPet('firemaking');
+}
+function lightBonfire(t) {
+  if (LV.firemaking < GATHER_REQ[t] || has('log' + t) < BONFIRE_LOGS) return;
+  take('log' + t, BONFIRE_LOGS);
+  addXp('firemaking', FM_XP[t] * BONFIRE_LOGS);
+  S.bonfire = { pct: BONFIRE_PCT[t], left: BONFIRE_TIME };
+  log(`🔥 Bonfire lit: +${BONFIRE_PCT[t]}% XP for all skills for ${BONFIRE_TIME / 60} minutes`, 'lg-xp');
+  showBanner(`🔥 Bonfire: +${BONFIRE_PCT[t]}% XP`); sfx('magic');
+}
+
 function craftTick(dt) {
-  const e = R.ent, skill = e.skill, cooking = skill === 'cooking';
-  const r = cooking ? null : CRAFT[skill].recipes[S.csel[skill]];
-  const can = cooking ? cookTarget() >= 0 : canCraft(skill, S.csel[skill]);
-  e.reason = r && LV[skill] < r.req ? `Needs ${SKILLS[skill].name} ${r.req}` : 'No materials';
-  if (!can && !e.blocked) log(cooking ? '⚠️ No fish left to cook.' : `⚠️ Out of materials for ${SKILLS[skill].name}.`, 'lg-bad');
+  const e = R.ent, skill = e.skill, cooking = skill === 'cooking', fm = skill === 'firemaking';
+  const r = cooking || fm ? null : CRAFT[skill].recipes[S.csel[skill]];
+  const can = cooking ? cookTarget() >= 0 : fm ? fmTarget() >= 0 : canCraft(skill, S.csel[skill]);
+  e.reason = r && LV[skill] < r.req ? `Needs ${SKILLS[skill].name} ${r.req}` : fm ? 'No logs' : 'No materials';
+  if (!can && !e.blocked) log(cooking ? '⚠️ No fish left to cook.' : fm ? '⚠️ No logs left to burn.' : `⚠️ Out of materials for ${SKILLS[skill].name}.`, 'lg-bad');
   e.blocked = !can;
   if (!can) {
     // don't idle at an empty station all night: go back to what the hero was doing before
@@ -1237,16 +1355,20 @@ function craftTick(dt) {
   }
   const need = stationTime(e), ex = entScreenX(e);
   e.t += dt;
-  if (!cooking && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; burst(ex - 6, GY - 46, CRAFT[skill].spark, 4); }
+  if (!cooking && !fm && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; burst(ex - 6, GY - 46, CRAFT[skill].spark, 4); }
   if (e.t >= need) {
     e.t -= need; e.swung = false; e.hit = 1;
-    if (cooking) {
-      const res = cookOnce(cookTarget());
+    if (fm) {
+      const t = fmTarget(); burnOnce(t);
+      burst(ex, GY - 30, '#ffb347', 10);
+      floatText(ex, GY - 100, `🔥 ${LOG_N[t]}`, '#ffd27a');
+    } else if (cooking) {
+      const res = cookOnce(cookTarget()); rollSkillPet('cooking');
       burst(ex, GY - 40, res === 'burnt' ? '#444444' : '#ffb347', 6);
       floatText(ex, GY - 100, res === 'burnt' ? 'Burnt!' : '+1 🍽️', res === 'burnt' ? '#ff8a5a' : '#ffffff');
     } else {
       R.swing = 1;
-      const [out, n] = craftOnce(skill, S.csel[skill]);
+      const [out, n] = craftOnce(skill, S.csel[skill]); rollSkillPet(skill);
       burst(ex - 6, GY - 46, CRAFT[skill].spark, 8); sfx(skill === 'runecrafting' ? 'magic' : 'clink');
       floatText(ex, GY - 100, `+${n} ${ITEMS[out].icon}`, '#ffffff');
     }
@@ -1362,6 +1484,7 @@ function slayerKill(e) {
   if (--S.task.left > 0) return;
   const bonus = 10 + S.task.n * 2;
   S.scoins += bonus; S.stats.tasks++;
+  rollPet('wolf', 1 / 25);
   log(`💀 Slayer task complete! +${bonus} Slayer coins`, 'lg-xp');
   showBanner('💀 Slayer task complete!'); sfx('level');
   S.task = null;
@@ -1388,6 +1511,8 @@ function objVal(o) {
     case 'gather': return S.stats.g[o.skill] || 0;
     case 'bury': return S.stats.buried;
     case 'tasks': return S.stats.tasks;
+    case 'steal': return S.stats.stolen;
+    case 'burn': return S.stats.burned;
     case 'boss': return S.bosses[o.z] ? 1 : 0;
     case 'level': return LV[o.skill];
   }
@@ -1409,6 +1534,8 @@ function objText(o) {
     case 'gather': return o.skill === 'essence' ? 'Mine Rune Essence' : `Gather (${SKILLS[o.skill].name})`;
     case 'bury': return 'Bury bones';
     case 'tasks': return 'Complete Slayer tasks';
+    case 'steal': return 'Pickpocket successfully';
+    case 'burn': return 'Burn logs';
     case 'boss': return `Defeat ${ENEMIES[ZONES[o.z].boss].name}`;
     case 'level': return `Reach ${SKILLS[o.skill].name} level`;
   }
@@ -1702,6 +1829,8 @@ function heroTool() {
     };
   }
   if (a === 'smithing') return () => { rr(-1.5, 12, 3, 24, 1, '#7a4e2a'); rr(-7, 33, 14, 9, 2, '#5b5f68'); };
+  if (a === 'thieving') return null;
+  if (a === 'firemaking') return () => { rr(-4, 16, 8, 6, 1, '#7a6a5a'); };
   if (a === 'fletching') return () => { rr(-1.5, 14, 3, 8, 1, '#5a3a22'); poly([-2, 22, 2, 22, 0, 36], '#cfd4dc'); };
   if (a === 'runecrafting') return () => {
     const g = ctx.createRadialGradient(0, 24, 1, 0, 24, 14);
@@ -1769,6 +1898,8 @@ function heroArmAngle() {
   if (S.activity === 'fishing') return -2.05 - R.swing * 0.4;
   if (S.activity === 'cooking') return -1.35 + Math.sin(time * 2) * 0.08;
   if (S.activity === 'runecrafting') return -2.3 + Math.sin(time * 3) * 0.1 - R.swing * 0.3;
+  if (S.activity === 'thieving') return R.ent && R.ent.stun > 0 ? 0.4 : -1.25 - R.swing * 0.35;
+  if (S.activity === 'firemaking') return -0.9 - R.swing * 0.5;
   if (S.activity === 'combat' && wtype() !== 'melee') return -1.5 - R.swing * 0.25;
   return -0.6 - 1.9 * R.swing;
 }
@@ -1798,6 +1929,17 @@ function drawHero() {
     },
     tool: heroTool(),
   });
+  if (S.pet && !dead) {
+    const p = PETS.find(x => x.id === S.pet);
+    const px = HX - 44, py = GY - 8 - (walking ? Math.abs(Math.sin(time * 13 + 1)) * 6 : Math.sin(time * 2) * 2);
+    ellipse(px, GY + 2, 10, 3, 'rgba(0,0,0,0.25)');
+    ctx.save(); ctx.translate(px, py); ctx.scale(-1, 1);   // emoji pets face the way the hero walks
+    ctx.font = `${Math.round(24 * FS)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(p.icon, 0, 4); ctx.restore(); ctx.textAlign = 'left';
+  }
+  if (R.ent && R.ent.kind === 'npc' && R.ent.stun > 0) {
+    for (let k = 0; k < 3; k++) { const a = time * 5 + k * 2.1; circle(HX + Math.cos(a) * 14, GY - 76 + Math.sin(a) * 4, 2.5, '#ffe14a'); }
+  }
   if (S.activity === 'fishing' && R.phase === 'act' && R.ent && R.ent.kind === 'pond') {
     const a = heroArmAngle();
     const sx = HX + 5, sy = GY - 46;
@@ -1947,12 +2089,48 @@ function drawNode(e) {
   ctx.restore();
 }
 
+function drawNpc(e) {
+  const n = e.d, fade = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
+  const x = entScreenX(e) + (1 - fade) * 70;   // wanders off after the last try
+  ctx.save(); ctx.globalAlpha = fade;
+  ellipse(x, GY + 2, 16, 4, 'rgba(0,0,0,0.25)');
+  drawHumanoid({
+    x, y: GY, s: 0.95, face: -1, walk: e.dying ? Math.sin(time * 13) * 0.6 : 0, arm: 0.15 + Math.sin(time * 2) * 0.05,
+    body: n.body, leg: shade(n.body, -0.25), skin: n.skin,
+    headExtra: () => {
+      if (e.id === 'wizard') poly([-11, -66, 11, -66, 2, -92], '#3a3a9a');
+      if (e.id === 'guard') { ctx.fillStyle = '#8a8f98'; ctx.beginPath(); ctx.arc(0, -61, 11, Math.PI, 0); ctx.fill(); }
+      if (e.id === 'lord') poly([-8, -67, -8, -75, -3, -70, 0, -77, 3, -70, 8, -75, 8, -67], '#f2c94c');
+      if (e.id === 'golbin') { poly([-8, -62, -18, -70, -6, -56], n.skin); poly([6, -62, 16, -70, 4, -56], n.skin); }
+      if (e.id === 'farmer') { ctx.fillStyle = '#d9b45a'; ctx.fillRect(-14, -68, 28, 4); ctx.fillRect(-8, -76, 16, 9); }
+    },
+  });
+  // coin pouch on the belt
+  circle(x + 9, GY - 30, 4, '#b08a3a');
+  ctx.restore();
+}
+
 function drawStation(e) {
   const x = entScreenX(e);
   const fade = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
   const working = R.phase === 'act' && R.ent === e && !e.blocked;
   ctx.save(); ctx.globalAlpha = fade; ctx.translate(x, GY);
-  if (e.kind === 'furnace') {
+  if (e.kind === 'pyre') {
+    ctx.save(); ctx.rotate(0.3); rr(-22, -6, 44, 8, 3, '#6b4426'); ctx.restore();
+    ctx.save(); ctx.rotate(-0.3); rr(-22, -6, 44, 8, 3, '#7a4e2a'); ctx.restore();
+    rr(-18, -14, 36, 7, 3, '#5a3a22');
+    if (working || e.hit > 0) {
+      const big = 1 + e.hit * 0.4;
+      const glow = ctx.createRadialGradient(0, -24, 4, 0, -24, 70);
+      glow.addColorStop(0, 'rgba(255,170,60,0.55)'); glow.addColorStop(1, 'rgba(255,120,30,0)');
+      ctx.fillStyle = glow; ctx.fillRect(-70, -94, 140, 100);
+      for (let k = 0; k < 4; k++) {
+        const fl = Math.sin(time * 11 + k * 1.7) * 5, hgt = (34 + k * 8 + fl) * big;
+        poly([-16 + k * 8, -10, -8 + k * 8 + fl * 0.4, -10 - hgt, 0 + k * 8, -10], ['#ff5a1a', '#ff8a2a', '#ffb43a', '#ffe06a'][k]);
+      }
+      if (Math.random() < 0.4) particles.push({ wx: R.worldX + entScreenX(e) - HX + rand(-10, 10), y: GY - 50, vx: rand(-15, 15), vy: rand(-90, -50), life: 0.6, color: '#ffb347' });
+    }
+  } else if (e.kind === 'furnace') {
     ellipse(0, 2, 34, 5, 'rgba(0,0,0,0.25)');
     rr(-30, -58, 60, 58, 6, '#6e6a72');
     rr(-14, -96, 18, 40, 2, '#5c5860');
@@ -2085,7 +2263,16 @@ function floatText(sx, y, text, color, life = 1, size = 1, screen = false) {
   if (SIM) return;
   floaters.push({ sx: sx + rand(-6, 6), wx: R.worldX + sx - HX + rand(-6, 6), y, text, color, life, max: life, size, screen });
 }
-function showBanner(text) { if (!SIM) R.banner = { text, t: 2.2 }; }
+let toastTimer = 0;
+function showBanner(text) {
+  if (SIM) return;
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = text; el.hidden = false;
+  el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';   // replay the pop
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2400);
+}
 function coinsFly(sx, y, n) {
   if (SIM) return;
   for (let i = 0; i < n; i++) coins.push({ x0: sx, y0: y, cx: sx + rand(-80, 40), cy: y - rand(80, 160), t: -i * 0.04 });
@@ -2149,6 +2336,13 @@ function drawHud() {
     rr(10, 16 + lh, ctx.measureText(t).width + 16, ph, 6, 'rgba(90,40,140,0.75)');
     ctx.fillStyle = '#f0e0ff'; ctx.fillText(t, 18, 16 + lh + ph / 2);
   }
+  if (S.bonfire) {
+    const t = `🔥 +${S.bonfire.pct}% XP · ${Math.ceil(S.bonfire.left / 60)}m`, ph = 22 * FS;
+    const py = 16 + lh + (R.buff > 0 ? ph + 6 : 0) + (R.rested > 0 ? ph + 6 : 0);
+    font(600, 12);
+    rr(10, py, ctx.measureText(t).width + 16, ph, 6, 'rgba(140,60,10,0.75)');
+    ctx.fillStyle = '#ffe0b0'; ctx.fillText(t, 18, py + ph / 2);
+  }
   if (R.rested > 0) {
     const t = `😴 Rested +50% XP · ${Math.ceil(R.rested / 60)}m`, ph = 22 * FS, py = 16 + lh + (R.buff > 0 ? ph + 6 : 0);
     font(600, 12);
@@ -2188,6 +2382,12 @@ function drawHud() {
       bar(ex - bw / 2, top, bw, e.d.boss ? 8 : 6, e.hp / e.maxHp, '#e85a5a');
       ctx.textAlign = 'left';
       bar(HX - 25, GY - 82, 50, 3, 1 - R.atkT / playerSpeed(), '#f2c94c');
+    } else if (e.kind === 'npc') {
+      const top = GY - 100;
+      font(600, 12); ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      outlined(`${e.d.name} · ${Math.round(stealChance(e.d) * 100)}%`, ex, top - 10 * FS, '#fff');
+      bar(ex - 30, top, 60, 6, e.stun > 0 ? e.stun / STUN_TIME : e.t / PICKPOCKET_TIME, e.stun > 0 ? '#e85a5a' : '#c58bff');
+      ctx.textAlign = 'left';
     } else {
       const craft = CRAFTING.has(e.skill);
       const top = e.kind === 'tree' ? GY - 150 : e.kind === 'rock' ? GY - 72 : e.kind === 'altar' ? GY - 92 : e.kind === 'furnace' ? GY - 112 : craft ? GY - 84 : GY - 40;
@@ -2210,17 +2410,6 @@ function drawHud() {
     const x = u * u * c.x0 + 2 * u * t * c.cx + t * t * tx, y = u * u * c.y0 + 2 * u * t * c.cy + t * t * ty;
     circle(x, y, 5, '#f2c94c'); circle(x - 1, y - 1, 2.5, '#fff1a8');
   }
-  if (R.banner) {
-    const a = clamp(R.banner.t * 2, 0, 1), pop = 1 + 0.3 * clamp((R.banner.t - 1.9) / 0.3, 0, 1);
-    ctx.save(); ctx.globalAlpha = a; ctx.translate(W / 2, 62 * FS); ctx.scale(pop, pop);
-    font(800, 20); ctx.textAlign = 'center';
-    const bw = ctx.measureText(R.banner.text).width + 36;
-    const fit = Math.min(1, (W - 20) / bw);   // shrink long banners on narrow screens
-    ctx.scale(fit, fit);
-    rr(-bw / 2, -18 * FS, bw, 36 * FS, 10, 'rgba(20,16,32,0.8)');
-    ctx.fillStyle = '#f2c94c'; ctx.fillText(R.banner.text, 0, 1);
-    ctx.restore(); ctx.textAlign = 'left';
-  }
 }
 
 function draw() {
@@ -2228,11 +2417,11 @@ function draw() {
   ctx.save();
   if (R.shake > 0) ctx.translate(rand(-1, 1) * R.shake, rand(-1, 1) * R.shake);
   drawBackground(z);
-  drawEvents();
   if (R.ent) {
     const k = R.ent.kind;
-    if (k === 'enemy') drawEnemy(R.ent); else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
+    if (k === 'enemy') drawEnemy(R.ent); else if (k === 'npc') drawNpc(R.ent); else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
   }
+  drawEvents();
   drawHero();
   drawProjs();
   if (R.ring > 0) {
@@ -2413,8 +2602,8 @@ function htmlCombatPanel() {
   return h;
 }
 
-const ACT_ORDER = ['combat', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting'];
-const STATION_NAME = { smithing: '🔥 Furnace and 🔨 Anvil', cooking: '🔥 Campfire', fletching: '🪶 Fletching bench', runecrafting: '🔮 Rune altar' };
+const ACT_ORDER = ['combat', 'thieving', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting', 'firemaking'];
+const STATION_NAME = { smithing: '🔥 Furnace and 🔨 Anvil', cooking: '🔥 Campfire', fletching: '🪶 Fletching bench', runecrafting: '🔮 Rune altar', firemaking: '🔥 Campsite' };
 let mapSel = null, mapAct = null;
 function actIcon(a) { return a === 'combat' ? '⚔️' : SKILLS[a].icon; }
 function enemyLevel(d) { return Math.round((d.atk + d.def) / 2); }
@@ -2486,6 +2675,24 @@ function htmlLocAct(i, a) {
     }
     return h + '</div>';
   }
+  if (a === 'thieving') {
+    const cur = here && R.ent && R.ent.kind === 'npc' ? R.ent.id : null;
+    return '<div class="grid">' + z.npcs.map(id => {
+      const n = NPCS[id], locked = LV.thieving < n.lvl, on = here && (S.tsel === id || (!S.tsel && cur === id));
+      return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">🥷</span>
+        <span class="nm"><b>${n.name}</b> <span class="tag">Thieving ${n.lvl}</span><br>
+        <small>${locked ? '🔒 ' : ''}${Math.round(stealChance(n) * 100)}% success · ${n.xp} XP · ${n.gold[0]}–${n.gold[1]} 🪙 · drops <span class="drops">${[...new Set(n.drops.map(d => ITEMS[d[0]].icon))].join('')}</span></small><br>
+        <small>Getting caught stuns you for ${STUN_TIME}s and hits up to ${n.maxHit}</small></span></div>
+        <div class="btns">${on ? '<button class="sel" disabled>🥷 Pickpocketing…</button>' : `<button data-a="thieve" data-z="${i}" data-id="${id}" ${locked ? 'disabled' : ''}>🥷 Pickpocket</button>`}</div></div>`;
+    }).join('') + '</div>';
+  }
+  if (a === 'firemaking') {
+    const t = fmTarget();
+    return `<div class="item ${here ? 'on' : ''}"><div class="top"><span class="ic">🔥</span><span class="nm"><b>${STATION_NAME[a]}</b><br>
+      <small>${t >= 0 ? `Burning ${S.fmSel < 0 ? 'your best logs' : LOG_N[S.fmSel]} · ${has('log' + t)} ${LOG_N[t]} left` : '<span class="need">No logs you can burn</span>'}</small></span></div>
+      <div class="btns">${here ? '<button class="sel" disabled>🔥 Burning…</button>' : `<button data-a="station" data-z="${i}" data-id="firemaking">🔥 Burn logs here</button>`}
+      <button data-tab="firemaking">Choose logs / bonfire</button></div></div>`;
+  }
   // crafting station
   const detail = a === 'cooking'
     ? (cookTarget() >= 0 ? `Cooking ${S.cookSel < 0 ? 'your best fish' : FISH_N[S.cookSel]} · ${has('fish' + cookTarget())} raw fish` : '<span class="need">No raw fish to cook</span>')
@@ -2544,8 +2751,9 @@ function matsHtml(mats) {
 }
 
 function htmlCraft() {
-  let h = subNav('craftsub', craftSub, [['smithing', '🔨 Smithing'], ['cooking', '🍳 Cooking'], ['fletching', '🪶 Fletching'], ['runecrafting', '🔮 Runecrafting']]);
+  let h = subNav('craftsub', craftSub, [['smithing', '🔨 Smithing'], ['cooking', '🍳 Cooking'], ['fletching', '🪶 Fletching'], ['runecrafting', '🔮 Runecrafting'], ['firemaking', '🔥 Firemaking']]);
   if (craftSub === 'cooking') return h + htmlCooking();
+  if (craftSub === 'firemaking') return h + htmlFiremaking();
   const sk = craftSub, c = CRAFT[sk];
   let list = c.recipes.map((r, i) => [r, i]);
   if (sk === 'smithing') {
@@ -2565,6 +2773,21 @@ function htmlCraft() {
       <div class="btns">${active ? `<button class="sel" disabled>${SKILLS[sk].icon} Working…</button>`
         : `<button data-a="craft" data-skill="${sk}" data-id="${i}" ${locked ? 'disabled' : ''}>${c.verb}${mx ? ` (${mx})` : ''}</button>`}</div></div>`;
   }).join('') + '</div>';
+}
+
+function htmlFiremaking() {
+  const auto = S.activity === 'firemaking' && S.fmSel < 0;
+  let h = `<p class="muted">Burn logs at any campsite for Firemaking XP – sometimes the ashes leave Coal. A bonfire uses ${BONFIRE_LOGS} logs and gives every skill bonus XP for ${BONFIRE_TIME / 60} minutes.${S.bonfire ? ` <b>Bonfire burning: +${S.bonfire.pct}% XP, ${Math.ceil(S.bonfire.left / 60)} min left.</b>` : ''} Firemaking level: <b>${LV.firemaking}</b></p><div class="grid">
+    <div class="item"><div class="top"><span class="ic">🔥</span><span class="nm">Best logs available<br><small>Always burns your best logs first</small></span></div>
+    <div class="btns">${auto ? '<button class="sel" disabled>🔥 Burning…</button>' : '<button data-a="burn" data-id="-1">Burn</button>'}</div></div>`;
+  for (let t = 0; t < 5; t++) {
+    const locked = LV.firemaking < GATHER_REQ[t], n = has('log' + t), active = S.activity === 'firemaking' && S.fmSel === t;
+    h += `<div class="item"><div class="top"><span class="ic">🪵</span><span class="nm">${itemLabel('log' + t)}<br>
+      <small>${FM_XP[t]} XP · ${locked ? '🔒 ' : ''}Firemaking ${GATHER_REQ[t]} · bonfire +${BONFIRE_PCT[t]}% XP · you have ${fmt(n)}</small></span></div>
+      <div class="btns">${active ? '<button class="sel" disabled>🔥 Burning…</button>' : `<button data-a="burn" data-id="${t}" ${locked ? 'disabled' : ''}>Burn</button>`}
+      <button data-a="bonfire" data-id="${t}" ${locked || n < BONFIRE_LOGS || S.bonfire ? 'disabled' : ''}>🔥 Bonfire (${BONFIRE_LOGS})</button></div></div>`;
+  }
+  return h + '</div>';
 }
 
 function htmlCooking() {
@@ -2652,6 +2875,13 @@ function htmlProgress() {
     <span>✨ XP <b>+${pct(xpMult())}%</b></span><span>🪙 Gold <b>+${pct(goldMult())}%</b></span>
     <span>⏱️ Gathering <b>+${BON.gather}%</b></span><span>🥾 Walking <b>+${S.rup.boots * 5}%</b></span>
     <span>⏳ Offline <b>${offlineCap() / 3600}h</b></span></div>`;
+  const owned = PETS.filter(pt => S.pets[pt.id]).length;
+  h += `<h3>🐾 Pets · ${owned} / ${PETS.length}</h3><p class="muted">Pets turn up rarely while you train their skill (or beat their boss). Every pet you own gives its bonus; pick one to walk with you.</p><div class="grid">` + PETS.map(pt => {
+    const got = S.pets[pt.id];
+    return `<div class="item ${S.pet === pt.id ? 'on' : ''}"><div class="top"><span class="ic">${got ? pt.icon : '❔'}</span>
+      <span class="nm"><b>${got ? pt.name : '???'}</b><br><small>${got ? pt.desc : 'Found through ' + (pt.from || SKILLS[pt.skill].name)}</small></span></div>
+      ${got ? `<div class="btns">${S.pet === pt.id ? '<button class="sel" disabled>Following you</button>' : `<button data-a="pet" data-id="${pt.id}">Walk with me</button>`}</div>` : ''}</div>`;
+  }).join('') + '</div>';
   h += '<h3>🌟 New Journey</h3><div class="info">';
   h += S.bosses[4]
     ? `<p>Start again from level 1 and earn <b>${renownGain()} Renown</b> (more for higher levels and every boss beaten). You keep achievements, Renown, upgrades and lifetime stats.</p>
@@ -2669,6 +2899,7 @@ function htmlProgress() {
     <span>Fish cooked <b>${fmt(S.stats.cooked)}</b></span><span>Total level <b>${totalLevel()}</b></span>
     <span>Fletched <b>${fmt(S.stats.fletched)}</b></span><span>Runes crafted <b>${fmt(S.stats.rc)}</b></span>
     <span>Bones buried <b>${fmt(S.stats.buried)}</b></span><span>Slayer tasks <b>${fmt(S.stats.tasks)}</b></span>
+    <span>Pickpockets <b>${fmt(S.stats.stolen)}</b></span><span>Logs burned <b>${fmt(S.stats.burned)}</b></span>
     <span>Quests <b>${questsDone()} / ${QUESTS.length}</b></span><span>Journeys <b>${S.journeys}</b></span></div>`;
   const done = ACH.filter(a => S.ach[a.id]).length;
   h += `<h3>Achievements · ${done} / ${ACH.length}</h3><div class="grid">` + ACH.map(a => `
@@ -2721,6 +2952,7 @@ function nextGoal() {
     return { t: S.activity === 'smithing' ? 'Your hero is smelting a Bronze Bar…' : 'Smelt a Bronze Bar at the 🔥 furnace', tab: 'smithing' };
   }
   if (R.ent && R.ent.blocked) {
+    if (S.activity === 'firemaking') return { t: 'No logs to burn – go 🪓 Woodcutting', tab: 'activity' };
     return S.activity === 'cooking' ? { t: 'No fish to cook – go 🎣 Fishing', tab: 'activity' }
       : { t: `Out of materials for ${ITEMS[CRAFT[S.activity].recipes[S.csel[S.activity]].out].name} – gather more or pick another recipe`, tab: S.activity };
   }
@@ -2763,7 +2995,7 @@ function renderGoal() {
   document.querySelectorAll('nav.tabs [data-tab]').forEach(b => b.classList.toggle('alert', !!alerts[b.dataset.tab] && b.dataset.tab !== tab));
 }
 // old tab names (used by goals and buttons) map to a tab plus its sub-view
-const TAB_ALIAS = { smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], shop: ['inventory', 'shop'] };
+const TAB_ALIAS = { firemaking: ['craft', 'firemaking'], smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], shop: ['inventory', 'shop'] };
 function openTab(name, scroll) {
   const al = TAB_ALIAS[name];
   if (al) { name = al[0]; if (name === 'craft') craftSub = al[1]; else bagSub = al[1]; }
@@ -2812,6 +3044,10 @@ document.addEventListener('click', ev => {
     case 'slayerbuy': buySlayer(+id); break;
     case 'qstart': startQuest(id); break;
     case 'qclaim': claimQuest(id); break;
+    case 'thieve': S.tsel = id; travel(+b.dataset.z, 'thieving'); resetEncounter(); break;
+    case 'burn': S.fmSel = +id; if (S.activity === 'firemaking') resetEncounter(); else setActivity('firemaking'); break;
+    case 'bonfire': lightBonfire(+id); break;
+    case 'pet': if (S.pets[id]) S.pet = id; break;
     case 'loc': mapSel = +id; mapAct = null; break;
     case 'mapact': mapAct = id; break;
     case 'fight': S.ctarget = id === 'mix' ? null : id; travel(+b.dataset.z, 'combat'); resetEncounter(); break;
