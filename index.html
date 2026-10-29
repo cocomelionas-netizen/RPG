@@ -130,6 +130,15 @@
   .stats span { display: flex; justify-content: space-between; gap: 8px; }
   .stats b { font-variant-numeric: tabular-nums; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chips.sub { margin: 0 0 12px; }
+  .chips button small { display: block; font-size: 11px; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #2f2a44; color: var(--muted); }
+  .tag.good { background: #1f3a24; color: var(--good); } .tag.bad { background: #3f2024; color: var(--bad); }
+  .quest { border: 1px solid transparent; }
+  .quest.ready { border-color: #6b5a24; }
+  .quest .bar { margin-top: 3px; }
+  .check { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .check input { width: 18px; height: 18px; }
   #modal h2 { margin: 0 0 10px; font-size: 18px; }
   #modal ul { padding-left: 18px; margin: 6px 0 14px; }
   /* phone + touch rules last so they override the base styles */
@@ -198,10 +207,10 @@
       <nav class="tabs">
         <button data-tab="activity" class="sel"><span class="ti">🧭</span><span class="tl">Activity</span></button>
         <button data-tab="skills"><span class="ti">📈</span><span class="tl">Skills</span></button>
-        <button data-tab="inventory"><span class="ti">🎒</span><span class="tl">Inventory</span></button>
-        <button data-tab="smithing"><span class="ti">🔨</span><span class="tl">Smithing</span></button>
-        <button data-tab="cooking"><span class="ti">🍳</span><span class="tl">Cooking</span></button>
-        <button data-tab="shop"><span class="ti">🏪</span><span class="tl">Shop</span></button>
+        <button data-tab="inventory"><span class="ti">🎒</span><span class="tl">Bag</span></button>
+        <button data-tab="craft"><span class="ti">🔨</span><span class="tl">Craft</span></button>
+        <button data-tab="slayer"><span class="ti">💀</span><span class="tl">Slayer</span></button>
+        <button data-tab="quests"><span class="ti">📜</span><span class="tl">Quests</span></button>
         <button data-tab="progress"><span class="ti">🏆</span><span class="tl">Progress</span></button>
       </nav>
       <div id="tab-content"></div>
@@ -229,14 +238,21 @@
 /* ================= DUOMENYS ================= */
 
 const SKILLS = {
-  attack:      { name: 'Attack',     icon: '⚔️' },
-  defence:     { name: 'Defence',    icon: '🛡️' },
-  hitpoints:   { name: 'Hitpoints',  icon: '❤️' },
-  woodcutting: { name: 'Woodcutting',icon: '🪓' },
-  mining:      { name: 'Mining',     icon: '⛏️' },
-  fishing:     { name: 'Fishing',    icon: '🎣' },
-  smithing:    { name: 'Smithing',   icon: '🔨' },
-  cooking:     { name: 'Cooking',    icon: '🍳' },
+  attack:       { name: 'Attack',       icon: '⚔️' },
+  strength:     { name: 'Strength',     icon: '💪' },
+  defence:      { name: 'Defence',      icon: '🛡️' },
+  hitpoints:    { name: 'Hitpoints',    icon: '❤️' },
+  ranged:       { name: 'Ranged',       icon: '🏹' },
+  magic:        { name: 'Magic',        icon: '✨' },
+  prayer:       { name: 'Prayer',       icon: '🙏' },
+  slayer:       { name: 'Slayer',       icon: '💀' },
+  woodcutting:  { name: 'Woodcutting',  icon: '🪓' },
+  mining:       { name: 'Mining',       icon: '⛏️' },
+  fishing:      { name: 'Fishing',      icon: '🎣' },
+  smithing:     { name: 'Smithing',     icon: '🔨' },
+  cooking:      { name: 'Cooking',      icon: '🍳' },
+  fletching:    { name: 'Fletching',    icon: '🪶' },
+  runecrafting: { name: 'Runecrafting', icon: '🔮' },
 };
 
 // RuneScape/Melvor style XP curve
@@ -244,21 +260,25 @@ const XP_TABLE = [0, 0];
 { let pts = 0; for (let l = 1; l < 99; l++) { pts += Math.floor(l + 300 * Math.pow(2, l / 7)); XP_TABLE[l + 1] = Math.floor(pts / 4); } }
 function levelFromXp(xp) { let l = 1; while (l < 99 && xp >= XP_TABLE[l + 1]) l++; return l; }
 
-const TIER_COLORS = ['#c87533', '#9aa0a8', '#dfe3ee', '#f2c94c', '#4fd6e8', '#e0453a'];
+const TIER_COLORS = ['#c87533', '#9aa0a8', '#dfe3ee', '#f2c94c', '#4fd6e8', '#e0453a', '#b46bff'];
 const CANOPY = ['#8ccf6b', '#3f8f3a', '#d0702f', '#2f6b45', '#b06be0'];
 const METAL = ['Copper', 'Iron', 'Silver', 'Gold', 'Mithril'];
+const WOOD = ['Birch', 'Oak', 'Maple', 'Yew', 'Magic'];
 const TREE_N = ['Birch', 'Oak', 'Maple', 'Yew', 'Magic Tree'];
 const LOG_N = ['Birch Logs', 'Oak Logs', 'Maple Logs', 'Yew Logs', 'Magic Logs'];
 const FISH_N = ['Roach', 'Perch', 'Pike', 'Salmon', 'Eel'];
 const COOKED_N = ['Cooked Roach', 'Cooked Perch', 'Cooked Pike', 'Cooked Salmon', 'Cooked Eel'];
+const STAFF_N = ['Apprentice Staff', 'Adept Staff', 'Mystic Staff', 'Master Staff', 'Archmage Staff'];
 const GATHER_REQ = [1, 15, 30, 50, 70];
 const GATHER_TIME = [3, 3.5, 4, 4.5, 5];
 const GATHER_XP = [10, 20, 35, 55, 80];
+const ESSENCE_TIME = 2.2, ESSENCE_XP = 5;
 const TOOL_COST = [300, 3000, 20000, 80000];
 const TOOL_NAMES = { axe: 'Axe', pick: 'Pickaxe', rod: 'Fishing Rod' };
 const TOOL_OF = { woodcutting: 'axe', mining: 'pick', fishing: 'rod' };
-const SMITH_TIME = 2.4, COOK_TIME = 2.0, STATION_CRAFTS = 10;
+const COOK_TIME = 2.0, STATION_CRAFTS = 10;
 const BOSS_EVERY = 20;   // zone kills before the zone boss shows up
+const MAIN_ZONES = 5;    // zones 0-4 form the story road; the rest are Slayer areas
 
 const ITEMS = {};
 function defItem(id, o) { ITEMS[id] = Object.assign({ id }, o); }
@@ -267,17 +287,34 @@ for (let t = 0; t < 5; t++) {
   defItem('ore' + t,    { name: METAL[t] + ' Ore', icon: '🪨', tier: t, value: [3, 7, 14, 28, 55][t], type: 'Resources' });
   defItem('fish' + t,   { name: 'Raw ' + FISH_N[t], icon: '🐟', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Resources' });
   defItem('cooked' + t, { name: COOKED_N[t], icon: '🍽️', tier: t, value: [5, 12, 25, 50, 100][t], heal: [20, 45, 80, 120, 170][t], type: 'Food' });
-  defItem('sword' + t,  { name: METAL[t] + ' Sword', icon: '🗡️', tier: t, value: [12, 30, 60, 120, 240][t], slot: 'weapon', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Equipment' });
+  defItem('sword' + t,  { name: METAL[t] + ' Sword', icon: '🗡️', tier: t, value: [12, 30, 60, 120, 240][t], slot: 'weapon', wtype: 'melee', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Equipment' });
+  defItem('bow' + t,    { name: WOOD[t] + ' Bow', icon: '🏹', tier: t, value: [10, 25, 50, 100, 200][t], slot: 'weapon', wtype: 'ranged', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Equipment' });
+  defItem('staff' + t,  { name: STAFF_N[t], icon: '🪄', tier: t, value: [12, 30, 60, 120, 240][t], slot: 'weapon', wtype: 'magic', power: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Equipment' });
   defItem('armor' + t,  { name: METAL[t] + ' Armour', icon: '🥋', tier: t, value: [20, 45, 90, 180, 360][t], slot: 'armor', armor: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Equipment' });
+  defItem('arrow' + t,  { name: METAL[t] + ' Arrows', icon: '➶', tier: t, value: [1, 2, 3, 5, 8][t], power: [1, 3, 5, 8, 12][t], type: 'Ammo' });
 }
 // endgame set made from Dragon drops
-defItem('sword5', { name: 'Dragon Sword', icon: '🗡️', tier: 5, value: 900, slot: 'weapon', power: 36, req: 80, type: 'Equipment' });
+defItem('sword5', { name: 'Dragon Sword', icon: '🗡️', tier: 5, value: 900, slot: 'weapon', wtype: 'melee', power: 36, req: 80, type: 'Equipment' });
 defItem('armor5', { name: 'Dragon Armour', icon: '🥋', tier: 5, value: 1400, slot: 'armor', armor: 28, req: 80, type: 'Equipment' });
-defItem('bread', { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
-defItem('burnt', { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
-defItem('bones', { name: 'Bones', icon: '🦴', value: 3, type: 'Misc' });
-defItem('gem',   { name: 'Gem', icon: '💎', value: 150, type: 'Misc' });
-defItem('scale', { name: 'Dragon Scale', icon: '🐉', value: 600, type: 'Misc' });
+// rare Slayer drops
+defItem('whip',   { name: 'Abyssal Whip', icon: '🪢', tier: 6, value: 2500, slot: 'weapon', wtype: 'melee', power: 38, req: 75, type: 'Equipment' });
+defItem('cbow',   { name: 'Crystal Bow', icon: '🏹', tier: 6, value: 2500, slot: 'weapon', wtype: 'ranged', power: 36, req: 75, type: 'Equipment' });
+defItem('sstaff', { name: 'Shadow Staff', icon: '🪄', tier: 6, value: 2500, slot: 'weapon', wtype: 'magic', power: 28, req: 75, type: 'Equipment' });
+// amulets: acc = +hit chance, dmg = +max hit %, dr = +damage reduction, slay = bonus on Slayer task
+defItem('amu_acc',    { name: 'Amulet of Accuracy', icon: '📿', value: 200, slot: 'amulet', acc: 0.06, type: 'Equipment', note: '+6% accuracy' });
+defItem('amu_def',    { name: 'Amulet of Warding', icon: '📿', value: 300, slot: 'amulet', dr: 0.05, type: 'Equipment', note: '+5% damage reduction' });
+defItem('amu_str',    { name: 'Amulet of Strength', icon: '📿', value: 400, slot: 'amulet', dmg: 0.1, type: 'Equipment', note: '+10% max hit' });
+defItem('amu_slayer', { name: 'Slayer Amulet', icon: '💀', value: 300, slot: 'amulet', slay: 0.2, type: 'Equipment', note: '+20% damage and Slayer XP on task' });
+defItem('amu_fury',   { name: 'Amulet of Fury', icon: '🔱', value: 3000, slot: 'amulet', acc: 0.06, dmg: 0.1, dr: 0.05, type: 'Equipment', note: '+6% accuracy, +10% max hit, +5% damage reduction' });
+defItem('bread',   { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
+defItem('burnt',   { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
+defItem('bones',   { name: 'Bones', icon: '🦴', value: 3, bury: 5, pp: 1, type: 'Misc' });
+defItem('bigbones', { name: 'Big Bones', icon: '🦴', value: 10, bury: 15, pp: 3, type: 'Misc' });
+defItem('dragonbones', { name: 'Dragon Bones', icon: '🦴', value: 60, bury: 70, pp: 12, type: 'Misc' });
+defItem('essence', { name: 'Rune Essence', icon: '🔹', value: 2, type: 'Resources' });
+defItem('rune',    { name: 'Runes', icon: '🔮', value: 2, type: 'Ammo' });
+defItem('gem',     { name: 'Gem', icon: '💎', value: 150, type: 'Misc' });
+defItem('scale',   { name: 'Dragon Scale', icon: '🐉', value: 600, type: 'Misc' });
 const FOOD_ORDER = ['cooked4', 'cooked3', 'cooked2', 'cooked1', 'cooked0', 'bread'];
 
 const RECIPES = [];
@@ -287,51 +324,145 @@ for (let t = 0; t < 5; t++) {
 }
 RECIPES.push({ out: 'sword5', req: 80, xp: 400, mats: { ore4: 10, gem: 2, scale: 1 } });
 RECIPES.push({ out: 'armor5', req: 85, xp: 600, mats: { ore4: 15, scale: 3 } });
+const FLETCH = [];
+for (let t = 0; t < 5; t++) {
+  FLETCH.push({ out: 'arrow' + t, n: 15, req: GATHER_REQ[t], xp: [8, 16, 28, 44, 64][t], mats: { ['log' + t]: 1, ['ore' + t]: 1 } });
+  FLETCH.push({ out: 'bow' + t, req: GATHER_REQ[t] + 2, xp: [14, 28, 50, 80, 120][t], mats: { ['log' + t]: 3 } });
+  FLETCH.push({ out: 'staff' + t, req: GATHER_REQ[t] + 4, xp: [16, 32, 56, 88, 130][t], mats: t < 3 ? { ['log' + t]: 2, ['ore' + t]: 2 } : { ['log' + t]: 2, gem: 1 } });
+}
+// more runes per essence as Runecrafting grows
+const RUNECRAFT = [{ out: 'rune', n: () => 4 + Math.floor(LV.runecrafting / 10), req: 1, xp: 6, mats: { essence: 1 } }];
+const CRAFT = {
+  smithing:     { recipes: RECIPES,   time: 2.4, verb: 'Smith',  stat: 'smithed',  spark: '#ffd27a', place: 'anvils' },
+  fletching:    { recipes: FLETCH,    time: 2.0, verb: 'Fletch', stat: 'fletched', spark: '#e8c890', place: 'workbenches' },
+  runecrafting: { recipes: RUNECRAFT, time: 1.6, verb: 'Craft',  stat: 'rc',       spark: '#c58bff', place: 'rune altars' },
+};
+const CRAFTING = new Set(['smithing', 'cooking', 'fletching', 'runecrafting']);
 
-// drops: [item, chance, min, max]
+/* ===== Combat data ===== */
+const TYPE_ICON = { melee: '⚔️', ranged: '🏹', magic: '✨' };
+const TYPE_NAME = { melee: 'Melee', ranged: 'Ranged', magic: 'Magic' };
+const BEATS = { melee: 'ranged', ranged: 'magic', magic: 'melee' };   // Melvor's combat triangle
+const STYLES = {
+  melee:  [['attack', 'Accurate', 'Attack XP'], ['strength', 'Aggressive', 'Strength XP'], ['defence', 'Defensive', 'Defence XP']],
+  ranged: [['accurate', 'Accurate', 'Ranged XP'], ['rapid', 'Rapid', 'Ranged XP, faster'], ['longrange', 'Longrange', 'Ranged + Defence XP']],
+  magic:  [['standard', 'Standard', 'Magic XP'], ['defensive', 'Defensive', 'Magic + Defence XP']],
+};
+const SPELLS = [
+  { name: 'Wind Strike', lvl: 1,  max: 8,  runes: 1, color: '#d8f0ff' },
+  { name: 'Water Bolt',  lvl: 15, max: 16, runes: 2, color: '#4fa3ff' },
+  { name: 'Earth Blast', lvl: 30, max: 26, runes: 3, color: '#8bd34a' },
+  { name: 'Fire Wave',   lvl: 50, max: 38, runes: 4, color: '#ff7a2a' },
+  { name: 'Storm Surge', lvl: 70, max: 52, runes: 5, color: '#c58bff' },
+];
+// prayer effects: dr = damage reduction, dmg = max hit %, acc = hit chance, protect = halves that damage type, heal = HP per hit
+const PRAYERS = [
+  { id: 'skin',    name: 'Thick Skin',            icon: '🪨', lvl: 1,  cost: 1, dr: 0.1, desc: '+10% damage reduction' },
+  { id: 'str',     name: 'Burst of Strength',     icon: '💪', lvl: 5,  cost: 1, dmg: 0.1, desc: '+10% max hit' },
+  { id: 'eye',     name: 'Sharp Eye',             icon: '👁️', lvl: 10, cost: 1, acc: 0.1, desc: '+10% accuracy' },
+  { id: 'heal',    name: 'Rapid Heal',            icon: '💗', lvl: 20, cost: 1, heal: 0.02, desc: 'Heal 2% HP each hit you land' },
+  { id: 'pmelee',  name: 'Protect from Melee',    icon: '⚔️', lvl: 30, cost: 2, protect: 'melee', desc: 'Halve melee damage taken' },
+  { id: 'pranged', name: 'Protect from Missiles', icon: '🏹', lvl: 40, cost: 2, protect: 'ranged', desc: 'Halve ranged damage taken' },
+  { id: 'pmagic',  name: 'Protect from Magic',    icon: '✨', lvl: 50, cost: 2, protect: 'magic', desc: 'Halve magic damage taken' },
+  { id: 'piety',   name: 'Piety',                 icon: '😇', lvl: 70, cost: 3, dmg: 0.15, acc: 0.1, dr: 0.1, desc: '+15% max hit, +10% accuracy, +10% damage reduction' },
+];
+
+// drops: [item, chance, min, max]; type: how the enemy attacks (combat triangle)
 const ENEMIES = {
-  slime:    { name: 'Slime',          hp: 12,   maxHit: 2,  atk: 1,  def: 1,  speed: 2.6, gold: [1, 3],     shape: 'blob',     size: 1,   color: '#5fd35f', drops: [] },
-  rat:      { name: 'Rat',            hp: 18,   maxHit: 3,  atk: 3,  def: 2,  speed: 2.2, gold: [1, 4],     shape: 'quad',     size: .6,  color: '#8a7f75', drops: [['bones', .5, 1, 1]] },
-  goblin:   { name: 'Goblin',         hp: 60,   maxHit: 7,  atk: 11, def: 10, speed: 2.4, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#7a5a3a', drops: [['bones', .6, 1, 1], ['ore0', .25, 2, 4]] },
-  wolf:     { name: 'Wolf',           hp: 75,   maxHit: 9,  atk: 13, def: 12, speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
-  bat:      { name: 'Bat',            hp: 180,  maxHit: 16, atk: 27, def: 25, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
-  skeleton: { name: 'Skeleton',       hp: 260,  maxHit: 20, atk: 31, def: 30, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['ore1', .25, 2, 4]] },
-  orc:      { name: 'Orc',            hp: 520,  maxHit: 32, atk: 48, def: 47, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bones', 1, 1, 2], ['ore2', .25, 2, 4], ['gem', .03, 1, 1]] },
-  troll:    { name: 'Troll',          hp: 800,  maxHit: 40, atk: 54, def: 54, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bones', 1, 2, 4], ['ore3', .2, 2, 4], ['gem', .05, 1, 1]] },
-  lizard:   { name: 'Fire Lizard',    hp: 1200, maxHit: 50, atk: 68, def: 68, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', drops: [['bones', 1, 1, 2], ['ore4', .2, 1, 3], ['gem', .06, 1, 1]] },
-  imp:      { name: 'Fire Imp',       hp: 1000, maxHit: 46, atk: 64, def: 62, speed: 1.8, gold: [45, 80],   shape: 'flyer',    size: 1,   color: '#c43a2a', drops: [['ore4', .15, 1, 2], ['gem', .05, 1, 1]] },
+  slime:    { name: 'Slime',          type: 'melee',  hp: 12,   maxHit: 2,  atk: 1,  def: 1,  speed: 2.6, gold: [1, 3],     shape: 'blob',     size: 1,   color: '#5fd35f', drops: [] },
+  rat:      { name: 'Rat',            type: 'melee',  hp: 18,   maxHit: 3,  atk: 3,  def: 2,  speed: 2.2, gold: [1, 4],     shape: 'quad',     size: .6,  color: '#8a7f75', drops: [['bones', .5, 1, 1]] },
+  goblin:   { name: 'Goblin',         type: 'melee',  hp: 60,   maxHit: 7,  atk: 11, def: 10, speed: 2.4, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#7a5a3a', drops: [['bones', .6, 1, 1], ['ore0', .25, 2, 4]] },
+  gobarcher: { name: 'Goblin Archer', type: 'ranged', hp: 50,   maxHit: 8,  atk: 12, def: 8,  speed: 2.2, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#3f5a2a', drops: [['bones', .6, 1, 1], ['arrow0', .4, 3, 8]] },
+  wolf:     { name: 'Wolf',           type: 'melee',  hp: 75,   maxHit: 9,  atk: 13, def: 12, speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
+  bat:      { name: 'Bat',            type: 'melee',  hp: 180,  maxHit: 16, atk: 27, def: 25, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
+  skeleton: { name: 'Skeleton Archer', type: 'ranged', hp: 260, maxHit: 20, atk: 31, def: 30, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['arrow1', .3, 5, 12]] },
+  cultist:  { name: 'Dark Cultist',   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 26, speed: 2.6, gold: [10, 20],   shape: 'humanoid', size: 1,   color: '#d8c0a0', body: '#3a2050', orb: '#b06bff', drops: [['bones', 1, 1, 1], ['rune', .6, 5, 12], ['essence', .5, 2, 5]] },
+  orc:      { name: 'Orc',            type: 'melee',  hp: 520,  maxHit: 32, atk: 48, def: 47, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bigbones', 1, 1, 1], ['ore2', .25, 2, 4], ['gem', .03, 1, 1]] },
+  icemage:  { name: 'Ice Mage',       type: 'magic',  hp: 600,  maxHit: 36, atk: 50, def: 44, speed: 2.6, gold: [20, 45],   shape: 'humanoid', size: 1,   color: '#e0eaff', body: '#4a6aa8', orb: '#9fe0ff', drops: [['bones', 1, 1, 1], ['rune', .8, 10, 20], ['gem', .04, 1, 1]] },
+  troll:    { name: 'Troll',          type: 'melee',  hp: 800,  maxHit: 40, atk: 54, def: 54, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bigbones', 1, 1, 2], ['ore3', .2, 2, 4], ['gem', .05, 1, 1]] },
+  lizard:   { name: 'Fire Lizard',    type: 'magic',  hp: 1200, maxHit: 50, atk: 68, def: 68, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', breath: true, drops: [['bigbones', 1, 1, 1], ['ore4', .2, 1, 3], ['gem', .06, 1, 1]] },
+  imp:      { name: 'Fire Imp',       type: 'magic',  hp: 1000, maxHit: 46, atk: 64, def: 62, speed: 1.8, gold: [45, 80],   shape: 'flyer',    size: 1,   color: '#c43a2a', orb: '#ff7a2a', drops: [['ore4', .15, 1, 2], ['gem', .05, 1, 1]] },
+  drakeknight: { name: 'Dragon Knight', type: 'melee', hp: 1300, maxHit: 52, atk: 70, def: 72, speed: 2.6, gold: [55, 95],  shape: 'humanoid', size: 1.2, color: '#c8a080', body: '#7a1e14', drops: [['bigbones', 1, 1, 2], ['ore4', .25, 1, 3], ['gem', .05, 1, 1]] },
   // zone bosses
-  kingslime: { name: 'King Slime',    hp: 150,  maxHit: 6,  atk: 6,  def: 5,  speed: 2.6, gold: [60, 100],  shape: 'blob',     size: 1.9, color: '#3fbf5a', boss: true, drops: [['bread', 1, 5, 10]] },
-  gobchief: { name: 'Goblin Chief',   hp: 450,  maxHit: 14, atk: 20, def: 18, speed: 2.4, gold: [150, 250], shape: 'humanoid', size: 1.15, color: '#5d9a34', body: '#8a2f2f', boss: true, drops: [['ore1', 1, 5, 10], ['gem', .2, 1, 1]] },
-  bonelord: { name: 'Bone Lord',      hp: 1300, maxHit: 30, atk: 42, def: 40, speed: 2.6, gold: [400, 700], shape: 'humanoid', size: 1.4, color: '#efe9d6', body: '#6b5fa0', boss: true, drops: [['ore2', 1, 6, 12], ['gem', .4, 1, 2]] },
-  frosttroll: { name: 'Frost Troll',  hp: 3200, maxHit: 50, atk: 62, def: 62, speed: 3.0, gold: [900, 1500], shape: 'humanoid', size: 1.85, color: '#a8d8f0', body: '#3a5470', boss: true, drops: [['ore3', 1, 6, 12], ['gem', .6, 1, 3]] },
-  dragon:   { name: 'Dragon',         hp: 15000, maxHit: 110, atk: 95, def: 95, speed: 3.2, gold: [2000, 3500], shape: 'dragon', size: 1,   color: '#9b2222', boss: true, drops: [['scale', 1, 1, 2], ['gem', 1, 1, 3]] },
+  kingslime: { name: 'King Slime',    type: 'melee',  hp: 150,  maxHit: 6,  atk: 6,  def: 5,  speed: 2.6, gold: [60, 100],  shape: 'blob',     size: 1.9, color: '#3fbf5a', boss: true, drops: [['bread', 1, 5, 10]] },
+  gobchief: { name: 'Goblin Chief',   type: 'melee',  hp: 450,  maxHit: 14, atk: 20, def: 18, speed: 2.4, gold: [150, 250], shape: 'humanoid', size: 1.15, color: '#5d9a34', body: '#8a2f2f', boss: true, drops: [['bigbones', 1, 1, 2], ['ore1', 1, 5, 10], ['gem', .2, 1, 1]] },
+  bonelord: { name: 'Bone Lord',      type: 'magic',  hp: 1300, maxHit: 30, atk: 42, def: 40, speed: 2.6, gold: [400, 700], shape: 'humanoid', size: 1.4, color: '#efe9d6', body: '#6b5fa0', orb: '#7dffb0', boss: true, drops: [['bigbones', 1, 3, 5], ['ore2', 1, 6, 12], ['gem', .4, 1, 2]] },
+  frosttroll: { name: 'Frost Troll',  type: 'melee',  hp: 3200, maxHit: 50, atk: 62, def: 62, speed: 3.0, gold: [900, 1500], shape: 'humanoid', size: 1.85, color: '#a8d8f0', body: '#3a5470', boss: true, drops: [['bigbones', 1, 3, 6], ['ore3', 1, 6, 12], ['gem', .6, 1, 3]] },
+  dragon:   { name: 'Dragon',         type: 'magic',  hp: 15000, maxHit: 110, atk: 95, def: 95, speed: 3.2, gold: [2000, 3500], shape: 'dragon', size: 1, color: '#9b2222', breath: true, boss: true, drops: [['dragonbones', 1, 1, 2], ['scale', 1, 1, 2], ['gem', 1, 1, 3]] },
+  // Slayer areas
+  bog:      { name: 'Bog Horror',     type: 'melee',  hp: 300,  maxHit: 18, atk: 28, def: 26, speed: 2.4, gold: [15, 30],   shape: 'blob',     size: 1.4, color: '#5a7a3a', drops: [['bones', 1, 1, 2], ['essence', .5, 3, 6], ['gem', .03, 1, 1]] },
+  wisp:     { name: "Will-o'-Wisp",   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 22, speed: 2.0, gold: [12, 26],   shape: 'flyer',    size: 1,   color: '#a8f0ff', orb: '#c8ffff', drops: [['essence', 1, 4, 8], ['rune', .4, 5, 10], ['gem', .04, 1, 1]] },
+  golem:    { name: 'Crystal Golem',  type: 'melee',  hp: 1400, maxHit: 42, atk: 56, def: 62, speed: 3.0, gold: [60, 110],  shape: 'humanoid', size: 1.6, color: '#9fe8f5', body: '#4aa0b8', drops: [['ore3', .4, 3, 5], ['gem', .1, 1, 1], ['cbow', .003, 1, 1]] },
+  sentry:   { name: 'Crystal Sentry', type: 'ranged', hp: 1000, maxHit: 46, atk: 60, def: 55, speed: 2.0, gold: [50, 95],   shape: 'humanoid', size: 1.1, color: '#c8f6ff', body: '#3d7f99', drops: [['arrow3', .5, 10, 25], ['gem', .08, 1, 1], ['cbow', .003, 1, 1]] },
+  abyssal:  { name: 'Abyssal Demon',  type: 'melee',  hp: 2600, maxHit: 62, atk: 82, def: 80, speed: 2.4, gold: [120, 200], shape: 'humanoid', size: 1.5, color: '#9a3a8a', body: '#3a1030', drops: [['bigbones', 1, 1, 2], ['ore4', .3, 2, 4], ['gem', .12, 1, 1], ['whip', .004, 1, 1]] },
+  shade:    { name: 'Shade',          type: 'magic',  hp: 2000, maxHit: 66, atk: 84, def: 74, speed: 2.2, gold: [100, 180], shape: 'flyer',    size: 1,   color: '#3a2a5a', orb: '#b06bff', drops: [['rune', 1, 20, 40], ['gem', .1, 1, 1], ['sstaff', .004, 1, 1]] },
 };
 
 const ZONES = [
-  { name: 'Green Meadow',    req: 1,  boss: 'kingslime', enemies: ['slime', 'rat'],
+  { name: 'Green Meadow',    req: 1,  tier: 0, boss: 'kingslime', enemies: ['slime', 'rat'],
     th: { sky: ['#78c4ff', '#dff3ff'], far: '#a9cbe0', mid: '#79c062', near: '#4c9a3f', ground: '#5c9a3c', dirt: '#7a5a3a', sun: '#fff3a0', decor: 'tree' } },
-  { name: 'Dark Forest',     req: 10, boss: 'gobchief', enemies: ['goblin', 'wolf'],
+  { name: 'Dark Forest',     req: 10, tier: 1, boss: 'gobchief', enemies: ['goblin', 'gobarcher', 'wolf'],
     th: { sky: ['#3f6b7d', '#a5c6b2'], far: '#4f7366', mid: '#2f5d3a', near: '#1b3b24', ground: '#365f2b', dirt: '#4a3826', sun: '#e8f0c0', decor: 'pine' } },
-  { name: 'Shadow Caves',    req: 25, boss: 'bonelord', enemies: ['bat', 'skeleton'],
+  { name: 'Shadow Caves',    req: 25, tier: 2, boss: 'bonelord', enemies: ['bat', 'skeleton', 'cultist'],
     th: { sky: ['#140f1d', '#352841'], far: '#2a2134', mid: '#3a2e46', near: '#22192b', ground: '#4a3f4f', dirt: '#2a2230', sun: null, decor: 'stalag', cave: true } },
-  { name: 'Ice Mountains',   req: 45, boss: 'frosttroll', enemies: ['orc', 'troll'],
+  { name: 'Ice Mountains',   req: 45, tier: 3, boss: 'frosttroll', enemies: ['orc', 'icemage', 'troll'],
     th: { sky: ['#8fa9cc', '#eef4fb'], far: '#d3deeb', mid: '#97aac0', near: '#5f7186', ground: '#e9eff6', dirt: '#a3b0be', sun: '#ffffff', decor: 'rock', snow: true } },
-  { name: 'Dragon\'s Lair',  req: 70, boss: 'dragon', enemies: ['lizard', 'lizard', 'imp'],
+  { name: 'Dragon\'s Lair',  req: 70, tier: 4, boss: 'dragon', enemies: ['lizard', 'imp', 'drakeknight'],
     th: { sky: ['#2a0808', '#c2481e'], far: '#5a1a14', mid: '#3a1410', near: '#1c0806', ground: '#2b1a17', dirt: '#140b09', sun: '#ffb347', decor: 'spike', lava: true } },
+  // Slayer areas: opened by Slayer level instead of bosses
+  { name: 'Haunted Swamp',   slayer: 10, tier: 1, enemies: ['bog', 'wisp'],
+    th: { sky: ['#2c3a2a', '#7d8f6a'], far: '#4a5a42', mid: '#34452e', near: '#1e2a1a', ground: '#3e4a2a', dirt: '#2a2a1a', sun: '#d8e0a0', decor: 'dead' } },
+  { name: 'Crystal Caverns', slayer: 35, tier: 3, enemies: ['golem', 'sentry'],
+    th: { sky: ['#0d1a24', '#1f4a5a'], far: '#1c3a48', mid: '#24505e', near: '#10303c', ground: '#3a6a78', dirt: '#1a3038', sun: null, decor: 'crystal', cave: true } },
+  { name: 'Abyssal Rift',    slayer: 65, tier: 4, enemies: ['abyssal', 'shade'],
+    th: { sky: ['#0a0412', '#3a1050'], far: '#2a0c3a', mid: '#1e0a2c', near: '#12061c', ground: '#2a1638', dirt: '#140a1c', sun: '#c070ff', decor: 'spike' } },
+];
+
+/* ===== Shops ===== */
+const SHOP = [
+  { id: 'bread', n: 1, cost: 5 },
+  { id: 'arrow0', n: 50, cost: 60 },
+  { id: 'rune', n: 50, cost: 75 },
+  { id: 'essence', n: 50, cost: 60 },
+];
+const SLAYER_SHOP = [
+  { id: 'amu_slayer', cost: 150 },
+  { id: 'amu_str', cost: 400 },
+  { id: 'amu_fury', cost: 3000 },
+  { id: 'autoslayer', cost: 600, name: 'Auto Slayer', icon: '🧭', note: 'Your hero travels to the task area and only fights the task monster' },
+];
+
+/* ===== Quests ===== */
+// objective types: kill/smith/cook/fletch/rc/gather/bury/tasks count from when the quest starts; boss/level check the current state
+const QUESTS = [
+  { id: 'q1',  name: 'First Steps', desc: 'Prove yourself against the meadow slimes.', obj: [{ t: 'kill', id: 'slime', n: 10 }], rew: { gold: 50, items: { bread: 10 } } },
+  { id: 'q2',  name: 'Forged in Copper', req: 'q1', desc: 'Every adventurer needs a blade.', obj: [{ t: 'smith', n: 3 }], rew: { gold: 100, xp: { smithing: 200 } } },
+  { id: 'q3',  name: 'Rat Catcher', req: 'q1', desc: 'The farmers want their barns back.', obj: [{ t: 'kill', id: 'rat', n: 25 }], rew: { gold: 120, items: { cooked0: 10 } } },
+  { id: 'q4',  name: "A Fisherman's Tale", desc: 'Catch and cook a proper meal.', obj: [{ t: 'gather', skill: 'fishing', n: 40 }, { t: 'cook', n: 20 }], rew: { xp: { fishing: 300 }, items: { cooked1: 15 } } },
+  { id: 'q5',  name: "The Archer's Path", req: 'q2', desc: 'Fletch your first arrows and bow.', obj: [{ t: 'fletch', n: 5 }], rew: { xp: { ranged: 300 }, items: { arrow0: 150 } } },
+  { id: 'q6',  name: 'Runes of Power', req: 'q2', desc: 'Mine Rune Essence and bind it into runes.', obj: [{ t: 'gather', skill: 'essence', n: 20 }, { t: 'rc', n: 5 }], rew: { xp: { magic: 300 }, items: { rune: 150, staff0: 1 } } },
+  { id: 'q7',  name: 'Slime Monarchy', req: 'q1', desc: 'Dethrone the King Slime.', obj: [{ t: 'boss', z: 0 }], rew: { gold: 300, items: { amu_acc: 1 } } },
+  { id: 'q8',  name: 'Goblin Trouble', req: 'q7', desc: 'Clear the archers out of the Dark Forest.', obj: [{ t: 'kill', id: 'gobarcher', n: 20 }, { t: 'boss', z: 1 }], rew: { gold: 800, items: { amu_def: 1 } } },
+  { id: 'q9',  name: 'Bones of the Earth', req: 'q8', desc: 'Lay the fallen to rest.', obj: [{ t: 'bury', n: 100 }], rew: { xp: { prayer: 1500 } } },
+  { id: 'q10', name: 'The Hunter', req: 'q8', desc: 'Complete Slayer tasks for the Slayer master.', obj: [{ t: 'tasks', n: 3 }], rew: { scoins: 200, xp: { slayer: 1000 } } },
+  { id: 'q11', name: 'Into the Dark', req: 'q8', desc: 'Silence the Bone Lord in the Shadow Caves.', obj: [{ t: 'kill', id: 'cultist', n: 25 }, { t: 'boss', z: 2 }], rew: { gold: 3000, items: { gem: 3 } } },
+  { id: 'q12', name: 'Frozen Peaks', req: 'q11', desc: 'Break the Frost Troll\'s hold on the mountains.', obj: [{ t: 'kill', id: 'icemage', n: 30 }, { t: 'boss', z: 3 }], rew: { gold: 10000, items: { scale: 1 } } },
+  { id: 'q13', name: 'Master of Arms', req: 'q11', desc: 'Train every combat style.', obj: [{ t: 'level', skill: 'strength', n: 50 }, { t: 'level', skill: 'ranged', n: 50 }, { t: 'level', skill: 'magic', n: 50 }], rew: { gold: 20000, xp: { hitpoints: 5000 } } },
+  { id: 'q14', name: 'Dragonslayer', req: 'q12', desc: 'End the Dragon at the end of the road.', obj: [{ t: 'boss', z: 4 }], rew: { gold: 50000, items: { dragonbones: 10 } } },
 ];
 
 /* ================= STATE ================= */
 
 const SAVE_KEY = 'begalinis-kelias-v1';
 const BOSS_ACH = ['Slime Royalty', 'Chief Toppler', 'Bone Breaker', 'Frostbite', 'Dragonslayer'];
-const SKILL_ACH = { attack: 'Duelist', defence: 'Bulwark', hitpoints: 'Iron Body', woodcutting: 'Lumberjack',
-  mining: 'Prospector', fishing: 'Angler', smithing: 'Blacksmith', cooking: 'Chef' };
+const SKILL_ACH = { attack: 'Duelist', strength: 'Brute', defence: 'Bulwark', hitpoints: 'Iron Body', ranged: 'Marksman',
+  magic: 'Archmage', prayer: 'Devout', slayer: 'Hunter', woodcutting: 'Lumberjack', mining: 'Prospector', fishing: 'Angler',
+  smithing: 'Blacksmith', cooking: 'Chef', fletching: 'Fletcher', runecrafting: 'Runesmith' };
 // bonus: [type, percent] – xp: all XP, gold: gold from enemies and chests, gather: gathering speed
 const ACH = [
   { id: 'kill1', name: 'First Blood', desc: 'Defeat an enemy', bonus: ['gold', 1], test: () => S.kills >= 1 },
   { id: 'kill100', name: 'Monster Hunter', desc: 'Defeat 100 enemies', bonus: ['gold', 2], test: () => S.kills >= 100 },
-  { id: 'kill1k', name: 'Slayer', desc: 'Defeat 1,000 enemies', bonus: ['gold', 3], test: () => S.kills >= 1000 },
+  { id: 'kill1k', name: 'Monster Slayer', desc: 'Defeat 1,000 enemies', bonus: ['gold', 3], test: () => S.kills >= 1000 },
   { id: 'kill10k', name: 'Legend of the Road', desc: 'Defeat 10,000 enemies', bonus: ['gold', 5], test: () => S.kills >= 10000 },
   ...BOSS_ACH.map((name, i) => ({ id: 'boss' + i, name, desc: () => `Defeat ${ENEMIES[ZONES[i].boss].name}`, bonus: ['xp', i === 4 ? 5 : 2], test: () => S.bosses[i] })),
   { id: 'dist1k', name: 'Wanderer', desc: 'Walk 1,000 m', bonus: ['gather', 2], test: () => S.dist >= 1000 },
@@ -349,6 +480,10 @@ const ACH = [
   { id: 'dragongear', name: 'Dragonforged', desc: 'Smith a piece of Dragon gear', bonus: ['xp', 5], test: () => S.stats.dragonGear >= 1 },
   { id: 'death1', name: 'Learning Experience', desc: 'Get defeated once', bonus: ['xp', 1], test: () => S.deaths >= 1 },
   { id: 'journey1', name: 'New Beginnings', desc: 'Start a New Journey', bonus: ['xp', 5], test: () => S.journeys >= 1 },
+  { id: 'quest5', name: 'Adventurer', desc: 'Complete 5 quests', bonus: ['xp', 3], test: () => questsDone() >= 5 },
+  { id: 'questall', name: 'Hero of the Road', desc: 'Complete every quest', bonus: ['gold', 5], test: () => questsDone() >= QUESTS.length },
+  { id: 'task10', name: 'Slayer Apprentice', desc: 'Complete 10 Slayer tasks', bonus: ['xp', 3], test: () => S.stats.tasks >= 10 },
+  { id: 'unique', name: 'Lucky Drop', desc: 'Find a rare Slayer weapon', bonus: ['gold', 3], test: () => S.stats.uniques >= 1 },
 ];
 const RUP = {
   wisdom:    { name: 'Wisdom', icon: '📜', desc: '+15% XP', max: 10, cost: 5 },
@@ -363,7 +498,7 @@ let SIM = false;       // fast simulation (offline) - no visuals
 const R = {            // runtime state (not saved)
   worldX: 0, phase: 'walk', ent: null, atkT: 0, deadT: 0, doneT: 0,
   swing: 0, eatFlash: 0, pendingHit: 0, shake: 0, freeze: 0, heroHit: 0, ring: 0, banner: null,
-  events: [], buff: 0, deathStreak: 0, rested: 0,
+  events: [], buff: 0, deathStreak: 0, rested: 0, shot: null, ammoWarn: false,
 };
 let time = 0;
 let floaters = [], particles = [], logLines = [];
@@ -372,12 +507,14 @@ let uiDirty = true;
 function newState() {
   return {
     v: 1, gold: 25, skills: Object.fromEntries(Object.keys(SKILLS).map(k => [k, 0])),
-    inv: { bread: 5 }, equip: { weapon: null, armor: null }, tools: { axe: 0, pick: 0, rod: 0 },
-    activity: 'combat', zone: 0, style: 'attack', hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
-    zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], smithSel: 0, cookSel: -1, tipEvent: false,
-    ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0 }, renown: 0, journeys: 0,
+    inv: { bread: 5 }, equip: { weapon: null, armor: null, amulet: null }, tools: { axe: 0, pick: 0, rod: 0 },
+    activity: 'combat', zone: 0, hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
+    styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: -1, prayer: null, pp: 0, autoBury: true,
+    zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0 }, cookSel: -1, tipEvent: false,
+    ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', muted: false, tipA2HS: false,
+    kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {},
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -396,11 +533,18 @@ function applySave(data) {
   if (data && data.v === 1) {
     S = Object.assign(base, data);
     S.skills = Object.assign(base.skills, data.skills);
+    // older saves had no Strength: start it where Attack was so combat level doesn't drop
+    if (data.skills && data.skills.strength === undefined) S.skills.strength = data.skills.attack || 0;
     S.tools = Object.assign({ axe: 0, pick: 0, rod: 0 }, data.tools);
-    S.equip = Object.assign({ weapon: null, armor: null }, data.equip);
+    S.equip = Object.assign(base.equip, data.equip);
     S.stats = Object.assign(base.stats, data.stats);
+    S.stats.g = Object.assign({}, data.stats && data.stats.g);
     S.rup = Object.assign(base.rup, data.rup);
     S.gsel = Object.assign(base.gsel, data.gsel);
+    S.styles = Object.assign(base.styles, data.styles);
+    if (!data.styles && data.style) S.styles.melee = data.style === 'defence' ? 'defence' : 'attack';
+    S.csel = Object.assign(base.csel, data.csel);
+    if (!data.csel && data.smithSel !== undefined) S.csel.smithing = data.smithSel;
   } else S = base;
   recalcLevels(); recalcBonuses();
   if (S.activity === 'combat' && !zoneOpen(S.zone)) S.zone = bestZone();
@@ -444,18 +588,58 @@ function addXp(skill, amt) {
   uiDirty = true;
 }
 
-// a zone opens once the previous zone's boss is beaten and combat level is high enough
-function zoneOpen(i) { return i === 0 || (S.bosses[i - 1] && combatLevel() >= ZONES[i].req); }
-function bestZone() { let b = 0; for (let i = 1; i < ZONES.length; i++) if (zoneOpen(i)) b = i; return b; }
-function combatLevel() { return Math.floor((LV.attack + LV.defence + LV.hitpoints) / 3); }
+// story zones open once the previous boss is beaten and combat level is high enough; Slayer areas need Slayer level
+function zoneOpen(i) {
+  const z = ZONES[i];
+  if (z.slayer) return LV.slayer >= z.slayer;
+  return i === 0 || (S.bosses[i - 1] && combatLevel() >= z.req);
+}
+function bestZone() { let b = 0; for (let i = 1; i < MAIN_ZONES; i++) if (zoneOpen(i)) b = i; return b; }
+function combatLevel() { return Math.floor((Math.max((LV.attack + LV.strength) / 2, LV.ranged, LV.magic) + LV.defence + LV.hitpoints) / 3); }
 function maxHp() { return 40 + LV.hitpoints * 10; }
-function weaponPower() { return S.equip.weapon ? ITEMS[S.equip.weapon].power : 0; }
+function wtype() { return S.equip.weapon ? ITEMS[S.equip.weapon].wtype : 'melee'; }
+function bestArrow() { for (let t = 4; t >= 0; t--) if (has('arrow' + t)) return 'arrow' + t; return null; }
+function curSpell() {
+  const ok = sp => LV.magic >= sp.lvl && has('rune') >= sp.runes;
+  if (S.spell >= 0) return ok(SPELLS[S.spell]) ? SPELLS[S.spell] : null;
+  for (let i = SPELLS.length - 1; i >= 0; i--) if (ok(SPELLS[i])) return SPELLS[i];
+  return null;
+}
+// a bow without arrows or a staff without runes leaves the hero punching
+function attackMode() {
+  const t = wtype();
+  if (t === 'ranged' && !bestArrow()) return 'unarmed';
+  if (t === 'magic' && !curSpell()) return 'unarmed';
+  return t;
+}
+function combatType() { const m = attackMode(); return m === 'unarmed' ? 'melee' : m; }
+function styleOf() { return S.styles[combatType()]; }
+function amu(k) { return S.equip.amulet ? (ITEMS[S.equip.amulet][k] || 0) : 0; }
+function activePrayer() { return S.prayer ? PRAYERS.find(p => p.id === S.prayer) : null; }
+function pray(k) { const p = activePrayer(); return (p && p[k]) || 0; }
+function weaponPower() { return S.equip.weapon && attackMode() !== 'unarmed' ? ITEMS[S.equip.weapon].power : 0; }
 function armorValue() { return S.equip.armor ? ITEMS[S.equip.armor].armor : 0; }
-function playerMaxHit() { return Math.floor(4 + LV.attack * 0.7 + weaponPower()); }
-const PLAYER_SPEED = 1.8;
-function playerHitChance(e) { return clamp(0.6 + (LV.attack + weaponPower() * 0.5 - e.def) * 0.03, 0.1, 0.95); }
+function playerMaxHit() {
+  const m = attackMode(), p = weaponPower();
+  const base = m === 'ranged' ? 4 + LV.ranged * 0.7 + p * 0.8 + ITEMS[bestArrow()].power
+    : m === 'magic' ? curSpell().max + LV.magic * 0.35 + p
+    : 4 + LV.strength * 0.7 + p;
+  return Math.floor(base * (1 + amu('dmg') + pray('dmg')));
+}
+function accuracyLevel() {
+  const m = attackMode();
+  return (m === 'ranged' ? LV.ranged : m === 'magic' ? LV.magic : LV.attack) + weaponPower() * 0.5;
+}
+function playerSpeed() {
+  const m = attackMode();
+  return m === 'ranged' ? (S.styles.ranged === 'rapid' ? 1.3 : 1.6) : m === 'magic' ? 2.2 : 1.8;
+}
+// +1: the hero's style beats the enemy's, -1: the enemy's beats the hero's
+function triangle(e) { const p = combatType(); return BEATS[p] === e.d.type ? 1 : BEATS[e.d.type] === p ? -1 : 0; }
+function onTask(e) { return !!(S.task && e.id === S.task.id); }
+function playerHitChance(e) { return clamp(0.6 + (accuracyLevel() - e.def) * 0.03 + amu('acc') + pray('acc'), 0.1, 0.97); }
 function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue()) * 0.02, 0.15, 0.95); }
-function damageReduction() { return Math.min(0.5, armorValue() * 0.012 + LV.defence * 0.002); }
+function damageReduction() { return Math.min(0.6, armorValue() * 0.012 + LV.defence * 0.002 + amu('dr') + pray('dr')); }
 
 function gatherTier(skill) {
   let t = 0;
@@ -465,6 +649,8 @@ function gatherTier(skill) {
 // the tier the hero actually gathers: the player's pick, or the best unlocked one
 function chosenTier(skill) { const sel = S.gsel[skill]; return sel < 0 ? gatherTier(skill) : Math.min(sel, gatherTier(skill)); }
 function gatherTime(skill, tier) { return GATHER_TIME[tier] * (1 - 0.12 * S.tools[TOOL_OF[skill]]) / (1 + BON.gather / 100); }
+function nodeTime(e) { return e.ess ? gatherTime('mining', 0) * ESSENCE_TIME / GATHER_TIME[0] : gatherTime(e.skill, e.tier); }
+function stationTime(e) { return e.skill === 'cooking' ? COOK_TIME : CRAFT[e.skill].time; }
 
 /* ===== Achievements, Renown and permanent bonuses ===== */
 const BON = { xp: 0, gold: 0, gather: 0 };
@@ -501,7 +687,7 @@ function newJourney() {
   if (!S.bosses[4]) return;
   const gain = renownGain();
   // keep achievements, lifetime stats and Renown; everything else starts over
-  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup,
+  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted,
     renown: S.renown + gain, journeys: S.journeys + 1, tipEvent: true };
   S = Object.assign(newState(), keep);
   const hs = S.rup.headstart;
@@ -524,19 +710,26 @@ function spawnEntity() {
   const x = R.worldX + Math.max(790, W - HX + 60) + Math.random() * 140;
   const act = S.activity;
   if (act === 'combat') {
+    // Auto Slayer walks to the task's area and only fights the task monster
+    const auto = S.autoSlayer && S.task && zoneOpen(S.task.zone);
+    if (auto && S.zone !== S.task.zone) S.zone = S.task.zone;
     const z = ZONES[S.zone];
-    const id = S.zk[S.zone] >= BOSS_EVERY ? z.boss : z.enemies[Math.floor(Math.random() * z.enemies.length)];
+    const id = z.boss && S.zk[S.zone] >= BOSS_EVERY ? z.boss
+      : auto ? S.task.id : z.enemies[Math.floor(Math.random() * z.enemies.length)];
     const d = ENEMIES[id];
-    const stop = d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size;
-    R.ent = { kind: 'enemy', id, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0 };
-  } else if (act === 'smithing' || act === 'cooking') {
-    R.ent = { kind: act === 'smithing' ? 'anvil' : 'fire', skill: act, crafts: STATION_CRAFTS, t: 0, x, stop: 62, hit: 0, swung: false, blocked: false };
+    // archers and mages keep their distance
+    const stop = (d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0);
+    R.ent = { kind: 'enemy', id, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0, pend: 0 };
+  } else if (CRAFTING.has(act)) {
+    const kind = { smithing: 'anvil', cooking: 'fire', fletching: 'bench', runecrafting: 'altar' }[act];
+    R.ent = { kind, skill: act, crafts: STATION_CRAFTS, t: 0, x, stop: 62, hit: 0, swung: false, blocked: false };
   } else {
-    const tier = chosenTier(act);
+    const ess = act === 'mining' && S.gsel.mining === -2;
+    const tier = ess ? 0 : chosenTier(act);
     const yields = randi(3, 6);
     const kind = act === 'woodcutting' ? 'tree' : act === 'mining' ? 'rock' : 'pond';
     const stop = kind === 'pond' ? 135 : kind === 'tree' ? 58 : 62;
-    R.ent = { kind, skill: act, tier, yields, maxYields: yields, t: 0, x, stop, hit: 0, swung: false };
+    R.ent = { kind, skill: act, tier, ess, yields, maxYields: yields, t: 0, x, stop, hit: 0, swung: false };
   }
   if (!SIM && Math.random() < 0.3) spawnEvent(R.ent.x);
 }
@@ -554,7 +747,7 @@ function collectEvent(ev) {
   const { x, y } = evScreen(ev);
   S.tipEvent = true; S.stats.events++;
   if (ev.type === 'chest') {
-    const g = Math.round(rand(15, 30) * (1 + S.zone) ** 2 * goldMult());
+    const g = Math.round(rand(15, 30) * (1 + ZONES[S.zone].tier) ** 2 * goldMult());
     S.gold += g;
     coinsFly(x, y, 8); burst(x, y, '#f2c94c', 14);
     floatText(x, y - 30, `+${g} 🪙`, '#f2c94c', 1.4, 1.2);
@@ -580,7 +773,7 @@ function collectEvent(ev) {
 }
 
 function startAct() {
-  R.atkT = PLAYER_SPEED * 0.35; R.pendingHit = 0;
+  R.atkT = playerSpeed() * 0.35; R.pendingHit = 0;
 }
 
 function tick(dt) {
@@ -597,14 +790,15 @@ function tick(dt) {
     }
   } else if (R.phase === 'act') {
     const k = R.ent.kind;
-    if (k === 'enemy') combatTick(dt); else if (k === 'anvil' || k === 'fire') craftTick(dt); else gatherTick(dt);
+    if (k === 'enemy') combatTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
   } else if (R.phase === 'dead') {
     R.deadT -= dt;
     if (R.deadT <= 0) {
       S.hp = maxHp(); R.phase = 'walk'; R.ent = null;
       // don't let an idle hero die over and over (and bleed gold) in a zone that is too hard
       if (S.activity === 'combat' && S.zone > 0 && (foodCount() === 0 || R.deathStreak >= 3)) {
-        S.zone--; R.deathStreak = 0;
+        S.zone = ZONES[S.zone].slayer ? bestZone() : S.zone - 1;
+        R.deathStreak = 0; S.autoSlayer = false;
         log(`🏃 You retreat to ${ZONES[S.zone].name} to recover.`, 'lg-bad');
       } else log('You get back up and continue on.');
     }
@@ -622,41 +816,88 @@ function tick(dt) {
 function combatTick(dt) {
   const e = R.ent;
   R.atkT -= dt; e.atkT -= dt;
-  if (R.atkT <= 0) { R.atkT += PLAYER_SPEED; R.swing = 1; R.pendingHit = 0.12; }
-  // damage lands when the swing connects, not when it starts
-  if (R.pendingHit > 0) { R.pendingHit -= dt; if (R.pendingHit <= 0) playerHit(e); }
+  if (R.atkT <= 0) {
+    R.atkT += playerSpeed();
+    const mode = attackMode();
+    // work the hit out before using up ammo, so the last arrow still counts
+    const spell = mode === 'magic' ? curSpell() : null;
+    R.shot = { mode, maxHit: playerMaxHit(), chance: playerHitChance(e), color: spell ? spell.color : null };
+    if (mode === 'ranged') take(bestArrow());
+    if (mode === 'magic') take('rune', spell.runes);
+    if (mode === 'unarmed' && !R.ammoWarn) { R.ammoWarn = true; log(`⚠️ Out of ${wtype() === 'ranged' ? 'arrows' : 'runes'} – fighting with fists!`, 'lg-bad'); }
+    if (mode !== 'unarmed') R.ammoWarn = false;
+    const p = activePrayer();
+    if (p) {
+      if (S.pp >= p.cost) S.pp -= p.cost;
+      else { S.prayer = null; log('🙏 Out of prayer points – prayer stopped. Bury bones to restore them.', 'lg-bad'); }
+    }
+    R.swing = 1;
+    R.pendingHit = mode === 'ranged' ? 0.28 : mode === 'magic' ? 0.34 : 0.12;
+    if (mode === 'ranged' || mode === 'magic') {
+      shoot(HX + 18, GY - 48, entScreenX(e), GY - entHeight(e) * 0.55, mode === 'ranged' ? 'arrow' : 'orb', R.shot.color || '#fff', R.pendingHit);
+      sfx(mode === 'ranged' ? 'bow' : 'zap');
+    }
+  }
+  // damage lands when the swing or projectile connects, not when it starts
+  if (R.pendingHit > 0) { R.pendingHit -= dt; if (R.pendingHit <= 0) playerHit(e, R.shot); }
   if (e.hp <= 0) { killEnemy(e); return; }
   if (e.atkT <= 0) {
     e.atkT += e.d.speed;
     e.lunge = 1;
-    if (Math.random() < enemyHitChance(e)) {
-      const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
-      const dmg = Math.max(1, Math.round(raw * (1 - damageReduction())));
-      S.hp -= dmg;
-      addXp('defence', dmg * 0.5);
-      floatText(HX - 18, GY - 108, '-' + dmg, '#ff6b6b', 1, 1, true);
-      burst(HX + 4, GY - 40, '#c22', 5);
-      R.heroHit = 1; sfx('hurt');
-      R.shake = Math.max(R.shake, e.d.boss ? 8 : 3);
-    } else floatText(HX - 18, GY - 108, 'Dodge', '#9ad', 1, 1, true);
+    const ranged = e.d.type !== 'melee' && !e.d.breath;
+    e.pend = ranged ? 0.3 : 0.1;
+    if (ranged) {
+      const ex = entScreenX(e), ey = GY - entHeight(e) * 0.6;
+      shoot(ex - 10, ey, HX + 6, GY - 44, e.d.type === 'ranged' ? 'arrow' : 'orb', e.d.orb || '#c58bff', e.pend);
+    }
   }
+  if (e.pend > 0) { e.pend -= dt; if (e.pend <= 0) enemyHit(e); }
   autoEat();
   if (S.hp <= 0) die();
 }
 
-function playerHit(e) {
-  const ex = entScreenX(e), ey = GY - entHeight(e) - 10;
-  if (Math.random() >= playerHitChance(e)) { floatText(ex, ey, 'Miss', '#bbbbbb'); return; }
-  const mh = playerMaxHit();
-  const roll = 1 + Math.floor(Math.random() * mh);
-  const crit = roll >= Math.max(3, mh * 0.9);
-  const dmg = Math.min(e.hp, roll);
-  e.hp -= dmg; e.hit = 1;
-  addXp(S.style, dmg * 4);
+function enemyHit(e) {
+  if (Math.random() >= enemyHitChance(e)) { floatText(HX - 18, GY - 108, 'Dodge', '#9ad', 1, 1, true); return; }
+  const tri = triangle(e);
+  const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
+  const mult = (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === e.d.type ? 0.5 : 1);
+  const dmg = Math.max(1, Math.round(raw * mult));
+  S.hp -= dmg;
+  addXp('defence', dmg * 0.5);
+  floatText(HX - 18, GY - 108, '-' + dmg, '#ff6b6b', 1, 1, true);
+  burst(HX + 4, GY - 40, '#c22', 5);
+  R.heroHit = 1; sfx('hurt');
+  R.shake = Math.max(R.shake, e.d.boss ? 8 : 3);
+}
+
+function combatXp(dmg) {
+  const xp = dmg * 4;
+  switch (styleOf()) {
+    case 'strength': addXp('strength', xp); break;
+    case 'defence': addXp('defence', xp); break;
+    case 'accurate': case 'rapid': addXp('ranged', xp); break;
+    case 'longrange': addXp('ranged', xp / 2); addXp('defence', xp / 2); break;
+    case 'standard': addXp('magic', xp); break;
+    case 'defensive': addXp('magic', xp / 2); addXp('defence', xp / 2); break;
+    default: addXp('attack', xp);
+  }
   addXp('hitpoints', dmg * 1.33);
+}
+
+function playerHit(e, shot) {
+  const ex = entScreenX(e), ey = GY - entHeight(e) - 10;
+  if (Math.random() >= shot.chance) { floatText(ex, ey, 'Miss', '#bbbbbb'); return; }
+  const roll = 1 + Math.floor(Math.random() * shot.maxHit);
+  const crit = roll >= Math.max(3, shot.maxHit * 0.9);
+  const tri = triangle(e);
+  const mult = (tri > 0 ? 1.2 : tri < 0 ? 0.85 : 1) * (onTask(e) ? 1 + amu('slay') : 1);
+  const dmg = Math.min(e.hp, Math.max(1, Math.round(roll * mult)));
+  e.hp -= dmg; e.hit = 1;
+  combatXp(dmg);
+  if (pray('heal')) S.hp = Math.min(maxHp(), S.hp + maxHp() * pray('heal'));
   sfx(crit ? 'crit' : 'hit');
-  floatText(ex, ey, crit ? dmg + '!' : '-' + dmg, crit ? '#ffe14a' : '#ffd166', 1, crit ? 1.6 : 1);
-  burst(ex, GY - entHeight(e) * 0.55, crit ? '#ffe14a' : '#ff5a5a', crit ? 12 : 6);
+  floatText(ex, ey, crit ? dmg + '!' : '-' + dmg, crit ? '#ffe14a' : tri > 0 ? '#9dffa0' : '#ffd166', 1, crit ? 1.6 : 1);
+  burst(ex, GY - entHeight(e) * 0.55, crit ? '#ffe14a' : shot.color || '#ff5a5a', crit ? 12 : 6);
   if (crit && !SIM) { R.shake = Math.max(R.shake, 5); R.freeze = 0.06; }
 }
 
@@ -693,13 +934,16 @@ function die() {
 function killEnemy(e) {
   const g = Math.round(randi(e.d.gold[0], e.d.gold[1]) * goldMult());
   S.gold += g; S.kills++; R.deathStreak = 0;
+  S.kc[e.id] = (S.kc[e.id] || 0) + 1;
   const got = [`${g} gold`];
   const ex = entScreenX(e), ey = GY - entHeight(e) * 0.5;
   for (const [id, ch, mn, mx] of e.d.drops) {
-    if (Math.random() < ch) {
-      const n = randi(mn, mx); give(id, n); got.push(`${n}× ${ITEMS[id].name}`);
-      if (ITEMS[id].value >= 150) { log(`✨ Rare drop: ${ITEMS[id].icon} ${ITEMS[id].name}!`, 'lg-xp'); showBanner(`✨ Rare drop: ${ITEMS[id].name}!`); }
-    }
+    if (Math.random() >= ch) continue;
+    const n = randi(mn, mx);
+    if (ITEMS[id].bury && S.autoBury) bury(id, n, true); else give(id, n);
+    got.push(`${n}× ${ITEMS[id].name}`);
+    if (ITEMS[id].tier === 6) S.stats.uniques++;
+    if (ITEMS[id].value >= 150) { log(`✨ Rare drop: ${ITEMS[id].icon} ${ITEMS[id].name}!`, 'lg-xp'); showBanner(`✨ Rare drop: ${ITEMS[id].name}!`); }
   }
   log(`⚔️ Defeated ${e.d.name} (${got.join(', ')})`, 'lg-gold');
   floatText(ex, GY - entHeight(e) - 30, '+' + g + ' 🪙', '#f2c94c', 1.4);
@@ -707,31 +951,34 @@ function killEnemy(e) {
   coinsFly(ex, ey, Math.min(12, 3 + Math.floor(g / 10)));
   sfx('coin');
   if (!SIM) { R.shake = Math.max(R.shake, e.d.boss ? 12 : 4); R.freeze = e.d.boss ? 0.2 : 0.08; }
+  if (onTask(e)) slayerKill(e);
   const z = S.zone;
   if (e.d.boss) {
     S.zk[z] = 0;
     if (!S.bosses[z]) {
       S.bosses[z] = true;
-      const nxt = ZONES[z + 1];
+      const nxt = z + 1 < MAIN_ZONES ? ZONES[z + 1] : null;
       log(`👑 ${e.d.name} defeated for the first time!` + (nxt ? ` ${nxt.name} opens at combat level ${nxt.req}.` : ''), 'lg-xp');
       showBanner(nxt ? `👑 ${nxt.name} unlocked!` : '🏆 The Dragon is slain!');
       if (!nxt && !SIM) victory();
     } else showBanner(`👑 ${e.d.name} defeated!`);
-  } else S.zk[z] = Math.min(BOSS_EVERY, S.zk[z] + 1);
+  } else if (ZONES[z].boss) S.zk[z] = Math.min(BOSS_EVERY, S.zk[z] + 1);
   R.phase = 'done'; R.doneT = 0.6; e.dying = true;
   uiDirty = true;
 }
 
 function gatherTick(dt) {
   const e = R.ent;
-  const need = gatherTime(e.skill, e.tier);
+  const need = nodeTime(e);
   e.t += dt;
   if (!e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; chips(e); }
   if (e.t >= need) {
     e.t -= need; e.swung = false; R.swing = 1; e.hit = 1; chips(e);
-    const item = (e.kind === 'tree' ? 'log' : e.kind === 'rock' ? 'ore' : 'fish') + e.tier;
+    const item = e.ess ? 'essence' : (e.kind === 'tree' ? 'log' : e.kind === 'rock' ? 'ore' : 'fish') + e.tier;
     give(item);
-    addXp(e.skill, GATHER_XP[e.tier]);
+    addXp(e.skill, e.ess ? ESSENCE_XP : GATHER_XP[e.tier]);
+    const key = e.ess ? 'essence' : e.skill;
+    S.stats.g[key] = (S.stats.g[key] || 0) + 1;
     floatText(entScreenX(e), GY - 120, `+1 ${ITEMS[item].icon}`, '#ffffff');
     sfx('gather');
     e.yields--;
@@ -741,13 +988,14 @@ function gatherTick(dt) {
 
 function setActivity(a) {
   if (S.activity === a) return;
-  if ((a === 'smithing' || a === 'cooking') && S.activity !== 'smithing' && S.activity !== 'cooking') S.prevAct = S.activity;
+  if (CRAFTING.has(a) && !CRAFTING.has(S.activity)) S.prevAct = S.activity;
   S.activity = a;
   if (a === 'combat' && !zoneOpen(S.zone)) S.zone = bestZone();
   resetEncounter();
 }
 function setZone(i) {
   if (S.activity === 'combat' && !zoneOpen(i)) return;
+  if (S.activity === 'combat' && S.autoSlayer && S.task && i !== S.task.zone) { S.autoSlayer = false; log('🧭 Auto Slayer paused while you pick your own area.'); }
   S.zone = i; resetEncounter();
 }
 function resetEncounter() {
@@ -758,16 +1006,17 @@ function resetEncounter() {
 /* ===== Crafting, shop, inventory ===== */
 
 function maxCraft(mats) { return Math.min(...Object.entries(mats).map(([id, n]) => Math.floor(has(id) / n))); }
-
-function canSmith(i) { const r = RECIPES[i]; return LV.smithing >= r.req && maxCraft(r.mats) > 0; }
-function smithOnce(i) {
-  const r = RECIPES[i];
+function recipeCount(r) { return typeof r.n === 'function' ? r.n() : (r.n || 1); }
+function canCraft(skill, i) { const r = CRAFT[skill].recipes[i]; return !!r && LV[skill] >= r.req && maxCraft(r.mats) > 0; }
+function craftOnce(skill, i) {
+  const r = CRAFT[skill].recipes[i], n = recipeCount(r);
   for (const [id, c] of Object.entries(r.mats)) take(id, c);
-  give(r.out);
-  addXp('smithing', r.xp);
-  S.stats.smithed++; if (ITEMS[r.out].tier === 5) S.stats.dragonGear++;
-  if (isUpgrade(r.out)) { equip(r.out); showBanner(`⬆️ Equipped ${ITEMS[r.out].name}`); }
-  return r.out;
+  give(r.out, n);
+  addXp(skill, r.xp);
+  S.stats[CRAFT[skill].stat]++;
+  if (ITEMS[r.out].tier === 5) S.stats.dragonGear++;
+  if (ITEMS[r.out].slot && isUpgrade(r.out)) { equip(r.out); showBanner(`⬆️ Equipped ${ITEMS[r.out].name}`); }
+  return [r.out, n];
 }
 function burnChance(t) { return Math.max(0, 0.35 - (LV.cooking - GATHER_REQ[t]) * 0.02); }
 function cookTarget() {
@@ -784,36 +1033,36 @@ function cookOnce(t) {
 }
 
 function craftTick(dt) {
-  const e = R.ent, smithing = e.kind === 'anvil';
-  const can = smithing ? canSmith(S.smithSel) : cookTarget() >= 0;
-  const req = RECIPES[S.smithSel].req;
-  e.reason = smithing && LV.smithing < req ? `Needs Smithing ${req}` : 'No materials';
-  if (!can && !e.blocked) log(smithing ? '⚠️ Out of materials for smithing.' : '⚠️ No fish left to cook.', 'lg-bad');
+  const e = R.ent, skill = e.skill, cooking = skill === 'cooking';
+  const r = cooking ? null : CRAFT[skill].recipes[S.csel[skill]];
+  const can = cooking ? cookTarget() >= 0 : canCraft(skill, S.csel[skill]);
+  e.reason = r && LV[skill] < r.req ? `Needs ${SKILLS[skill].name} ${r.req}` : 'No materials';
+  if (!can && !e.blocked) log(cooking ? '⚠️ No fish left to cook.' : `⚠️ Out of materials for ${SKILLS[skill].name}.`, 'lg-bad');
   e.blocked = !can;
   if (!can) {
-    // don't idle at an empty anvil all night: go back to what the hero was doing before
+    // don't idle at an empty station all night: go back to what the hero was doing before
     e.blockT = (e.blockT || 0) + dt;
     if (e.blockT > 3) {
       const back = S.prevAct || 'combat';
-      log(`↩️ Nothing left to ${smithing ? 'smith' : 'cook'} – back to ${back}.`);
+      log(`↩️ Nothing left for ${SKILLS[skill].name} – back to ${back}.`);
       setActivity(back);
     }
     return;
   }
-  const need = smithing ? SMITH_TIME : COOK_TIME, ex = entScreenX(e);
+  const need = stationTime(e), ex = entScreenX(e);
   e.t += dt;
-  if (smithing && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; burst(ex - 6, GY - 46, '#ffb347', 4); }
+  if (!cooking && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; burst(ex - 6, GY - 46, CRAFT[skill].spark, 4); }
   if (e.t >= need) {
     e.t -= need; e.swung = false; e.hit = 1;
-    if (smithing) {
-      R.swing = 1;
-      const out = smithOnce(S.smithSel);
-      burst(ex - 6, GY - 46, '#ffd27a', 8); sfx('clink');
-      floatText(ex, GY - 100, `+1 ${ITEMS[out].icon}`, '#ffffff');
-    } else {
+    if (cooking) {
       const res = cookOnce(cookTarget());
       burst(ex, GY - 40, res === 'burnt' ? '#444444' : '#ffb347', 6);
       floatText(ex, GY - 100, res === 'burnt' ? 'Burnt!' : '+1 🍽️', res === 'burnt' ? '#ff8a5a' : '#ffffff');
+    } else {
+      R.swing = 1;
+      const [out, n] = craftOnce(skill, S.csel[skill]);
+      burst(ex - 6, GY - 46, CRAFT[skill].spark, 8); sfx(skill === 'runecrafting' ? 'magic' : 'clink');
+      floatText(ex, GY - 100, `+${n} ${ITEMS[out].icon}`, '#ffffff');
     }
     if (--e.crafts <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
   }
@@ -835,23 +1084,34 @@ function sell(id, n) {
   log(`💰 Sold ${n}× ${ITEMS[id].name} for ${fmt(g)} gold`, 'lg-gold');
 }
 
+function reqSkill(it) {
+  if (it.slot === 'armor') return 'defence';
+  if (it.slot === 'weapon') return { melee: 'attack', ranged: 'ranged', magic: 'magic' }[it.wtype];
+  return null;
+}
+function canEquip(id) {
+  const it = ITEMS[id], sk = reqSkill(it);
+  return !!it.slot && (!sk || LV[sk] >= (it.req || 0));
+}
 function equip(id) {
   const it = ITEMS[id];
   if (!it.slot) return;
-  const skill = it.slot === 'weapon' ? 'attack' : 'defence';
-  if (LV[skill] < it.req) { log(`Requires ${SKILLS[skill].name} level ${it.req}.`, 'lg-bad'); return; }
+  if (!canEquip(id)) { const sk = reqSkill(it); log(`Requires ${SKILLS[sk].name} level ${it.req}.`, 'lg-bad'); return; }
   if (!take(id)) return;
   if (S.equip[it.slot]) give(S.equip[it.slot]);
   S.equip[it.slot] = id;
   log(`Equipped ${it.name}`);
+  if (R.ent && R.ent.kind === 'enemy' && R.phase === 'act') R.atkT = Math.min(R.atkT, playerSpeed());
 }
-function canEquip(id) {
-  const it = ITEMS[id];
-  return it.slot && LV[it.slot === 'weapon' ? 'attack' : 'defence'] >= it.req;
-}
+// only a stronger item of the same kind counts, so a new bow never replaces a sword on its own
 function isUpgrade(id) {
   const it = ITEMS[id], cur = S.equip[it.slot];
-  return canEquip(id) && (!cur || ITEMS[cur].tier < it.tier);
+  if (!canEquip(id)) return false;
+  if (!cur) return it.slot !== 'amulet' && (it.slot !== 'weapon' || it.wtype === 'melee');
+  const c = ITEMS[cur];
+  if (it.slot === 'weapon') return c.wtype === it.wtype && c.power < it.power;
+  if (it.slot === 'armor') return c.armor < it.armor;
+  return false;
 }
 function unequip(slot) {
   if (!S.equip[slot]) return;
@@ -865,11 +1125,130 @@ function buyTool(tool) {
   log(`🏪 Upgraded ${TOOL_NAMES[tool]} to level ${S.tools[tool]}`, 'lg-good');
   uiDirty = true;
 }
-function buyBread(n) {
-  n = Math.min(n, Math.floor(S.gold / 5));
+function buy(i, times) {
+  const it = SHOP[i];
+  times = Math.min(times, Math.floor(S.gold / it.cost));
+  if (times <= 0) return;
+  S.gold -= it.cost * times; give(it.id, it.n * times);
+  log(`🏪 Bought ${fmt(it.n * times)}× ${ITEMS[it.id].name}`);
+}
+
+/* ===== Prayer ===== */
+function bury(id, n, quiet) {
+  n = quiet ? n : Math.min(n, has(id));
   if (n <= 0) return;
-  S.gold -= n * 5; give('bread', n);
-  log(`🏪 Bought ${n}× Bread`);
+  if (!quiet) take(id, n);
+  addXp('prayer', ITEMS[id].bury * n);
+  S.pp = Math.min(9999, S.pp + ITEMS[id].pp * n);
+  S.stats.buried += n;
+  if (!quiet) log(`🙏 Buried ${n}× ${ITEMS[id].name}`, 'lg-good');
+}
+function togglePrayer(id) {
+  const p = PRAYERS.find(x => x.id === id);
+  if (!p || LV.prayer < p.lvl) return;
+  S.prayer = S.prayer === id ? null : id;
+}
+
+/* ===== Slayer ===== */
+function taskOptions() {
+  const out = [];
+  ZONES.forEach((z, i) => { if (zoneOpen(i)) for (const id of new Set(z.enemies)) out.push({ id, zone: i }); });
+  return out;
+}
+function newTask() {
+  const opts = taskOptions();
+  const o = opts[Math.floor(Math.random() * opts.length)];
+  const n = randi(15, 35);
+  S.task = { id: o.id, zone: o.zone, n, left: n };
+  log(`💀 Slayer task: defeat ${n}× ${ENEMIES[o.id].name} in ${ZONES[o.zone].name}`, 'lg-xp');
+  uiDirty = true;
+}
+function skipTask() { if (S.scoins < 25 || !S.task) return; S.scoins -= 25; newTask(); }
+function slayerKill(e) {
+  addXp('slayer', e.d.hp * 0.25 * (1 + amu('slay')));
+  S.scoins += Math.max(1, Math.round(e.d.hp / 60));
+  if (--S.task.left > 0) return;
+  const bonus = 10 + S.task.n * 2;
+  S.scoins += bonus; S.stats.tasks++;
+  log(`💀 Slayer task complete! +${bonus} Slayer coins`, 'lg-xp');
+  showBanner('💀 Slayer task complete!'); sfx('level');
+  S.task = null;
+  // keep the idle loop going: Auto Slayer asks for the next task by itself
+  if (S.autoSlayer) newTask();
+}
+function buySlayer(i) {
+  const it = SLAYER_SHOP[i];
+  if (S.scoins < it.cost) return;
+  if (it.id === 'autoslayer') { if (S.ownsAutoSlayer) return; S.ownsAutoSlayer = true; S.autoSlayer = true; }
+  else give(it.id);
+  S.scoins -= it.cost;
+  log(`💀 Bought ${it.name || ITEMS[it.id].name}`, 'lg-good');
+}
+
+/* ===== Quests ===== */
+function objVal(o) {
+  switch (o.t) {
+    case 'kill': return S.kc[o.id] || 0;
+    case 'smith': return S.stats.smithed;
+    case 'cook': return S.stats.cooked;
+    case 'fletch': return S.stats.fletched;
+    case 'rc': return S.stats.rc;
+    case 'gather': return S.stats.g[o.skill] || 0;
+    case 'bury': return S.stats.buried;
+    case 'tasks': return S.stats.tasks;
+    case 'boss': return S.bosses[o.z] ? 1 : 0;
+    case 'level': return LV[o.skill];
+  }
+  return 0;
+}
+const ABSOLUTE_OBJ = new Set(['boss', 'level']);
+function objNeed(o) { return o.t === 'boss' ? 1 : o.n; }
+function objProgress(q, k) {
+  const o = q.obj[k], v = objVal(o);
+  return Math.min(objNeed(o), ABSOLUTE_OBJ.has(o.t) ? v : v - S.quests[q.id].base[k]);
+}
+function objText(o) {
+  switch (o.t) {
+    case 'kill': return `Defeat ${ENEMIES[o.id].name}`;
+    case 'smith': return 'Smith items';
+    case 'cook': return 'Cook fish';
+    case 'fletch': return 'Fletch items';
+    case 'rc': return 'Craft runes';
+    case 'gather': return o.skill === 'essence' ? 'Mine Rune Essence' : `Gather (${SKILLS[o.skill].name})`;
+    case 'bury': return 'Bury bones';
+    case 'tasks': return 'Complete Slayer tasks';
+    case 'boss': return `Defeat ${ENEMIES[ZONES[o.z].boss].name}`;
+    case 'level': return `Reach ${SKILLS[o.skill].name} level`;
+  }
+}
+function questState(q) { return S.quests[q.id] ? S.quests[q.id].s : (!q.req || (S.quests[q.req] && S.quests[q.req].s === 'done')) ? 'open' : 'locked'; }
+function questReady(q) { return questState(q) === 'active' && q.obj.every((o, k) => objProgress(q, k) >= objNeed(o)); }
+function questsDone() { return QUESTS.filter(q => questState(q) === 'done').length; }
+function startQuest(id) {
+  const q = QUESTS.find(x => x.id === id);
+  if (!q || questState(q) !== 'open') return;
+  S.quests[id] = { s: 'active', base: q.obj.map(objVal) };
+  log(`📜 Quest started: ${q.name}`, 'lg-xp');
+}
+function claimQuest(id) {
+  const q = QUESTS.find(x => x.id === id);
+  if (!q || !questReady(q)) return;
+  S.quests[id] = { s: 'done' };
+  const w = q.rew;
+  if (w.gold) S.gold += w.gold;
+  if (w.scoins) S.scoins += w.scoins;
+  for (const [it, n] of Object.entries(w.items || {})) give(it, n);
+  for (const [sk, xp] of Object.entries(w.xp || {})) addXp(sk, xp);
+  log(`📜 Quest complete: ${q.name}! ${rewardText(w)}`, 'lg-gold');
+  showBanner(`📜 Quest complete: ${q.name}`); sfx('chest');
+}
+function rewardText(w) {
+  const parts = [];
+  if (w.gold) parts.push(`${fmt(w.gold)} gold`);
+  if (w.scoins) parts.push(`${w.scoins} Slayer coins`);
+  for (const [it, n] of Object.entries(w.items || {})) parts.push(`${n}× ${ITEMS[it].name}`);
+  for (const [sk, xp] of Object.entries(w.xp || {})) parts.push(`${fmt(xp)} ${SKILLS[sk].name} XP`);
+  return parts.join(', ');
 }
 
 /* ================= OFFLINE ================= */
@@ -883,7 +1262,7 @@ function simulate(sec) {
   const step = 0.2;
   for (let t = 0; t < sec; t += step) tick(step);
   SIM = false;
-  floaters = []; particles = []; coins = [];
+  floaters = []; particles = []; coins = []; projs = [];
   checkAch();
   R.shake = R.freeze = R.ring = 0; R.banner = null; R.events = [];
   return sec;
@@ -949,6 +1328,8 @@ function sfx(kind) {
     case 'chest': [784, 988, 1319].forEach((f, i) => tone(f, 0.1, 'square', 0.05, 0, i * 0.06)); break;
     case 'magic': [660, 880, 1175, 1568].forEach((f, i) => tone(f, 0.2, 'sine', 0.07, 0, i * 0.05)); break;
     case 'boss': tone(98, 0.6, 'sawtooth', 0.09, 0.7); tone(147, 0.6, 'sawtooth', 0.05, 0.7, 0.05); break;
+    case 'bow': tone(520, 0.07, 'triangle', 0.06, 0.4); break;
+    case 'zap': tone(880, 0.18, 'sine', 0.06, 0.3); tone(1320, 0.12, 'sine', 0.03, 0.5, 0.03); break;
   }
 }
 
@@ -1039,6 +1420,16 @@ function drawBackground(z) {
     else if (th.decor === 'pine') { for (let k = 0; k < 3; k++) poly([x - (26 - k * 6) * s, by - (20 + k * 26) * s, x + (26 - k * 6) * s, by - (20 + k * 26) * s, x, by - (60 + k * 28) * s], c); rr(x - 4 * s, by - 22 * s, 8 * s, 22 * s, 1, c); }
     else if (th.decor === 'stalag') poly([x - 16 * s, by, x + 16 * s, by, x + 2 * s, by - 70 * s], c);
     else if (th.decor === 'rock') { poly([x - 34 * s, by, x - 20 * s, by - 30 * s, x + 6 * s, by - 42 * s, x + 30 * s, by - 18 * s, x + 36 * s, by], c); poly([x - 8 * s, by - 36 * s, x + 6 * s, by - 42 * s, x + 20 * s, by - 29 * s], '#f4f8fc'); }
+    else if (th.decor === 'dead') {
+      rr(x - 3 * s, by - 70 * s, 6 * s, 70 * s, 2, c);
+      ctx.strokeStyle = c; ctx.lineWidth = 3 * s;
+      ctx.beginPath(); ctx.moveTo(x, by - 50 * s); ctx.lineTo(x - 22 * s, by - 72 * s); ctx.moveTo(x, by - 60 * s); ctx.lineTo(x + 18 * s, by - 84 * s); ctx.lineTo(x + 26 * s, by - 80 * s); ctx.stroke();
+    }
+    else if (th.decor === 'crystal') {
+      poly([x - 10 * s, by, x - 2 * s, by - 60 * s, x + 6 * s, by], c);
+      poly([x + 2 * s, by, x + 12 * s, by - 38 * s, x + 18 * s, by], shade(c, 0.08));
+      ctx.save(); ctx.globalAlpha = 0.5 + 0.3 * Math.sin(time * 2 + i); poly([x - 6 * s, by - 10 * s, x - 2 * s, by - 52 * s, x + 1 * s, by - 10 * s], '#7fe0f0'); ctx.restore();
+    }
     else if (th.decor === 'spike') { poly([x - 12 * s, by, x + 12 * s, by, x - 4 * s, by - 80 * s], c); poly([x + 6 * s, by, x + 24 * s, by, x + 18 * s, by - 45 * s], c); }
   }
 
@@ -1096,6 +1487,8 @@ function heroTool() {
   if (a === 'combat') {
     const t = S.equip.weapon ? ITEMS[S.equip.weapon].tier : -1;
     const blade = t >= 0 ? TIER_COLORS[t] : '#8a6a4a';
+    if (wtype() === 'ranged') return () => drawBow(t >= 0 ? TIER_COLORS[t] : '#8a6a4a', R.swing < 0.5);
+    if (wtype() === 'magic') { const sp = curSpell(); return () => drawStaff(sp ? sp.color : '#888'); }
     return () => {
       rr(-1.5, 15, 3, 8, 1, '#5a3a22');
       rr(-6, 22, 12, 3, 1, '#c9a43a');
@@ -1103,6 +1496,12 @@ function heroTool() {
     };
   }
   if (a === 'smithing') return () => { rr(-1.5, 12, 3, 24, 1, '#7a4e2a'); rr(-7, 33, 14, 9, 2, '#5b5f68'); };
+  if (a === 'fletching') return () => { rr(-1.5, 14, 3, 8, 1, '#5a3a22'); poly([-2, 22, 2, 22, 0, 36], '#cfd4dc'); };
+  if (a === 'runecrafting') return () => {
+    const g = ctx.createRadialGradient(0, 24, 1, 0, 24, 14);
+    g.addColorStop(0, 'rgba(210,160,255,0.9)'); g.addColorStop(1, 'rgba(210,160,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(-14, 10, 28, 28);
+  };
   if (a === 'cooking') return () => {
     ctx.strokeStyle = '#7a4e2a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, 56); ctx.stroke();
   };
@@ -1113,6 +1512,23 @@ function heroTool() {
     ctx.strokeStyle = tc; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 52, 16, -Math.PI * 0.85, -Math.PI * 0.15); ctx.stroke();
   };
   return () => { ctx.strokeStyle = '#7a4e2a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, 80); ctx.stroke(); };
+}
+
+// bow drawn in arm space (the arm points along +y)
+function drawBow(color, drawn) {
+  ctx.strokeStyle = shade(color.length === 7 ? color : '#8a6a4a', -0.15); ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 14, 18, Math.PI * 0.12, Math.PI * 0.88); ctx.stroke();
+  const ex = Math.cos(Math.PI * 0.12) * 18, ey = 14 + Math.sin(Math.PI * 0.12) * 18;
+  ctx.strokeStyle = 'rgba(240,240,240,0.8)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(0, drawn ? 10 : ey); ctx.lineTo(-ex, ey); ctx.stroke();
+  if (drawn) { rr(-0.8, 8, 1.6, 26, 1, '#d8c8a8'); poly([-2.5, 34, 2.5, 34, 0, 39], '#aab0b8'); }
+}
+function drawStaff(orb) {
+  rr(-1.8, -6, 3.6, 46, 1.5, '#6b4a2a');
+  const g = ctx.createRadialGradient(0, 42, 1, 0, 42, 11);
+  g.addColorStop(0, orb); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(-11, 31, 22, 22);
+  circle(0, 42, 3.5, orb);
 }
 
 function drawHumanoid(o) {
@@ -1141,6 +1557,8 @@ function heroArmAngle() {
   if (R.phase === 'dead') return 0.3;
   if (S.activity === 'fishing') return -2.05 - R.swing * 0.4;
   if (S.activity === 'cooking') return -1.35 + Math.sin(time * 2) * 0.08;
+  if (S.activity === 'runecrafting') return -2.3 + Math.sin(time * 3) * 0.1 - R.swing * 0.3;
+  if (S.activity === 'combat' && wtype() !== 'melee') return -1.5 - R.swing * 0.25;
   return -0.6 - 1.9 * R.swing;
 }
 
@@ -1176,7 +1594,7 @@ function drawHero() {
 /* --- enemies --- */
 function drawEnemy(e) {
   const d = e.d, s = d.size;
-  let x = entScreenX(e) + e.lunge * -18;
+  let x = entScreenX(e) + e.lunge * (d.type === 'melee' ? -18 : -5);
   const dying = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
   ctx.save();
   ctx.globalAlpha = dying;
@@ -1217,20 +1635,24 @@ function drawEnemy(e) {
     poly([x - 9, cy - 9, x - 6, cy - 22, x - 2, cy - 11], d.color);
     poly([x + 9, cy - 9, x + 6, cy - 22, x + 2, cy - 11], d.color);
     circle(x - 4, cy - 3, 2.2, '#ff3b3b'); circle(x + 4, cy - 3, 2.2, '#ff3b3b');
+    if (d.orb) { const g = ctx.createRadialGradient(x, cy, 2, x, cy, 30); g.addColorStop(0, d.orb + '88'); g.addColorStop(1, d.orb + '00'); ctx.fillStyle = g; ctx.fillRect(x - 30, cy - 30, 60, 60); }
   } else if (d.shape === 'humanoid') {
     const sk = e.id === 'skeleton' || e.id === 'bonelord';
+    const gob = e.id.startsWith('gob');
     drawHumanoid({
-      x, y: GY, s, face: -1, walk: 0, arm: -0.5 - 1.6 * e.lunge,
+      x, y: GY, s, face: -1, walk: 0, arm: d.type === 'melee' ? -0.5 - 1.6 * e.lunge : -1.5 - 0.25 * e.lunge,
       body: d.body, leg: sk ? '#d8d3c0' : shade(d.body, -0.2), skin: d.color, ribs: sk,
       eye: sk ? '#111' : e.id === 'orc' ? '#ffdd33' : '#331',
       headExtra: () => {
         if (d.boss) poly([-9, -67, -9, -77, -4, -71, 0, -79, 4, -71, 9, -77, 9, -67], '#f2c94c');
-        if (e.id === 'goblin' || e.id === 'gobchief') { poly([-8, -62, -18, -70, -6, -56], d.color); poly([6, -62, 16, -70, 4, -56], d.color); }
+        if (gob) { poly([-8, -62, -18, -70, -6, -56], d.color); poly([6, -62, 16, -70, 4, -56], d.color); }
         if (e.id === 'orc') { ctx.fillStyle = '#fff'; ctx.fillRect(4, -53, 2, 4); }
         if (e.id === 'troll' || e.id === 'frosttroll') { ellipse(9, -57, 5, 4, shade(d.color, -0.1)); }
       },
       tool: () => {
-        if (sk) { rr(-1.5, 15, 3, 6, 1, '#5a3a22'); rr(-2, 21, 4, 26, 1, '#8b7d6b'); }
+        if (d.type === 'ranged') drawBow(e.id === 'sentry' ? '#9fe8f5' : '#8a6a4a', e.atkT > 0.4);
+        else if (d.type === 'magic') drawStaff(d.orb || '#c58bff');
+        else if (sk) { rr(-1.5, 15, 3, 6, 1, '#5a3a22'); rr(-2, 21, 4, 26, 1, '#8b7d6b'); }
         else if (e.id === 'orc' || e.id === 'gobchief') { rr(-1.5, 12, 3, 30, 1, '#5a3a22'); poly([1, 32, 14, 24, 15, 46, 1, 42], '#888'); }
         else { ctx.fillStyle = '#6b4a2a'; ctx.beginPath(); ctx.moveTo(-2, 14); ctx.lineTo(2, 14); ctx.lineTo(5, 44); ctx.lineTo(-5, 44); ctx.closePath(); ctx.fill(); }
       },
@@ -1286,7 +1708,7 @@ function drawNode(e) {
     ctx.scale(s, s);
     poly([-46, 0, -38, -32, -14, -52, 20, -46, 42, -24, 48, 0], '#6e6e78');
     poly([-14, -52, 20, -46, 8, -30, -20, -34], '#868692');
-    const oc = TIER_COLORS[e.tier];
+    const oc = e.ess ? '#b48cff' : TIER_COLORS[e.tier];
     for (const [ox, oy, r] of [[-22, -18, 6], [6, -36, 5], [24, -14, 7], [-4, -12, 4], [-28, -36, 4]]) circle(ox, oy, r, oc);
   } else if (e.kind === 'pond') {
     ctx.globalAlpha = fade;
@@ -1312,7 +1734,26 @@ function drawStation(e) {
   const fade = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
   const working = R.phase === 'act' && R.ent === e && !e.blocked;
   ctx.save(); ctx.globalAlpha = fade; ctx.translate(x, GY);
-  if (e.kind === 'anvil') {
+  if (e.kind === 'bench') {
+    ellipse(0, 2, 34, 5, 'rgba(0,0,0,0.25)');
+    rr(-30, -6, 5, 6, 1, '#5a3a22'); rr(25, -6, 5, 6, 1, '#5a3a22');
+    rr(-28, -30, 6, 26, 2, '#6b4426'); rr(22, -30, 6, 26, 2, '#6b4426');
+    rr(-34, -36, 68, 8, 2, '#8a5a32');
+    ctx.strokeStyle = '#a06a3a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(-6, -30, 18, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    for (let k = 0; k < 3; k++) rr(10 + k * 5, -44, 2, 10, 1, '#d8c8a8');
+    if (working && e.hit > 0.3) burst(0, GY - 40, '#d8b888', 1);
+  } else if (e.kind === 'altar') {
+    const glow = ctx.createRadialGradient(0, -40, 4, 0, -40, 60);
+    glow.addColorStop(0, `rgba(190,130,255,${working ? 0.55 : 0.25})`); glow.addColorStop(1, 'rgba(190,130,255,0)');
+    ctx.fillStyle = glow; ctx.fillRect(-60, -100, 120, 100);
+    rr(-26, -8, 52, 8, 2, '#5e5a6e');
+    rr(-20, -34, 40, 27, 3, '#7a768c');
+    rr(-24, -40, 48, 7, 2, '#8f8aa3');
+    ctx.save(); ctx.translate(0, -56); ctx.rotate(time * (working ? 2 : 0.5));
+    poly([0, -10, 8, 0, 0, 10, -8, 0], '#d6b8ff'); ctx.restore();
+    ctx.strokeStyle = `rgba(214,184,255,${0.4 + 0.3 * Math.sin(time * 4)})`; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, -22, 8, 0, Math.PI * 2); ctx.stroke();
+  } else if (e.kind === 'anvil') {
     ellipse(0, 2, 30, 5, 'rgba(0,0,0,0.25)');
     rr(-15, -22, 30, 22, 3, '#6b4426');
     ellipse(0, -22, 15, 4, '#8a5a32');
@@ -1390,7 +1831,26 @@ function chips(e) {
 }
 
 /* --- effects --- */
-let coins = [];
+let coins = [], projs = [];
+function shoot(x0, y0, x1, y1, kind, color, dur) { if (!SIM) projs.push({ x0, y0, x1, y1, kind, color, t: 0, dur: Math.max(0.1, dur) }); }
+function drawProjs() {
+  for (const p of projs) {
+    const t = p.t, lift = p.kind === 'arrow' ? 22 : 8;
+    const x = p.x0 + (p.x1 - p.x0) * t, y = p.y0 + (p.y1 - p.y0) * t - Math.sin(t * Math.PI) * lift;
+    if (p.kind === 'arrow') {
+      const dx = p.x1 - p.x0, dy = (p.y1 - p.y0) - Math.cos(t * Math.PI) * Math.PI * lift;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan2(dy, dx));
+      rr(-14, -1, 14, 2, 1, '#d8c8a8'); poly([0, -3, 6, 0, 0, 3], '#c8ccd4'); poly([-14, -3, -10, 0, -14, 3], '#e86a6a');
+      ctx.restore();
+    } else {
+      const g = ctx.createRadialGradient(x, y, 1, x, y, 14);
+      g.addColorStop(0, p.color); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - 14, y - 14, 28, 28);
+      circle(x, y, 4.5, '#ffffff'); circle(x, y, 3.5, p.color);
+      if (Math.random() < 0.5) particles.push({ wx: R.worldX + x - HX, y, vx: rand(-20, 20), vy: rand(-30, 10), life: 0.3, color: p.color });
+    }
+  }
+}
 function floatText(sx, y, text, color, life = 1, size = 1, screen = false) {
   if (SIM) return;
   floaters.push({ sx: sx + rand(-6, 6), wx: R.worldX + sx - HX + rand(-6, 6), y, text, color, life, max: life, size, screen });
@@ -1414,6 +1874,8 @@ function updateVisuals(dt) {
   R.shake = Math.max(0, R.shake - dt * 30);
   R.heroHit = Math.max(0, R.heroHit - dt * 4);
   R.ring = Math.max(0, R.ring - dt * 1.2);
+  for (const p of projs) p.t += dt / p.dur;
+  projs = projs.filter(p => p.t < 1);
   if (R.banner && (R.banner.t -= dt) <= 0) R.banner = null;
   let arrived = false;
   for (const c of coins) { c.t += dt * 1.6; if (c.t >= 1) arrived = true; }
@@ -1445,7 +1907,7 @@ function drawHud() {
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
   }
   const z = ZONES[S.zone];
-  const act = { combat: '⚔️ Combat', woodcutting: '🪓 Woodcutting', mining: '⛏️ Mining', fishing: '🎣 Fishing', smithing: '🔨 Smithing', cooking: '🍳 Cooking' }[S.activity];
+  const act = S.activity === 'combat' ? `${TYPE_ICON[combatType()]} Combat` : `${SKILLS[S.activity].icon} ${SKILLS[S.activity].name}`;
   font(600, 14);
   const label = `${z.name} · ${act}`;
   const lh = 26 * FS;
@@ -1463,9 +1925,9 @@ function drawHud() {
     rr(10, py, ctx.measureText(t).width + 16, ph, 6, 'rgba(30,80,120,0.75)');
     ctx.fillStyle = '#d8efff'; ctx.fillText(t, 18, py + ph / 2);
   }
-  if (S.activity === 'combat') {
-    const ready = S.zk[S.zone] >= BOSS_EVERY;
-    const t = ready ? '👑 Boss incoming!' : `👑 ${S.zk[S.zone]} / ${BOSS_EVERY}`;
+  if (S.activity === 'combat' && (z.boss || S.task)) {
+    const ready = z.boss && S.zk[S.zone] >= BOSS_EVERY;
+    const t = z.boss ? (ready ? '👑 Boss incoming!' : `👑 ${S.zk[S.zone]} / ${BOSS_EVERY}`) : `💀 ${S.task.left} left`;
     font(600, 13);
     const bw = ctx.measureText(t).width + 20;
     rr(W - 10 - bw, 10, bw, lh, 6, ready ? 'rgba(150,100,0,0.8)' : 'rgba(0,0,0,0.45)');
@@ -1479,22 +1941,27 @@ function drawHud() {
     const fc = foodCount();
     ctx.fillStyle = fc ? '#fff' : '#ff7070'; ctx.textAlign = 'right';
     ctx.fillText(`🍞${fc}`, HX - 30, GY - 89); ctx.textAlign = 'left';
+    const pr = activePrayer();
+    if (pr) ctx.fillText(pr.icon, HX + 30, GY - 89);
   }
   const e = R.ent;
   if (e && !e.dying && R.phase !== 'walk') {
     const ex = entScreenX(e);
     if (e.kind === 'enemy') {
       const top = Math.max(GY - entHeight(e) - 24, 34 * FS + 26);
-      const name = e.d.boss ? '👑 ' + e.d.name : e.d.name, bw = e.d.boss ? 130 : 70;
-      font(e.d.boss ? 700 : 600, e.d.boss ? 14 : 12); ctx.textAlign = 'center'; ctx.fillStyle = e.d.boss ? '#ffe27a' : '#fff';
+      const tri = triangle(e);
+      const name = (e.d.boss ? '👑 ' : '') + TYPE_ICON[e.d.type] + ' ' + e.d.name + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
+      // name colour shows the combat triangle: green = your style is strong here, red = weak
+      font(e.d.boss ? 700 : 600, e.d.boss ? 14 : 12); ctx.textAlign = 'center';
+      ctx.fillStyle = tri > 0 ? '#9dffa0' : tri < 0 ? '#ffaaa0' : e.d.boss ? '#ffe27a' : '#fff';
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; outlined(name, ex, top - 10 * FS, ctx.fillStyle);
       bar(ex - bw / 2, top, bw, e.d.boss ? 8 : 6, e.hp / e.maxHp, '#e85a5a');
       ctx.textAlign = 'left';
-      bar(HX - 25, GY - 82, 50, 3, 1 - R.atkT / PLAYER_SPEED, '#f2c94c');
+      bar(HX - 25, GY - 82, 50, 3, 1 - R.atkT / playerSpeed(), '#f2c94c');
     } else {
-      const craft = e.kind === 'anvil' || e.kind === 'fire';
-      const top = e.kind === 'tree' ? GY - 150 : e.kind === 'rock' ? GY - 72 : craft ? GY - 84 : GY - 40;
-      const need = craft ? (e.kind === 'anvil' ? SMITH_TIME : COOK_TIME) : gatherTime(e.skill, e.tier);
+      const craft = CRAFTING.has(e.skill);
+      const top = e.kind === 'tree' ? GY - 150 : e.kind === 'rock' ? GY - 72 : e.kind === 'altar' ? GY - 92 : craft ? GY - 84 : GY - 40;
+      const need = craft ? stationTime(e) : nodeTime(e);
       bar(ex - 30, top, 60, 6, e.blocked ? 1 : e.t / need, e.blocked ? '#e85a5a' : '#6aa8ff');
       font(e.blocked ? 700 : 400, 11); ctx.textAlign = 'center'; ctx.fillStyle = e.blocked ? '#ff9a9a' : '#fff';
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
@@ -1534,9 +2001,10 @@ function draw() {
   drawEvents();
   if (R.ent) {
     const k = R.ent.kind;
-    if (k === 'enemy') drawEnemy(R.ent); else if (k === 'anvil' || k === 'fire') drawStation(R.ent); else drawNode(R.ent);
+    if (k === 'enemy') drawEnemy(R.ent); else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
   }
   drawHero();
+  drawProjs();
   if (R.ring > 0) {
     ctx.strokeStyle = `rgba(242,201,76,${R.ring})`; ctx.lineWidth = 4 * R.ring;
     ctx.beginPath(); ctx.ellipse(HX, GY - 40, 30 + (1 - R.ring) * 90, 20 + (1 - R.ring) * 70, 0, 0, Math.PI * 2); ctx.stroke();
@@ -1567,79 +2035,116 @@ function itemLabel(id) {
   return `${it.tier !== undefined ? `<span class="tier" style="background:${TIER_COLORS[it.tier]}"></span>` : ''}${it.name}`;
 }
 
+function zoneEnemies(z) {
+  return [...new Set(z.enemies)].map(id => `${TYPE_ICON[ENEMIES[id].type]} ${ENEMIES[id].name}`).join(', ');
+}
+function zoneButton(z, i) {
+  const combat = S.activity === 'combat', locked = combat && !zoneOpen(i);
+  let sub;
+  if (!combat) sub = 'Scenery only';
+  else if (z.slayer) sub = locked ? `Requires Slayer level ${z.slayer}` : `💀 Slayer area`;
+  else if (locked) { const prev = i > 0 && !S.bosses[i - 1] ? ENEMIES[ZONES[i - 1].boss].name : null; sub = prev ? `Beat ${prev} · combat ${z.req}` : `Requires combat level ${z.req}`; }
+  else sub = `<span class="boss">👑 ${S.bosses[i] ? '✔ ' : ''}${ENEMIES[z.boss].name} · ${S.zk[i]}/${BOSS_EVERY}</span>`;
+  return `<button class="zone ${S.zone === i ? 'sel' : ''}" ${locked ? 'disabled' : ''} data-a="zone" data-id="${i}">
+    <b>${locked ? '🔒 ' : ''}${z.name}</b><small>${sub}</small>${combat ? `<small>${zoneEnemies(z)}</small>` : ''}</button>`;
+}
+
+function htmlCombatPanel() {
+  const wt = wtype(), mode = attackMode(), ct = combatType();
+  let h = `<div class="row"><b>Weapon:</b> ${S.equip.weapon ? itemLabel(S.equip.weapon) : 'Fists'} <span class="tag">${TYPE_ICON[ct]} ${TYPE_NAME[ct]}</span></div>`;
+  if (mode === 'unarmed' && wt !== 'melee') h += `<p class="need">${wt === 'ranged' ? 'No arrows' : 'No runes'} – your hero is punching. Fletch or buy ${wt === 'ranged' ? 'arrows' : 'runes (Craft → Runecrafting, or the Shop)'}.</p>`;
+  h += `<h3>Style</h3><div class="chips">` + STYLES[ct].map(([id, n, xp]) =>
+    `<button class="${S.styles[ct] === id ? 'sel' : ''}" data-a="style" data-id="${id}">${n}<small>${xp}</small></button>`).join('') + '</div>';
+  if (wt === 'magic') {
+    h += `<h3>Spell · 🔮 ${fmt(has('rune'))} runes</h3><div class="chips"><button class="${S.spell < 0 ? 'sel' : ''}" data-a="spell" data-id="-1">Best<small>auto</small></button>` +
+      SPELLS.map((sp, i) => `<button class="${S.spell === i ? 'sel' : ''}" data-a="spell" data-id="${i}" ${LV.magic < sp.lvl ? 'disabled' : ''}>${LV.magic < sp.lvl ? '🔒 ' : ''}${sp.name}<small>Lv ${sp.lvl} · ${sp.runes} rune${sp.runes > 1 ? 's' : ''} · hit ${sp.max}</small></button>`).join('') + '</div>';
+  }
+  if (wt === 'ranged') { const a = bestArrow(); h += `<p class="muted">Ammo: ${a ? `${itemLabel(a)} ×${fmt(has(a))}` : '<span class="need">no arrows</span>'} – the best arrows are used first.</p>`; }
+  h += `<div class="row muted" style="margin-top:10px">Max hit <b>${playerMaxHit()}</b> · Accuracy <b>${Math.round(accuracyLevel())}</b> · Speed <b>${playerSpeed()}s</b> · Armour <b>${armorValue()}</b> · Damage reduction <b>${Math.round(damageReduction() * 100)}%</b></div>`;
+  const z = ZONES[S.zone];
+  h += `<h3>Combat triangle</h3><p class="muted">⚔️ Melee beats 🏹 Ranged · 🏹 Ranged beats ✨ Magic · ✨ Magic beats ⚔️ Melee. Against an enemy you beat you deal +20% damage and take 15% less.</p>
+    <div class="chips">` + [...new Set(z.enemies.concat(z.boss ? [z.boss] : []))].map(id => {
+      const d = ENEMIES[id], t = BEATS[ct] === d.type ? 1 : BEATS[d.type] === ct ? -1 : 0;
+      return `<span class="tag ${t > 0 ? 'good' : t < 0 ? 'bad' : ''}">${TYPE_ICON[d.type]} ${d.name}${t > 0 ? ' · strong' : t < 0 ? ' · weak' : ''}</span>`;
+    }).join('') + '</div>';
+  h += `<h3>🙏 Prayer · ${fmt(S.pp)} points</h3><div class="chips">` + PRAYERS.map(pr =>
+    `<button class="${S.prayer === pr.id ? 'sel' : ''}" data-a="prayer" data-id="${pr.id}" ${LV.prayer < pr.lvl ? 'disabled' : ''}>${LV.prayer < pr.lvl ? '🔒' : pr.icon} ${pr.name}<small>Lv ${pr.lvl} · ${pr.desc} · ${pr.cost} pt/attack</small></button>`).join('') + '</div>';
+  h += `<label class="check"><input type="checkbox" id="autobury" data-a="autobury" ${S.autoBury ? 'checked' : ''}> Bury bones automatically (Prayer XP + prayer points)</label>
+    <p class="muted">When HP drops below 40%, the hero eats the best food available.</p>`;
+  return h;
+}
+
 function htmlActivity() {
-  const acts = [['combat', '⚔️', 'Combat'], ['woodcutting', '🪓', 'Woodcutting'], ['mining', '⛏️', 'Mining'],
-    ['fishing', '🎣', 'Fishing'], ['smithing', '🔨', 'Smithing'], ['cooking', '🍳', 'Cooking']];
+  const acts = [['combat', '⚔️', 'Combat'], ['woodcutting', '🪓', 'Woodcutting'], ['mining', '⛏️', 'Mining'], ['fishing', '🎣', 'Fishing'],
+    ['smithing', '🔨', 'Smithing'], ['cooking', '🍳', 'Cooking'], ['fletching', '🪶', 'Fletching'], ['runecrafting', '🔮', 'Runecrafting']];
   let h = '<h3>What to do on the road?</h3><div class="acts">' + acts.map(([id, ic, n]) =>
     `<button class="act ${S.activity === id ? 'sel' : ''}" data-a="activity" data-id="${id}"><span class="big">${ic}</span>${n}
      <small>${id === 'combat' ? 'Combat level ' + combatLevel() : 'Level ' + LV[id]}</small></button>`).join('') + '</div>';
-  h += '<h3>Zone</h3><div class="zones">' + ZONES.map((z, i) => {
-    const locked = S.activity === 'combat' && !zoneOpen(i);
-    const prevBoss = i > 0 && !S.bosses[i - 1] ? ENEMIES[ZONES[i - 1].boss].name : null;
-    const req = locked ? (prevBoss ? `Beat ${prevBoss} · combat ${z.req}` : `Requires combat level ${z.req}`)
-      : `<span class="boss">👑 ${S.bosses[i] ? '✔ ' : ''}${ENEMIES[z.boss].name} · ${S.zk[i]}/${BOSS_EVERY}</span>`;
-    const what = S.activity === 'combat' ? z.enemies.filter((v, k, a) => a.indexOf(v) === k).map(id => ENEMIES[id].name).join(', ')
-      : S.activity === 'woodcutting' ? TREE_N[i] : S.activity === 'mining' ? METAL[i] + ' Ore' : FISH_N[i];
-    return `<button class="zone ${S.zone === i ? 'sel' : ''}" ${locked ? 'disabled' : ''} data-a="zone" data-id="${i}">
-      <b>${locked ? '🔒 ' : ''}${z.name}</b><small>${S.activity === 'combat' ? req : 'Scenery only'}</small>
-      ${S.activity === 'combat' ? `<small>${what}</small>` : ''}</button>`;
-  }).join('') + '</div>';
-
+  h += '<h3>Zone</h3><div class="zones">' + ZONES.slice(0, MAIN_ZONES).map((z, i) => zoneButton(z, i)).join('') + '</div>';
+  h += '<h3>💀 Slayer areas</h3><div class="zones">' + ZONES.slice(MAIN_ZONES).map((z, k) => zoneButton(z, MAIN_ZONES + k)).join('') + '</div>';
   h += '<div class="info">';
-  if (S.activity === 'combat') {
-    h += `<div class="row"><b>Combat style:</b>
-      <button class="${S.style === 'attack' ? 'sel' : ''}" data-a="style" data-id="attack">⚔️ Attack</button>
-      <button class="${S.style === 'defence' ? 'sel' : ''}" data-a="style" data-id="defence">🛡️ Defence</button></div>
-      <p class="muted">The selected skill earns XP for every hit. Hitpoints always gets a share of XP.
-      When HP drops below 40%, the hero automatically eats the best food available.</p>
-      <div class="row muted">Max hit: <b>${playerMaxHit()}</b> · Armour: <b>${armorValue()}</b> · Damage reduction: <b>${Math.round(damageReduction() * 100)}%</b></div>`;
-  } else if (S.activity === 'smithing') {
-    const r = RECIPES[S.smithSel];
-    h += `<b>Smithing:</b> ${itemLabel(r.out)}<br><small>${matsHtml(r.mats)}</small>
-      <p class="muted">${SMITH_TIME}s per item · ${r.xp} XP. Your hero smiths at anvils on the road until materials run out – even while you are away.</p>
-      <button data-tab="smithing">Choose recipe</button>`;
-  } else if (S.activity === 'cooking') {
+  if (S.activity === 'combat') h += htmlCombatPanel();
+  else if (S.activity === 'cooking') {
     const t = cookTarget();
     h += `<b>Cooking:</b> ${S.cookSel < 0 ? 'best fish available' : FISH_N[S.cookSel]}${t >= 0 ? ` <span class="muted">(now: ${FISH_N[t]}, ${has('fish' + t)} left)</span>` : ' – <span class="need">no fish to cook</span>'}
       <p class="muted">${COOK_TIME}s per fish. Burnt fish gives no XP – higher Cooking burns less.</p>
       <button data-tab="cooking">Choose fish</button>`;
+  } else if (CRAFTING.has(S.activity)) {
+    const sk = S.activity, r = CRAFT[sk].recipes[S.csel[sk]];
+    h += `<b>${SKILLS[sk].name}:</b> ${recipeCount(r) > 1 ? recipeCount(r) + '× ' : ''}${itemLabel(r.out)}<br><small>${matsHtml(r.mats)}</small>
+      <p class="muted">${CRAFT[sk].time}s per craft · ${r.xp} XP. Your hero works at ${CRAFT[sk].place} on the road until materials run out – even while you are away.</p>
+      <button data-tab="${sk}">Choose recipe</button>`;
   } else {
-    const sk = S.activity, t = chosenTier(sk), best = gatherTier(sk);
+    const sk = S.activity, best = gatherTier(sk), ess = sk === 'mining' && S.gsel.mining === -2;
+    const t = chosenTier(sk);
     const names = sk === 'woodcutting' ? TREE_N : sk === 'mining' ? METAL.map(m => m + ' Ore') : FISH_N;
-    h += `<b>Target:</b> ${names[t]}<br><span class="muted">${gatherTime(sk, t).toFixed(2)}s per item · ${GATHER_XP[t]} XP · tool level ${S.tools[TOOL_OF[sk]]}/4</span>
-      <div class="chips"><button class="${S.gsel[sk] < 0 ? 'sel' : ''}" data-a="gtier" data-id="-1">Best</button>` +
-      names.map((n, i) => `<button class="${S.gsel[sk] === i ? 'sel' : ''}" data-a="gtier" data-id="${i}" ${i > best ? 'disabled' : ''}>${i > best ? '🔒 ' : ''}${n}</button>`).join('') + '</div>';
-    if (best < 4) h += `<p class="muted">Next tier (${names[best + 1]}): ${SKILLS[sk].name} level ${GATHER_REQ[best + 1]}. Pick a lower tier if Smithing or Cooking can't use your current one yet.</p>`;
+    h += ess ? `<b>Target:</b> Rune Essence<br><span class="muted">${(gatherTime('mining', 0) * ESSENCE_TIME / GATHER_TIME[0]).toFixed(2)}s per item · ${ESSENCE_XP} XP · used for Runecrafting</span>`
+      : `<b>Target:</b> ${names[t]}<br><span class="muted">${gatherTime(sk, t).toFixed(2)}s per item · ${GATHER_XP[t]} XP · tool level ${S.tools[TOOL_OF[sk]]}/4</span>`;
+    h += `<div class="chips"><button class="${S.gsel[sk] === -1 ? 'sel' : ''}" data-a="gtier" data-id="-1">Best</button>` +
+      names.map((n, i) => `<button class="${S.gsel[sk] === i ? 'sel' : ''}" data-a="gtier" data-id="${i}" ${i > best ? 'disabled' : ''}>${i > best ? '🔒 ' : ''}${n}</button>`).join('') +
+      (sk === 'mining' ? `<button class="${ess ? 'sel' : ''}" data-a="gtier" data-id="-2">🔹 Rune Essence</button>` : '') + '</div>';
+    if (best < 4) h += `<p class="muted">Next tier (${names[best + 1]}): ${SKILLS[sk].name} level ${GATHER_REQ[best + 1]}. Pick a lower tier if Smithing, Fletching or Cooking can't use your current one yet.</p>`;
   }
   return h + '</div>';
 }
 
 function htmlSkills() {
-  return '<div class="grid">' + Object.entries(SKILLS).map(([k, s]) => {
+  return '<div class="grid">' + Object.entries(SKILLS).map(([k, sk]) => {
     const l = LV[k], xp = S.skills[k];
     const cur = XP_TABLE[l], nxt = l < 99 ? XP_TABLE[l + 1] : xp;
     const frac = l < 99 ? (xp - cur) / (nxt - cur) : 1;
-    return `<div class="skill"><div class="top"><span>${s.icon} ${s.name}</span><span class="lv">${l} / 99</span></div>
+    return `<div class="skill"><div class="top"><span>${sk.icon} ${sk.name}</span><span class="lv">${l} / 99</span></div>
       <div class="bar"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
       <small>${fmt(xp)} / ${fmt(nxt)} XP</small></div>`;
   }).join('') + '</div>';
 }
 
-function htmlInventory() {
+let bagSub = 'items', craftSub = 'smithing';
+function subNav(action, current, list) {
+  return `<div class="chips sub">` + list.map(([id, label]) => `<button class="${current === id ? 'sel' : ''}" data-a="${action}" data-id="${id}">${label}</button>`).join('') + '</div>';
+}
+function itemStats(it) {
+  return [it.heal && 'heals ' + it.heal, it.power && (it.slot ? `${TYPE_ICON[it.wtype]} power +${it.power}` : 'arrow power +' + it.power),
+    it.armor && 'armour +' + it.armor, it.note, it.req && 'Lv ' + it.req, it.bury && `bury: ${it.bury} Prayer XP`].filter(Boolean).join(' · ');
+}
+function htmlBag() {
+  const nav = subNav('bagsub', bagSub, [['items', '🎒 Items'], ['shop', '🏪 Shop']]);
+  if (bagSub === 'shop') return nav + htmlShop();
   const ids = Object.keys(S.inv);
-  if (!ids.length) return '<p class="muted">Your inventory is empty. Go gather resources or fight!</p>';
+  if (!ids.length) return nav + '<p class="muted">Your bag is empty. Go gather resources or fight!</p>';
   const groups = {};
   for (const id of ids) (groups[ITEMS[id].type] = groups[ITEMS[id].type] || []).push(id);
   const total = ids.reduce((a, id) => a + ITEMS[id].value * S.inv[id], 0);
-  let h = `<div class="row" style="justify-content:space-between"><span class="muted">Total value: <b class="lg-gold">${fmt(total)}</b> gold</span></div>`;
-  for (const g of ['Resources', 'Food', 'Equipment', 'Misc']) {
+  let h = nav + `<span class="muted">Total value: <b class="lg-gold">${fmt(total)}</b> gold</span>`;
+  for (const g of ['Equipment', 'Ammo', 'Food', 'Resources', 'Misc']) {
     if (!groups[g]) continue;
     h += `<h3>${g}</h3><div class="grid">` + groups[g].sort().map(id => {
       const it = ITEMS[id];
       return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${itemLabel(id)}<br>
-        <small>${it.value} 🪙${it.heal ? ' · heals ' + it.heal : ''}${it.power ? ' · power +' + it.power : ''}${it.armor ? ' · armour +' + it.armor : ''}${it.req ? ' · Lv ' + it.req : ''}</small></span>
+        <small>${it.value} 🪙${itemStats(it) ? ' · ' + itemStats(it) : ''}</small></span>
         <span class="ct">${fmt(S.inv[id])}</span></div>
-        <div class="btns">${it.slot ? `<button data-a="equip" data-id="${id}">Equip</button>` : ''}
+        <div class="btns">${it.slot ? `<button data-a="equip" data-id="${id}" ${canEquip(id) ? '' : 'disabled'}>Equip</button>` : ''}
+        ${it.bury ? `<button data-a="bury" data-id="${id}">Bury all</button>` : ''}
         <button data-a="sell" data-id="${id}" data-n="1">Sell 1</button>
         <button data-a="sell" data-id="${id}" data-n="999999">Sell all</button></div></div>`;
     }).join('') + '</div>';
@@ -1651,17 +2156,20 @@ function matsHtml(mats) {
   return Object.entries(mats).map(([id, n]) => `<span class="${has(id) >= n ? 'have' : 'need'}">${n}× ${ITEMS[id].name} (${has(id)})</span>`).join(', ');
 }
 
-function htmlSmithing() {
-  return `<p class="muted">Pick a recipe and your hero smiths it at anvils along the road (${SMITH_TIME}s each), also while you are away. Better gear is equipped automatically. Smithing level: <b>${LV.smithing}</b></p><div class="grid">` +
-    RECIPES.map((r, i) => {
-      const it = ITEMS[r.out], locked = LV.smithing < r.req, mx = maxCraft(r.mats);
-      return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${itemLabel(r.out)}<br>
-        <small>${it.power ? 'Power +' + it.power : 'Armour +' + it.armor} · ${r.xp} XP · ${locked ? '🔒 ' : ''}Smithing ${r.req}</small></span></div>
-        <small>${matsHtml(r.mats)}</small>
-        <div class="btns">${S.activity === 'smithing' && S.smithSel === i
-          ? '<button class="sel" disabled>🔨 Smithing…</button>'
-          : `<button data-a="smith" data-id="${i}" ${locked ? 'disabled' : ''}>Smith${mx ? ` (${mx})` : ''}</button>`}</div></div>`;
-    }).join('') + '</div>';
+function htmlCraft() {
+  let h = subNav('craftsub', craftSub, [['smithing', '🔨 Smithing'], ['cooking', '🍳 Cooking'], ['fletching', '🪶 Fletching'], ['runecrafting', '🔮 Runecrafting']]);
+  if (craftSub === 'cooking') return h + htmlCooking();
+  const sk = craftSub, c = CRAFT[sk];
+  h += `<p class="muted">Pick a recipe and your hero works at ${c.place} along the road (${c.time}s each), also while you are away. Better gear of the same kind is equipped automatically. ${SKILLS[sk].name} level: <b>${LV[sk]}</b></p><div class="grid">`;
+  return h + c.recipes.map((r, i) => {
+    const it = ITEMS[r.out], locked = LV[sk] < r.req, mx = maxCraft(r.mats), n = recipeCount(r);
+    const active = S.activity === sk && S.csel[sk] === i;
+    return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${n > 1 ? n + '× ' : ''}${itemLabel(r.out)}<br>
+      <small>${itemStats(it) ? itemStats(it) + ' · ' : ''}${r.xp} XP · ${locked ? '🔒 ' : ''}${SKILLS[sk].name} ${r.req}</small></span></div>
+      <small>${matsHtml(r.mats)}</small>
+      <div class="btns">${active ? `<button class="sel" disabled>${SKILLS[sk].icon} Working…</button>`
+        : `<button data-a="craft" data-skill="${sk}" data-id="${i}" ${locked ? 'disabled' : ''}>${c.verb}${mx ? ` (${mx})` : ''}</button>`}</div></div>`;
+  }).join('') + '</div>';
 }
 
 function htmlCooking() {
@@ -1688,10 +2196,58 @@ function htmlShop() {
       <span class="nm">${TOOL_NAMES[tool]}<br><small>Level ${l} / 4 · speed +${l * 12}%</small></span></div>
       <div class="btns">${l >= 4 ? '<button disabled>Maxed</button>' : `<button data-a="tool" data-id="${tool}" ${S.gold < cost ? 'disabled' : ''}>Upgrade – ${fmt(cost)} 🪙</button>`}</div></div>`;
   }
-  h += `</div><h3>Food</h3><div class="grid"><div class="item"><div class="top"><span class="ic">🍞</span>
-    <span class="nm">Bread<br><small>Heals 15 · costs 5 🪙</small></span><span class="ct">${has('bread')}</span></div>
-    <div class="btns"><button data-a="bread" data-n="1" ${S.gold < 5 ? 'disabled' : ''}>Buy 1</button>
-    <button data-a="bread" data-n="10" ${S.gold < 50 ? 'disabled' : ''}>Buy 10</button></div></div></div>`;
+  h += '</div><h3>Supplies</h3><div class="grid">' + SHOP.map((it, i) => {
+    const d = ITEMS[it.id];
+    return `<div class="item"><div class="top"><span class="ic">${d.icon}</span>
+      <span class="nm">${it.n > 1 ? it.n + '× ' : ''}${d.name}<br><small>${itemStats(d) || d.type} · ${it.cost} 🪙</small></span><span class="ct">${fmt(has(it.id))}</span></div>
+      <div class="btns"><button data-a="buy" data-id="${i}" data-n="1" ${S.gold < it.cost ? 'disabled' : ''}>Buy</button>
+      <button data-a="buy" data-id="${i}" data-n="10" ${S.gold < it.cost * 10 ? 'disabled' : ''}>Buy ×10</button></div></div>`;
+  }).join('') + '</div>';
+  return h;
+}
+
+function htmlSlayer() {
+  let h = `<div class="info row" style="justify-content:space-between"><span>💀 Slayer level <b>${LV.slayer}</b></span><span>🪙 Slayer coins <b>${fmt(S.scoins)}</b></span></div>`;
+  h += '<h3>Current task</h3><div class="info">';
+  if (S.task) {
+    const t = S.task, d = ENEMIES[t.id];
+    h += `<b>${TYPE_ICON[d.type]} ${d.name}</b> in ${ZONES[t.zone].name}<br><small>${t.n - t.left} / ${t.n} defeated · each kill gives Slayer XP and coins</small>
+      <div class="bar" style="margin:8px 0"><i style="width:${((t.n - t.left) / t.n * 100).toFixed(1)}%"></i></div>
+      <div class="row"><button data-a="tasktravel">⚔️ Travel there</button><button data-a="taskskip" ${S.scoins < 25 ? 'disabled' : ''}>Skip – 25 coins</button></div>`;
+  } else h += `<p class="muted">The Slayer master hands out monsters to hunt from the areas you can reach. Kills on task give Slayer XP and coins, plus a bonus when the task is done.</p><button data-a="newtask">💀 Get a task</button>`;
+  if (S.ownsAutoSlayer) h += `<label class="check"><input type="checkbox" id="autoslayer" data-a="autoslayer" ${S.autoSlayer ? 'checked' : ''}> Auto Slayer: travel to the task and take a new one when it's done</label>`;
+  h += '</div><h3>Slayer areas</h3><div class="grid">' + ZONES.slice(MAIN_ZONES).map(z =>
+    `<div class="item"><div class="top"><span class="ic">${LV.slayer >= z.slayer ? '💀' : '🔒'}</span><span class="nm"><b>${z.name}</b><br><small>Slayer ${z.slayer} · ${zoneEnemies(z)}</small></span></div></div>`).join('') + '</div>';
+  h += '<h3>Slayer shop</h3><div class="grid">' + SLAYER_SHOP.map((it, i) => {
+    const d = it.id === 'autoslayer' ? it : ITEMS[it.id], owned = it.id === 'autoslayer' && S.ownsAutoSlayer;
+    return `<div class="item"><div class="top"><span class="ic">${d.icon}</span><span class="nm">${d.name}<br><small>${d.note}</small></span></div>
+      <div class="btns">${owned ? '<button disabled>Owned</button>' : `<button data-a="slayerbuy" data-id="${i}" ${S.scoins < it.cost ? 'disabled' : ''}>Buy – ${fmt(it.cost)} coins</button>`}</div></div>`;
+  }).join('') + '</div>';
+  return h;
+}
+
+function htmlQuests() {
+  const by = st => QUESTS.filter(q => questState(q) === st);
+  const card = q => {
+    const st = questState(q), ready = questReady(q);
+    let h = `<div class="item quest ${ready ? 'ready' : ''}"><div class="top"><span class="ic">${st === 'done' ? '✅' : ready ? '🎁' : '📜'}</span>
+      <span class="nm"><b>${q.name}</b><br><small>${q.desc}</small></span></div>`;
+    if (st !== 'done') h += q.obj.map((o, k) => {
+      const need = objNeed(o), have = st === 'active' ? Math.max(0, objProgress(q, k)) : 0;
+      return `<small>${objText(o)}: ${have} / ${need}</small><div class="bar"><i style="width:${(have / need * 100).toFixed(1)}%"></i></div>`;
+    }).join('');
+    h += `<small class="lg-gold">Reward: ${rewardText(q.rew)}</small>`;
+    if (st === 'open') h += `<div class="btns"><button data-a="qstart" data-id="${q.id}">Start quest</button></div>`;
+    if (ready) h += `<div class="btns"><button data-a="qclaim" data-id="${q.id}">🎁 Claim reward</button></div>`;
+    return h + '</div>';
+  };
+  let h = `<p class="muted">Quests give gold, items and XP. Progress counts from the moment you start a quest. Completed: <b>${questsDone()} / ${QUESTS.length}</b></p>`;
+  const active = by('active'), open = by('open'), done = by('done');
+  if (active.length) h += '<h3>Active</h3><div class="grid">' + active.map(card).join('') + '</div>';
+  if (open.length) h += '<h3>Available</h3><div class="grid">' + open.map(card).join('') + '</div>';
+  if (done.length) h += '<h3>Completed</h3><div class="grid">' + done.map(card).join('') + '</div>';
+  const locked = by('locked').length;
+  if (locked) h += `<p class="muted">${locked} more quest${locked > 1 ? 's' : ''} unlock as you finish these.</p>`;
   return h;
 }
 
@@ -1716,7 +2272,9 @@ function htmlProgress() {
     <span>Deaths <b>${fmt(S.deaths)}</b></span><span>Bosses beaten <b>${S.bosses.filter(Boolean).length} / 5</b></span>
     <span>Road finds <b>${fmt(S.stats.events)}</b></span><span>Items smithed <b>${fmt(S.stats.smithed)}</b></span>
     <span>Fish cooked <b>${fmt(S.stats.cooked)}</b></span><span>Total level <b>${totalLevel()}</b></span>
-    <span>Journeys <b>${S.journeys}</b></span></div>`;
+    <span>Fletched <b>${fmt(S.stats.fletched)}</b></span><span>Runes crafted <b>${fmt(S.stats.rc)}</b></span>
+    <span>Bones buried <b>${fmt(S.stats.buried)}</b></span><span>Slayer tasks <b>${fmt(S.stats.tasks)}</b></span>
+    <span>Quests <b>${questsDone()} / ${QUESTS.length}</b></span><span>Journeys <b>${S.journeys}</b></span></div>`;
   const done = ACH.filter(a => S.ach[a.id]).length;
   h += `<h3>Achievements · ${done} / ${ACH.length}</h3><div class="grid">` + ACH.map(a => `
     <div class="item ach ${S.ach[a.id] ? 'done' : ''}"><div class="top"><span class="ic">${S.ach[a.id] ? '🏆' : '🔒'}</span>
@@ -1726,23 +2284,28 @@ function htmlProgress() {
 
 function renderTab(force) {
   if (force) lastHtml = '';
-  const html = { activity: htmlActivity, skills: htmlSkills, inventory: htmlInventory, smithing: htmlSmithing, cooking: htmlCooking, shop: htmlShop, progress: htmlProgress }[tab]();
+  const html = { activity: htmlActivity, skills: htmlSkills, inventory: htmlBag, craft: htmlCraft, slayer: htmlSlayer, quests: htmlQuests, progress: htmlProgress }[tab]();
   if (html !== lastHtml) { $('#tab-content').innerHTML = html; lastHtml = html; }
 }
 
 function renderHero() {
   const mh = maxHp();
-  const food = foodCount();
   const eq = slot => S.equip[slot]
     ? `<span>${itemLabel(S.equip[slot])}</span><button data-a="unequip" data-id="${slot}">Unequip</button>`
     : '<span class="muted">—</span>';
+  const ammo = wtype() === 'ranged' ? (bestArrow() ? `${ITEMS[bestArrow()].name} ×${fmt(has(bestArrow()))}` : '<span class="need">none</span>')
+    : wtype() === 'magic' ? `🔮 ${fmt(has('rune'))} runes` : null;
+  const pr = activePrayer();
   const html = `<h3>Hero</h3>
     <div class="row" style="justify-content:space-between"><span>❤️ ${Math.ceil(Math.max(0, S.hp))} / ${mh}</span><span class="muted">Combat level ${combatLevel()}</span></div>
     <div class="bar hp" style="margin:6px 0 10px"><i style="width:${(clamp(S.hp / mh, 0, 1) * 100).toFixed(1)}%"></i></div>
-    <div class="eq"><span class="muted">🗡️ Weapon</span></div><div class="eq">${eq('weapon')}</div>
+    <div class="eq"><span class="muted">${TYPE_ICON[wtype()]} Weapon</span></div><div class="eq">${eq('weapon')}</div>
     <div class="eq"><span class="muted">🥋 Armour</span></div><div class="eq">${eq('armor')}</div>
-    <div class="eq"><span class="muted">🍽️ Food</span><span>${food}</span></div>
-    <div class="eq"><span class="muted">⚔️ Enemies defeated</span><span>${fmt(S.kills)}</span></div>`;
+    <div class="eq"><span class="muted">📿 Amulet</span></div><div class="eq">${eq('amulet')}</div>
+    ${ammo ? `<div class="eq"><span class="muted">Ammo</span><span>${ammo}</span></div>` : ''}
+    <div class="eq"><span class="muted">🍽️ Food</span><span>${foodCount()}</span></div>
+    <div class="eq"><span class="muted">🙏 Prayer</span><span>${pr ? pr.icon + ' ' + pr.name + ' · ' : ''}${fmt(S.pp)} pts</span></div>
+    <div class="eq"><span class="muted">💀 Task</span><span>${S.task ? `${ENEMIES[S.task.id].name} ${S.task.left} left` : '—'}</span></div>`;
   if (html !== lastHero) { $('#hero').innerHTML = html; lastHero = html; }
   $('#gold b').textContent = fmt(S.gold);
   $('#cmb b').textContent = combatLevel();
@@ -1759,10 +2322,13 @@ function nextGoal() {
     return { t: S.activity === 'smithing' ? 'Your hero is smithing a Copper Sword…' : 'Smith a Copper Sword', tab: 'smithing' };
   }
   if (R.ent && R.ent.blocked) {
-    return S.activity === 'smithing'
-      ? { t: `Out of materials for ${ITEMS[RECIPES[S.smithSel].out].name} – gather more or pick another recipe`, tab: 'smithing' }
-      : { t: 'No fish to cook – go 🎣 Fishing', tab: 'activity' };
+    return S.activity === 'cooking' ? { t: 'No fish to cook – go 🎣 Fishing', tab: 'activity' }
+      : { t: `Out of materials for ${ITEMS[CRAFT[S.activity].recipes[S.csel[S.activity]].out].name} – gather more or pick another recipe`, tab: S.activity };
   }
+  if (S.activity === 'combat' && attackMode() === 'unarmed' && wtype() !== 'melee')
+    return { t: wtype() === 'ranged' ? 'Out of arrows – fletch or buy more' : 'Out of runes – craft or buy more', tab: wtype() === 'ranged' ? 'fletching' : 'runecrafting' };
+  const ready = QUESTS.find(q => questReady(q));
+  if (ready) return { t: `Quest "${ready.name}" is complete – claim your reward`, tab: 'quests' };
   const upg = Object.keys(S.inv).find(id => ITEMS[id].slot && isUpgrade(id));
   if (upg) return { t: `Equip your ${ITEMS[upg].name}`, tab: 'inventory' };
   if (foodCount() < 5) {
@@ -1771,9 +2337,11 @@ function nextGoal() {
   }
   const best = bestZone();
   if (S.activity === 'combat' && S.zone < best) return { t: `${ZONES[best].name} is open – travel there`, tab: 'activity' };
+  if (!questsDone() && !Object.keys(S.quests).length) return { t: 'Open 📜 Quests and start "First Steps"', tab: 'quests' };
   if (!S.bosses[best]) return { t: `Defeat ${ENEMIES[ZONES[best].boss].name} in ${ZONES[best].name} (appears after ${BOSS_EVERY} kills: ${S.zk[best]}/${BOSS_EVERY})`, tab: 'activity' };
   const nz = best + 1;
-  if (nz < ZONES.length) return { t: `Reach combat level ${ZONES[nz].req} to enter ${ZONES[nz].name} (now ${combatLevel()})`, tab: 'skills' };
+  if (nz < MAIN_ZONES) return { t: `Reach combat level ${ZONES[nz].req} to enter ${ZONES[nz].name} (now ${combatLevel()})`, tab: 'skills' };
+  if (!S.task) return { t: 'Get a 💀 Slayer task for Slayer XP and coins', tab: 'slayer' };
   return { t: `You beat the Dragon! Start a 🌟 New Journey for ${renownGain()} Renown`, tab: 'progress' };
 }
 let lastGoal = '';
@@ -1785,15 +2353,22 @@ function renderGoal() {
   if (html !== lastGoal) { el.innerHTML = html; lastGoal = html; }
   el.dataset.goto = g.tab;
   const alerts = {
-    smithing: S.activity !== 'smithing' && RECIPES.some((r, i) => canSmith(i)),
-    cooking: S.activity !== 'cooking' && [0, 1, 2, 3, 4].some(t => has('fish' + t) && LV.cooking >= GATHER_REQ[t]),
-    shop: ['axe', 'pick', 'rod'].some(t => S.tools[t] < 4 && S.gold >= TOOL_COST[S.tools[t]]),
-    inventory: Object.keys(S.inv).some(id => ITEMS[id].slot && isUpgrade(id)),
+    craft: !CRAFTING.has(S.activity) && (Object.keys(CRAFT).some(sk => CRAFT[sk].recipes.some((r, i) => canCraft(sk, i) && ITEMS[r.out].slot && isUpgrade(r.out)))
+      || [0, 1, 2, 3, 4].some(t => has('fish' + t) >= 10 && LV.cooking >= GATHER_REQ[t])),
+    inventory: Object.keys(S.inv).some(id => (ITEMS[id].slot && isUpgrade(id)) || (ITEMS[id].bury && has(id) >= 10))
+      || ['axe', 'pick', 'rod'].some(t => S.tools[t] < 4 && S.gold >= TOOL_COST[S.tools[t]]),
+    slayer: !S.task && combatLevel() >= 5,
+    quests: QUESTS.some(q => questReady(q) || questState(q) === 'open'),
     progress: S.bosses[4] || Object.keys(RUP).some(k => S.rup[k] < RUP[k].max && S.renown >= rupCost(k)),
   };
   document.querySelectorAll('nav.tabs [data-tab]').forEach(b => b.classList.toggle('alert', !!alerts[b.dataset.tab] && b.dataset.tab !== tab));
 }
+// old tab names (used by goals and buttons) map to a tab plus its sub-view
+const TAB_ALIAS = { smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], shop: ['inventory', 'shop'] };
 function openTab(name, scroll) {
+  const al = TAB_ALIAS[name];
+  if (al) { name = al[0]; if (name === 'craft') craftSub = al[1]; else bagSub = al[1]; }
+  else if (name === 'craft' && CRAFTING.has(S.activity)) craftSub = S.activity;
   tab = name;
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('sel', b.dataset.tab === name));
   renderTab(true);
@@ -1820,14 +2395,27 @@ document.addEventListener('click', ev => {
   switch (b.dataset.a) {
     case 'activity': setActivity(id); break;
     case 'zone': setZone(+id); break;
-    case 'style': S.style = id; break;
+    case 'style': S.styles[combatType()] = id; break;
+    case 'spell': S.spell = +id; break;
+    case 'prayer': togglePrayer(id); break;
+    case 'autobury': S.autoBury = b.checked; break;
+    case 'bury': bury(id, has(id)); break;
+    case 'bagsub': bagSub = id; break;
+    case 'craftsub': craftSub = id; break;
+    case 'craft': S.csel[b.dataset.skill] = +id; setActivity(b.dataset.skill); break;
+    case 'buy': buy(+id, n); break;
+    case 'newtask': newTask(); break;
+    case 'taskskip': skipTask(); break;
+    case 'tasktravel': if (S.task && zoneOpen(S.task.zone)) { setActivity('combat'); setZone(S.task.zone); openTab('activity', true); } break;
+    case 'autoslayer': S.autoSlayer = b.checked; break;
+    case 'slayerbuy': buySlayer(+id); break;
+    case 'qstart': startQuest(id); break;
+    case 'qclaim': claimQuest(id); break;
     case 'sell': sell(id, n); break;
     case 'equip': equip(id); break;
     case 'unequip': unequip(id); break;
-    case 'smith': S.smithSel = +id; setActivity('smithing'); break;
     case 'cook': S.cookSel = +id; setActivity('cooking'); break;
     case 'tool': buyTool(id); break;
-    case 'bread': buyBread(n); break;
     case 'rup': buyRup(id); break;
     case 'gtier': S.gsel[S.activity] = +id; resetEncounter(); break;
     case 'mute': S.muted = !S.muted; b.textContent = S.muted ? '🔇' : '🔊'; break;
