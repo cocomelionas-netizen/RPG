@@ -28,7 +28,7 @@
   [hidden] { display: none !important; }
   html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   html, body { overscroll-behavior: none; }
-  #scene, button, nav, #goal, header { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #view, button, nav, #goal, header { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   body.modal-open { overflow: hidden; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
@@ -41,7 +41,8 @@
     background: var(--panel); border-bottom: 1px solid var(--line);
   }
   header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; display: flex; align-items: center; gap: 10px; }
-  #mute { padding: 2px 8px; min-height: 0; font-size: 16px; line-height: 1.2; }
+  #mute, #gfx { padding: 2px 8px; min-height: 0; font-size: 16px; line-height: 1.2; }
+  #gfx { font-size: 12px; font-weight: 700; margin-left: 6px; }
   header .stat { color: var(--muted); display: inline-block; }
   header .stat b { color: var(--text); }
   #gold b { color: var(--accent); }
@@ -52,11 +53,13 @@
   .ach .bonus { color: var(--good); font-size: 12px; }
   .bonuses { display: flex; flex-wrap: wrap; gap: 6px 16px; }
   .wrap { max-width: 1200px; margin: 0 auto; padding: 12px 16px; }
-  #scene {
-    width: 100%; aspect-ratio: 3 / 1; display: block;
+  #view {
+    position: relative; width: 100%; aspect-ratio: 3 / 1; overflow: hidden;
     border-radius: 10px; border: 1px solid var(--line); background: #000;
-    image-rendering: auto;
   }
+  #view canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #scene3d { display: none; }
+  #view.g3 #scene3d { display: block; }
   #stage { position: relative; }
   #goal {
     margin-top: 8px; padding: 8px 12px; border-radius: 8px; cursor: pointer;
@@ -207,7 +210,7 @@
       padding: 8px max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
       padding-top: max(8px, env(safe-area-inset-top));
     }
-    #scene { border-radius: 8px; }
+    #view { border-radius: 8px; }
     #goal { margin-top: 6px; font-size: 13px; padding: 6px 10px; }
     #ticker {
       display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted);
@@ -242,7 +245,7 @@
 </head>
 <body>
 <header>
-  <h1>🗺️ Endless Road <button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button></h1>
+  <h1>🗺️ Endless Road <button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button></h1>
   <span class="stat" id="gold">Gold: <b>0</b></span>
   <span class="stat" id="cmb">Combat level: <b>1</b></span>
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
@@ -250,7 +253,7 @@
 </header>
 <div class="wrap">
   <div id="stage">
-    <canvas id="scene"></canvas>
+    <div id="view"><canvas id="scene3d"></canvas><canvas id="scene"></canvas></div>
     <div id="goal"></div>
     <div id="ticker"></div>
     <div id="toast" hidden></div>
@@ -286,6 +289,7 @@
 <div id="modal" hidden><div class="card" id="modal-body"></div></div>
 <div id="rotate" aria-live="polite"><span class="big">📱</span><b>Turn your phone upright</b><span class="muted">Endless Road is played in portrait.</span></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 'use strict';
 
@@ -780,6 +784,7 @@ function addXp(skill, amt) {
     if (!SIM) R.ring = 1;
     sfx('level');
   }
+  if (!SIM && amt > 0) xpDrop(skill, amt);
   uiDirty = true;
 }
 
@@ -1108,14 +1113,14 @@ function combatTick(dt) {
 }
 
 function enemyHit(e) {
-  if (Math.random() >= enemyHitChance(e)) { floatText(HX - 18, GY - 108, 'Dodge', '#9ad', 1, 1, true); return; }
+  if (Math.random() >= enemyHitChance(e)) { hitsplat(HX, GY - 42, 0, 'miss', true); return; }
   const tri = triangle(e);
   const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
   const mult = (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === e.d.type ? 0.5 : 1);
   const dmg = Math.max(1, Math.round(raw * mult));
   S.hp -= dmg;
   addXp('defence', dmg * 0.5);
-  floatText(HX - 18, GY - 108, '-' + dmg, '#ff6b6b', 1, 1, true);
+  hitsplat(HX, GY - 42, dmg, 'hit', true);
   burst(HX + 4, GY - 40, '#c22', 5);
   R.heroHit = 1; sfx('hurt');
   R.shake = Math.max(R.shake, e.d.boss ? 8 : 3);
@@ -1136,8 +1141,8 @@ function combatXp(dmg) {
 }
 
 function playerHit(e, shot) {
-  const ex = entScreenX(e), ey = GY - entHeight(e) - 10;
-  if (Math.random() >= shot.chance) { floatText(ex, ey, 'Miss', '#bbbbbb'); return; }
+  const ex = entScreenX(e), ey = GY - entHeight(e) * (e.d.shape === 'flyer' ? 0.7 : 0.5);
+  if (Math.random() >= shot.chance) { hitsplat(ex, ey, 0, 'miss'); return; }
   const roll = 1 + Math.floor(Math.random() * shot.maxHit);
   const crit = roll >= Math.max(3, shot.maxHit * 0.9);
   const tri = triangle(e);
@@ -1147,7 +1152,7 @@ function playerHit(e, shot) {
   combatXp(dmg);
   if (pray('heal')) S.hp = Math.min(maxHp(), S.hp + maxHp() * pray('heal'));
   sfx(crit ? 'crit' : 'hit');
-  floatText(ex, ey, crit ? dmg + '!' : '-' + dmg, crit ? '#ffe14a' : tri > 0 ? '#9dffa0' : '#ffd166', 1, crit ? 1.6 : 1);
+  hitsplat(ex, ey, dmg, crit ? 'max' : 'hit');
   burst(ex, GY - entHeight(e) * 0.55, crit ? '#ffe14a' : shot.color || '#ff5a5a', crit ? 12 : 6);
   if (crit && !SIM) { R.shake = Math.max(R.shake, 5); R.freeze = 0.06; }
 }
@@ -1669,10 +1674,11 @@ function resizeCanvas() {
   // phones get a narrower, zoomed-in view so the hero and text stay readable
   const narrow = window.innerWidth < 700;
   W = narrow ? 560 : 960; HX = narrow ? 140 : 230; FS = narrow ? 1.55 : 1;
-  canvas.style.aspectRatio = `${W} / ${H}`;
+  document.getElementById('view').style.aspectRatio = `${W} / ${H}`;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (typeof G3 !== 'undefined' && G3.ok) G3.resize();
 }
 
 const hash = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -1798,6 +1804,10 @@ function drawBackground(z) {
   }
   ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(0, GY + 12, W, 3);
 
+  drawWeather(th);
+}
+
+function drawWeather(th) {
   if (th.snow) {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     for (let i = 0; i < 50; i++) {
@@ -1938,6 +1948,19 @@ function drawHero() {
     },
     tool: heroTool(),
   });
+  drawHeroExtras();
+  if (S.activity === 'fishing' && R.phase === 'act' && R.ent && R.ent.kind === 'pond') {
+    const a = heroArmAngle();
+    const sx = HX + 5, sy = GY - 46;
+    const tx = sx - Math.sin(a) * 80, ty = sy + Math.cos(a) * 80;
+    const bx = entScreenX(R.ent) - 12 + Math.sin(time * 2) * 3, by = GY + 6 + Math.sin(time * 4) * 1.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo((tx + bx) / 2, ty + 10, bx, by); ctx.stroke();
+    circle(bx, by, 3, '#e84a4a'); ctx.fillStyle = '#fff'; ctx.fillRect(bx - 3, by - 1, 6, 1);
+  }
+}
+function drawHeroExtras() {
+  const walking = R.phase === 'walk', dead = R.phase === 'dead';
   if (S.pet && !dead) {
     const p = PETS.find(x => x.id === S.pet);
     const px = HX - 44, py = GY - 8 - (walking ? Math.abs(Math.sin(time * 13 + 1)) * 6 : Math.sin(time * 2) * 2);
@@ -1948,15 +1971,6 @@ function drawHero() {
   }
   if (R.ent && R.ent.kind === 'npc' && R.ent.stun > 0) {
     for (let k = 0; k < 3; k++) { const a = time * 5 + k * 2.1; circle(HX + Math.cos(a) * 14, GY - 76 + Math.sin(a) * 4, 2.5, '#ffe14a'); }
-  }
-  if (S.activity === 'fishing' && R.phase === 'act' && R.ent && R.ent.kind === 'pond') {
-    const a = heroArmAngle();
-    const sx = HX + 5, sy = GY - 46;
-    const tx = sx - Math.sin(a) * 80, ty = sy + Math.cos(a) * 80;
-    const bx = entScreenX(R.ent) - 12 + Math.sin(time * 2) * 3, by = GY + 6 + Math.sin(time * 4) * 1.5;
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo((tx + bx) / 2, ty + 10, bx, by); ctx.stroke();
-    circle(bx, by, 3, '#e84a4a'); ctx.fillStyle = '#fff'; ctx.fillRect(bx - 3, by - 1, 6, 1);
   }
 }
 
@@ -2200,7 +2214,7 @@ function drawStation(e) {
   ctx.restore();
 }
 
-function drawEvents() {
+function drawEvents(overlayOnly) {
   for (const ev of R.events) {
     const { x, y } = evScreen(ev);
     if (x < -60 || x > W + 60) continue;
@@ -2208,7 +2222,8 @@ function drawEvents() {
     ctx.globalAlpha = clamp((25 - ev.age) / 3, 0, 1);
     ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(x, y, 26 + Math.sin(time * 5) * 4, 0, Math.PI * 2); ctx.stroke();
-    if (ev.type === 'chest') {
+    if (overlayOnly) { /* the 3D view draws the find itself */ }
+    else if (ev.type === 'chest') {
       ctx.translate(x, GY - Math.abs(Math.sin(time * 4)) * 3);
       ellipse(0, 2, 20, 4, 'rgba(0,0,0,0.25)');
       rr(-17, -22, 34, 22, 3, '#8a5a2b');
@@ -2268,9 +2283,44 @@ function drawProjs() {
     }
   }
 }
-function floatText(sx, y, text, color, life = 1, size = 1, screen = false) {
+function floatText(sx, y, text, color, life = 1, size = 1, screen = false, splat = null) {
   if (SIM) return;
-  floaters.push({ sx: sx + rand(-6, 6), wx: R.worldX + sx - HX + rand(-6, 6), y, text, color, life, max: life, size, screen });
+  floaters.push({ sx: sx + rand(-6, 6), wx: R.worldX + sx - HX + rand(-6, 6), y: y + (splat ? rand(-6, 6) : 0), text, color, life, max: life, size, screen, splat });
+}
+// OSRS style damage: red splat with the number, blue splat with 0 for a miss
+function hitsplat(sx, y, dmg, kind, screen) { floatText(sx, y, String(dmg), '#fff', 0.95, kind === 'max' ? 1.2 : 1, screen, kind); }
+function drawSplat(x, y, text, kind, pop) {
+  const r = (kind === 'max' ? 14 : 12) * FS * pop;
+  ctx.beginPath();
+  for (let i = 0; i < 14; i++) {
+    const a = i / 14 * Math.PI * 2, q = r * (i % 2 ? 0.84 : 1.08);
+    ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * q, y + Math.sin(a) * q * 0.9);
+  }
+  ctx.closePath();
+  ctx.fillStyle = kind === 'miss' ? '#2a5fc4' : '#b4140e'; ctx.fill();
+  ctx.lineWidth = kind === 'max' ? 2.5 : 1.5; ctx.strokeStyle = kind === 'max' ? '#f2c94c' : kind === 'miss' ? '#123170' : '#560603'; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.ellipse(x - r * 0.25, y - r * 0.35, r * 0.45, r * 0.22, -0.4, 0, Math.PI * 2); ctx.fill();
+  font(700, 12 * pop * (kind === 'max' ? 1.1 : 1)); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  outlined(text, x, y + 1, '#ffffff');
+}
+// OSRS style xp drops: skill icons and the xp gained float up the right edge
+let xpDrops = [];
+function xpDrop(skill, amt) {
+  const last = xpDrops[xpDrops.length - 1];
+  if (last && last.t < 0.12) { last.amt += amt; if (!last.icons.includes(SKILLS[skill].icon)) last.icons.push(SKILLS[skill].icon); return; }
+  xpDrops.push({ icons: [SKILLS[skill].icon], amt, t: 0 });
+}
+function drawXpDrops() {
+  font(700, 13); ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+  for (const d of xpDrops) {
+    ctx.globalAlpha = clamp((1.6 - d.t) / 0.4, 0, 1);
+    const n = d.amt >= 10 ? Math.round(d.amt) : Math.round(d.amt * 10) / 10;
+    const y = 44 * FS + 90 - d.t * 45, txt = '+' + n.toLocaleString('en-US');
+    ctx.strokeText(txt, W - 12, y); ctx.fillStyle = '#ffffff'; ctx.fillText(txt, W - 12, y);
+    const tw = ctx.measureText(txt).width;
+    ctx.fillText(d.icons.join(''), W - 16 - tw, y);
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
 }
 let toastTimer = 0;
 function showBanner(text) {
@@ -2308,7 +2358,9 @@ function updateVisuals(dt) {
   coins = coins.filter(c => c.t < 1);
   if (arrived) pulseGold();
   if (R.ent) { R.ent.hit = Math.max(0, R.ent.hit - dt * 3); if (R.ent.lunge !== undefined) R.ent.lunge = Math.max(0, R.ent.lunge - dt * 3); }
-  for (const f of floaters) { f.life -= dt; f.y -= 30 * dt; }
+  for (const f of floaters) { f.life -= dt; if (!f.splat) f.y -= 30 * dt; }
+  for (const d of xpDrops) d.t += dt;
+  xpDrops = xpDrops.filter(d => d.t < 1.6);
   floaters = floaters.filter(f => f.life > 0);
   for (const p of particles) { p.life -= dt; p.wx += p.vx * dt; p.y += p.vy * dt; p.vy += 420 * dt; if (p.y > GY + 4) { p.y = GY + 4; p.vy *= -0.3; p.vx *= 0.6; } }
   particles = particles.filter(p => p.life > 0);
@@ -2423,15 +2475,20 @@ function drawHud() {
 
 function draw() {
   const z = ZONES[S.zone];
+  const shx = R.shake > 0 ? rand(-1, 1) * R.shake : 0, shy = R.shake > 0 ? rand(-1, 1) * R.shake : 0;
   ctx.save();
-  if (R.shake > 0) ctx.translate(rand(-1, 1) * R.shake, rand(-1, 1) * R.shake);
-  drawBackground(z);
-  if (R.ent) {
-    const k = R.ent.kind;
-    if (k === 'enemy') drawEnemy(R.ent); else if (k === 'npc') drawNpc(R.ent); else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
+  if (G3.on) { ctx.clearRect(0, 0, W, H); G3.render(shx, shy); }
+  ctx.translate(shx, shy);
+  if (G3.on) { drawWeather(z.th); drawEvents(true); drawHeroExtras(); }
+  else {
+    drawBackground(z);
+    if (R.ent) {
+      const k = R.ent.kind;
+      if (k === 'enemy') drawEnemy(R.ent); else if (k === 'npc') drawNpc(R.ent); else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
+    }
+    drawEvents();
+    drawHero();
   }
-  drawEvents();
-  drawHero();
   drawProjs();
   if (R.ring > 0) {
     ctx.strokeStyle = `rgba(242,201,76,${R.ring})`; ctx.lineWidth = 4 * R.ring;
@@ -2446,12 +2503,738 @@ function draw() {
     font(700, 15 * f.size * pop);
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     const x = f.screen ? f.sx : f.wx - R.worldX + HX;
-    outlined(f.text, x, f.y, f.color);
+    if (f.splat) drawSplat(x, f.y, f.text, f.splat, f.size * (1 + 0.3 * clamp((f.life - f.max + 0.1) / 0.1, 0, 1)));
+    else outlined(f.text, x, f.y, f.color);
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'left';
   ctx.restore();
   drawHud();
+  drawXpDrops();
 }
+
+function applyGfx() {
+  if (S.gfx !== '2d' && G3.ok === undefined) G3.ok = G3.init(document.getElementById('scene3d'));
+  G3.on = !!G3.ok && S.gfx !== '2d';
+  document.getElementById('view').classList.toggle('g3', G3.on);
+  const b = $('#gfx'); b.hidden = !window.THREE; b.textContent = G3.on ? '3D' : '2D';
+}
+
+/* ================= 3D VIEW (OSRS look) ================= */
+// The game still plays on the 2D road: world x in pixels, the ground line at GY. The 3D camera looks
+// straight down -z, so every point on the road plane (z = 0) lands exactly where the 2D overlay
+// (HUD bars, hitsplats, particles, tap targets) expects it. Scenery behind the road gives the depth.
+const U3 = 40;   // pixels per 3D unit on the road plane
+const G3 = (() => {
+  const T = window.THREE, api = { on: false };
+  if (!T) return api;
+  const D = 10, CAM_Y = 4.2, CH = 32, BACK = 24;
+  let renderer, scene, camera, hemi, sun, torch, fireLight, shadowGeo, shadowMat, glowTex;
+  let zoneKey = -1, ridge = null, lavaMat = null, ceiling = false;
+  const chunks = new Map();
+
+  /* --- helpers --- */
+  const C = c => new T.Color(c);
+  const dummy = new T.Object3D();
+  function flat(g) { const n = g.index ? g.toNonIndexed() : g; if (n !== g) g.dispose(); n.computeVertexNormals(); return n; }
+  function lam(c, o) { return new T.MeshLambertMaterial(Object.assign({ color: c, transparent: true }, o)); }
+  function unlit(c, o) { return new T.MeshBasicMaterial(Object.assign({ color: c, transparent: true }, o)); }
+  function mk(g, m, x = 0, y = 0, z = 0) { const o = new T.Mesh(flat(g), typeof m === 'string' ? lam(m) : m); o.position.set(x, y, z); return o; }
+  const box = (w, h, d, c, x, y, z) => mk(new T.BoxGeometry(w, h, d), c, x, y, z);
+  function group(...kids) { const g = new T.Group(); for (const k of kids) if (k) g.add(k); return g; }
+  function at(o, x, y, z) { o.position.set(x, y, z); return o; }
+  function glow(c, s, op = 0.7) {
+    const sp = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: c, transparent: true, opacity: op, depthWrite: false, blending: T.AdditiveBlending }));
+    sp.scale.set(s, s, 1); return sp;
+  }
+  function dispose(o) {
+    o.traverse(n => {
+      if (n.geometry && n.geometry !== shadowGeo) n.geometry.dispose();
+      if (n.material && n.material !== shadowMat) n.material.dispose();
+    });
+  }
+  function shadow(r) { const s = new T.Mesh(shadowGeo, shadowMat); s.scale.set(r, r * 0.55, 1); s.rotation.x = -Math.PI / 2; s.position.y = 0.02; s.renderOrder = -1; return s; }
+  // every material of a model, for hit flashes and fading out
+  function mats(o) { const list = []; o.traverse(n => { if (n.material && n.material !== shadowMat && !n.isSprite) list.push(n.material); }); return list; }
+  function flash(o, r, g, b) { for (const m of o.userData.mats) if (m.emissive) m.emissive.setRGB(r, g, b); }
+  function fade(o, a) {
+    o.traverse(n => {
+      const m = n.material; if (!m || m === shadowMat) return;
+      if (m.userData.op === undefined) m.userData.op = m.opacity;
+      m.opacity = a * m.userData.op;
+    });
+  }
+
+  /* --- static scenery: one merged mesh per chunk --- */
+  function acc() { return { p: [], n: [], c: [] }; }
+  function put(a, g, color, x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
+    g = flat(g);
+    dummy.position.set(x, y, z); dummy.rotation.set(rx, ry, rz); dummy.scale.set(sx, sy, sz); dummy.updateMatrix();
+    g.applyMatrix4(dummy.matrix);
+    const col = C(color), P = g.attributes.position.array, N = g.attributes.normal.array;
+    for (let i = 0; i < P.length; i += 9) {
+      // OSRS models have a little colour noise from face to face
+      const j = 0.94 + hash(x * 7.1 + z * 3.3 + i) * 0.12;
+      for (let k = 0; k < 3; k++) a.c.push(col.r * j, col.g * j, col.b * j);
+    }
+    a.p.push(...P); a.n.push(...N);
+    g.dispose();
+  }
+  function quad(a, pts, color, down) {
+    // pts: 4 corners [x,y,z] in order around the tile
+    const [p0, p1, p2, p3] = pts, tri = down ? [p0, p2, p1, p0, p3, p2] : [p0, p1, p2, p0, p2, p3];
+    const v1 = new T.Vector3(...p1).sub(new T.Vector3(...p0)), v2 = new T.Vector3(...p2).sub(new T.Vector3(...p0));
+    const nrm = v1.cross(v2).normalize(); if (down) nrm.negate();
+    const col = C(color);
+    for (const v of tri) { a.p.push(...v); a.n.push(nrm.x, nrm.y, nrm.z); a.c.push(col.r, col.g, col.b); }
+  }
+  function toMesh(a, m) {
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(a.p, 3));
+    g.setAttribute('normal', new T.Float32BufferAttribute(a.n, 3));
+    g.setAttribute('color', new T.Float32BufferAttribute(a.c, 3));
+    return new T.Mesh(g, m);
+  }
+
+  function hgt(x, z) {
+    if (z > -2.2 && z < 2.2) return 0;
+    const n = Math.sin(x * 0.37 + z * 0.21) + Math.sin(x * 0.13 - z * 0.41) * 0.8 + Math.sin(x * 0.71 + z * 0.9) * 0.3;
+    const back = Math.max(0, -z - 4);
+    return 0.07 * n + Math.pow(back, 1.5) * 0.045 * (1.2 + 0.4 * n);
+  }
+  function mix(a, b, t) { return '#' + C(a).lerp(C(b), t).getHexString(); }
+  function palette(th) {
+    const dark = C(th.dirt).getHSL({}).l < 0.15;
+    return {
+      grass: th.ground,
+      path: th.decor === 'house' ? '#8d867a' : th.lava ? '#3a2219' : dark ? mix(th.dirt, th.ground, 0.45) : mix(th.dirt, '#c8a878', 0.25),
+      wood: '#6b4426', leaf: th.decor === 'pine' ? '#2f5d30' : th.mid, leaf2: th.near,
+    };
+  }
+
+  function buildChunk(ci, z) {
+    const th = z.th, pal = palette(th), a = acc(), g = acc(), x0 = ci * CH;
+    // tiled ground with a dirt road along z = 0
+    for (let tx = 0; tx < CH; tx++) for (let tz = -BACK; tz < 4; tz++) {
+      const x = x0 + tx, k = x * 131 + tz * 17;
+      const zc = tz + 0.5, edge = Math.abs(zc) === 2.5 && hash(k + 3) < 0.3;
+      const road = Math.abs(zc) <= 1.5 || edge;
+      let c = road ? pal.path : pal.grass;
+      if (!road && th.lava && hash(k + 9) > 0.93) c = '#d8571e';
+      const j = road ? 0.9 + hash(k) * 0.14 : 0.88 + hash(k) * 0.2;
+      const cc = C(c).multiplyScalar(j); cc.r = Math.min(1, cc.r); cc.g = Math.min(1, cc.g); cc.b = Math.min(1, cc.b);
+      quad(th.lava && c === '#d8571e' ? g : a, [[x, hgt(x, tz), tz], [x, hgt(x, tz + 1), tz + 1], [x + 1, hgt(x + 1, tz + 1), tz + 1], [x + 1, hgt(x + 1, tz), tz]], '#' + cc.getHexString());
+      if (th.cave && tz < 2) {
+        const cy = 6.3 - hash(k + 5) * 0.5;
+        quad(a, [[x, cy, tz], [x, cy, tz + 1], [x + 1, cy, tz + 1], [x + 1, cy, tz]], mix(th.near, '#000000', 0.2 + hash(k) * 0.2), true);
+      }
+    }
+    // scenery: deterministic per chunk so it is the same every time you pass
+    const n = th.decor === 'house' ? 26 : 46;
+    for (let i = 0; i < n; i++) {
+      const s0 = ci * 977 + i * 13;
+      const x = x0 + hash(s0) * CH, zz = -3.2 - Math.pow(hash(s0 + 1), 0.8) * (BACK - 5), y = hgt(x, zz), s = 0.7 + hash(s0 + 2) * 0.7;
+      decor(a, g, th, pal, x, y, zz, s, s0);
+    }
+    // small things in front of the road (low enough never to hide the hero)
+    for (let i = 0; i < 6; i++) {
+      const s0 = ci * 577 + i * 31, x = x0 + hash(s0) * CH, zz = 1.9 + hash(s0 + 1) * 0.5, s = 0.5 + hash(s0 + 2) * 0.4;
+      if (th.cave || th.lava || th.decor === 'spike') put(a, new T.DodecahedronGeometry(0.3 * s, 0), mix(th.mid, '#777777', 0.4), x, 0.1, zz, hash(s0) * 3, 1, 0.6, 1);
+      else if (th.snow) put(a, new T.DodecahedronGeometry(0.3 * s, 0), '#f4f8fc', x, 0.1, zz, 0, 1.3, 0.6, 1);
+      else {
+        put(a, new T.IcosahedronGeometry(0.3 * s, 0), mix(pal.leaf2, '#000000', 0.1), x, 0.18 * s, zz, hash(s0) * 3, 1.3, 0.8, 1);
+        if (th.decor === 'tree' || th.decor === 'house') for (let f = 0; f < 3; f++) put(a, new T.BoxGeometry(0.07, 0.07, 0.07), ['#f4e04a', '#ffffff', '#e35a8a'][(i + f) % 3], x + 0.5 + f * 0.25, 0.05, zz + hash(s0 + f) * 0.4 - 0.2);
+      }
+    }
+    if (th.decor === 'house') {
+      // low stone wall behind the road, with gaps
+      for (let x = x0; x < x0 + CH; x += 1.05) if (hash(x * 3.1 + 7) > 0.25) put(a, new T.BoxGeometry(1, 0.55, 0.32), hash(x) > 0.5 ? '#8e8a82' : '#9c978e', x + 0.5, 0.27, -2.6);
+    }
+    const grp = group(toMesh(a, chunkMat));
+    if (g.p.length) grp.add(toMesh(g, lavaMat));
+    grp.userData.ci = ci;
+    return grp;
+  }
+
+  function tree(a, x, y, z, s, leaf, leaf2, pine) {
+    put(a, new T.CylinderGeometry(0.12 * s, 0.2 * s, 1.3 * s, 6), '#5e3c22', x, y + 0.65 * s, z);
+    if (pine) {
+      for (let k = 0; k < 3; k++) put(a, new T.ConeGeometry((1.0 - k * 0.22) * s, 1.1 * s, 7), k & 1 ? leaf2 : leaf, x, y + (1.3 + k * 0.62) * s, z, k);
+    } else {
+      put(a, new T.IcosahedronGeometry(0.9 * s, 0), leaf, x, y + 1.9 * s, z, x);
+      put(a, new T.IcosahedronGeometry(0.6 * s, 0), leaf2, x + 0.55 * s, y + 1.5 * s, z + 0.2, x * 2);
+      put(a, new T.IcosahedronGeometry(0.55 * s, 0), leaf2, x - 0.5 * s, y + 1.55 * s, z - 0.2, x * 3);
+    }
+  }
+  function decor(a, g, th, pal, x, y, z, s, k) {
+    const r = hash(k + 5);
+    switch (th.decor) {
+      case 'tree':
+        if (r < 0.6) tree(a, x, y, z, s * 1.1, mix(pal.leaf, '#2f6a28', hash(k) * 0.5), pal.leaf2);
+        else if (r < 0.85) put(a, new T.IcosahedronGeometry(0.45 * s, 0), pal.leaf2, x, y + 0.3 * s, z, k, 1.3, 0.8, 1);
+        else put(a, new T.DodecahedronGeometry(0.4 * s, 0), '#8a8a90', x, y + 0.15, z, k, 1.2, 0.7, 1);
+        break;
+      case 'pine':
+        if (r < 0.75) tree(a, x, y, z, s * 1.15, pal.leaf, mix(pal.leaf, '#1d3b20', 0.5), true);
+        else put(a, new T.DodecahedronGeometry(0.45 * s, 0), '#6a6e66', x, y + 0.15, z, k, 1.2, 0.7, 1);
+        break;
+      case 'house':
+        if (r < 0.45) {
+          const w = 2 + hash(k + 1) * 1.2, h = 1.6 + hash(k + 2) * 0.6, d = 1.8;
+          const wall = ['#b9a98a', '#9c968c', '#c8b896'][k % 3], roof = ['#a5452e', '#7a4a32', '#5f6a3a'][(k >> 1) % 3];
+          put(a, new T.BoxGeometry(w, h, d), wall, x, y + h / 2, z);
+          put(a, new T.ConeGeometry(0.78, 1.1, 4).rotateY(Math.PI / 4), roof, x, y + h + 0.55, z, 0, w, 1, d);
+          put(a, new T.BoxGeometry(0.5, 0.9, 0.05), '#4a2e1a', x - w * 0.2, y + 0.45, z + d / 2 + 0.02);
+          put(g, new T.BoxGeometry(0.4, 0.35, 0.05), '#ffd970', x + w * 0.22, y + h * 0.6, z + d / 2 + 0.02);
+          put(a, new T.BoxGeometry(0.3, 0.7, 0.3), '#7a746c', x + w * 0.25, y + h + 0.6, z - 0.3);
+        } else if (r < 0.75) tree(a, x, y, z, s, pal.leaf, pal.leaf2);
+        else put(a, new T.BoxGeometry(0.5, 0.5, 0.5), '#8a6a3a', x, y + 0.25, z, k);   // crates
+        break;
+      case 'stalag': case 'crystal': {
+        const c = th.decor === 'crystal';
+        put(a, new T.ConeGeometry(0.4 * s, 2.4 * s, 5), mix(th.mid, '#000000', hash(k) * 0.3), x, y + 1.2 * s, z, k);
+        put(a, new T.ConeGeometry(0.3 * s, 1.4 * s, 5), th.mid, x, 6.2 - 0.7 * s, z + 0.5, k, 1, 1, 1, Math.PI);
+        if (c || r < 0.25) {
+          put(g, new T.ConeGeometry(0.18 * s, 1.1 * s, 4), c ? '#7fe0f0' : '#b48cff', x + 0.5, y + 0.55 * s, z + 0.4, k, 1, 1, 1, 0, 0.2);
+          put(g, new T.ConeGeometry(0.13 * s, 0.7 * s, 4), c ? '#a8f4ff' : '#d6b8ff', x + 0.75, y + 0.35 * s, z + 0.5, k, 1, 1, 1, 0, -0.35);
+        }
+        break;
+      }
+      case 'rock':
+        if (r < 0.45) tree(a, x, y, z, s, '#3f6b55', '#eef4fa', true);
+        else {
+          put(a, new T.DodecahedronGeometry(0.8 * s, 0), mix(th.near, '#ffffff', 0.25), x, y + 0.3 * s, z, k, 1.3, 0.8, 1);
+          put(a, new T.DodecahedronGeometry(0.55 * s, 0), '#f4f8fc', x, y + 0.75 * s, z, k, 1.2, 0.5, 1);
+        }
+        break;
+      case 'dead':
+        if (r < 0.65) {
+          put(a, new T.CylinderGeometry(0.08 * s, 0.17 * s, 2.4 * s, 5), th.near, x, y + 1.2 * s, z);
+          put(a, new T.CylinderGeometry(0.04 * s, 0.07 * s, 1.1 * s, 4), th.near, x - 0.35 * s, y + 1.9 * s, z, 0, 1, 1, 1, 0, 0.8);
+          put(a, new T.CylinderGeometry(0.04 * s, 0.07 * s, 0.9 * s, 4), th.near, x + 0.3 * s, y + 1.6 * s, z, 0, 1, 1, 1, 0, -0.9);
+        } else put(a, new T.IcosahedronGeometry(0.45 * s, 0), mix(th.mid, '#000000', 0.2), x, y + 0.25 * s, z, k, 1.4, 0.6, 1);
+        break;
+      case 'spike':
+        put(a, new T.ConeGeometry(0.4 * s, 2.6 * s, 4), th.near === '#1c0806' ? '#2a1410' : mix(th.near, '#000000', 0.1), x, y + 1.3 * s, z, k, 1, 1, 1, 0, (hash(k) - 0.5) * 0.3);
+        put(a, new T.ConeGeometry(0.28 * s, 1.5 * s, 4), th.mid, x + 0.6 * s, y + 0.75 * s, z + 0.3, k, 1, 1, 1, 0, 0.25);
+        if (th.lava && r < 0.4) put(g, new T.DodecahedronGeometry(0.18 * s, 0), '#ff8a2a', x - 0.5, y + 0.1, z + 0.4);
+        break;
+    }
+  }
+
+  function buildRidge(th) {
+    if (th.cave) return null;
+    const a = acc(), P = 200, seg = 120;
+    for (let rep = -1; rep <= 1; rep++) for (let i = 0; i < seg; i++) {
+      const f = i / seg, f2 = (i + 1) / seg;
+      const h = t => { const w = t * Math.PI * 2; let n = Math.sin(w * 3 + 1.7) * 0.5 + Math.sin(w * 7 + 4.2) * 0.3 + Math.sin(w * 17) * 0.2; if (th.snow || th.decor === 'spike') n = 1 - Math.abs(n) * 1.6; return 6 + 9 * (0.5 + 0.5 * n); };
+      const xa = rep * P + f * P, xb = rep * P + f2 * P, ha = h(f), hb = h(f2);
+      const top = (th.snow ? '#f4f8fc' : th.far);
+      quad(a, [[xa, -6, 0], [xa, ha, 0], [xb, hb, 0], [xb, -6, 0]], th.far);
+      if (th.snow) quad(a, [[xa, ha - 2.2, 0.1], [xa, ha, 0.1], [xb, hb, 0.1], [xb, hb - 2.2, 0.1]], top);
+    }
+    const m = toMesh(a, new T.MeshBasicMaterial({ vertexColors: true, fog: false, side: T.DoubleSide }));
+    m.position.z = -80;
+    return m;
+  }
+
+  /* --- zone setup: sky, fog, lights, scenery --- */
+  function setZone(i) {
+    const z = ZONES[i], th = z.th;
+    zoneKey = i;
+    for (const c of chunks.values()) { scene.remove(c); dispose(c); }
+    chunks.clear();
+    if (ridge) { scene.remove(ridge); dispose(ridge); ridge = null; }
+    ridge = buildRidge(th); if (ridge) scene.add(ridge);
+    // sky gradient that meets the fog colour at the horizon
+    const cv = document.createElement('canvas'); cv.width = 2; cv.height = 128;
+    const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 128), hz = clamp((GY - CAM_Y * U3) / H, 0.1, 0.9);
+    gr.addColorStop(0, th.sky[0]); gr.addColorStop(hz, th.sky[1]); gr.addColorStop(1, th.sky[1]);
+    g.fillStyle = gr; g.fillRect(0, 0, 2, 128);
+    if (scene.background && scene.background.dispose) scene.background.dispose();
+    scene.background = new T.CanvasTexture(cv);
+    const fogNear = th.decor === 'dead' ? D + 2 : D + 9;
+    scene.fog = new T.Fog(th.cave ? '#000000' : th.sky[1], fogNear, D + BACK + 4);
+    if (th.cave) scene.fog.color = C(mix(th.sky[1], '#000000', 0.3));
+    hemi.color = C(th.cave ? '#b8a8d8' : th.lava ? '#ffd0b0' : '#ffffff');
+    hemi.groundColor = C(th.cave ? '#1a1420' : th.lava ? '#4a1408' : '#4a4232');
+    hemi.intensity = th.cave ? 0.5 : 0.8;
+    sun.intensity = th.cave ? 0.15 : th.lava ? 0.55 : 0.65;
+    sun.color = C(th.lava ? '#ffb080' : '#fff4e0');
+    torch.intensity = th.cave ? 1.3 : 0;
+    ceiling = !!th.cave;
+  }
+
+  function syncChunks() {
+    const z = ZONES[S.zone];
+    if (S.zone !== zoneKey) setZone(S.zone);
+    const cx = R.worldX / U3, spread = (D + BACK) / D, half = W / 2 / U3;
+    const mid = cx + (W / 2 - HX) / U3;
+    const lo = Math.floor((mid - half * spread - 2) / CH), hi = Math.floor((mid + half * spread + 2) / CH);
+    for (const [ci, c] of chunks) if (ci < lo || ci > hi) { scene.remove(c); dispose(c); chunks.delete(ci); }
+    for (let ci = lo; ci <= hi; ci++) if (!chunks.has(ci)) { const c = buildChunk(ci, z); chunks.set(ci, c); scene.add(c); }
+    if (ridge) { const P = 200, rx = mid * 0.75; ridge.position.x = rx + Math.round((mid - rx) / P) * P; }
+  }
+
+  /* --- characters --- */
+  // a box-limbed OSRS style person facing +x; o: body, leg, skin, hair, helm, shield, ribs, hat
+  function person(o) {
+    const g = new T.Group(), P = {};
+    const leg = c => { const p = new T.Group(); p.add(box(0.17, 0.62, 0.17, c, 0, -0.31, 0)); p.add(box(0.22, 0.08, 0.19, shadeC(c, -0.25), 0.03, -0.6, 0)); return p; };
+    P.legB = at(leg(shadeC(o.leg, -0.12)), 0, 0.62, -0.11); P.legF = at(leg(o.leg), 0, 0.62, 0.11);
+    const torso = box(0.32, 0.64, 0.5, o.body, 0, 0.93, 0);
+    const belt = box(0.34, 0.08, 0.52, shadeC(o.body, -0.35), 0, 0.64, 0);
+    g.add(P.legB, P.legF, torso, belt);
+    if (o.ribs) for (let k = 0; k < 3; k++) g.add(box(0.02, 0.05, 0.38, '#7a7466', 0.17, 0.82 + k * 0.13, 0));
+    const head = new T.Group(); head.position.y = 1.46;
+    head.add(box(0.36, 0.38, 0.36, o.skin, 0, 0, 0));
+    head.add(box(0.04, 0.06, 0.06, o.eye || '#1a1a1a', 0.18, 0.03, 0.09), box(0.04, 0.06, 0.06, o.eye || '#1a1a1a', 0.18, 0.03, -0.09));
+    if (o.helm) {
+      head.add(box(0.42, 0.22, 0.42, o.helm, -0.01, 0.12, 0));
+      if (o.fullhelm) { head.add(box(0.38, 0.4, 0.42, o.helm, -0.04, -0.02, 0)); head.add(box(0.02, 0.05, 0.3, '#111111', 0.16, 0.03, 0)); }
+    } else if (o.hair) head.add(box(0.4, 0.12, 0.4, o.hair, -0.02, 0.2, 0), box(0.1, 0.25, 0.4, o.hair, -0.17, 0.06, 0));
+    if (o.hat) o.hat(head);
+    g.add(head); P.head = head;
+    const arm = (c, z) => { const p = new T.Group(); p.position.set(0, 1.18, z); p.add(box(0.14, 0.48, 0.14, c, 0, -0.24, 0)); p.add(box(0.13, 0.12, 0.13, o.skin, 0, -0.53, 0)); return p; };
+    P.armB = arm(shadeC(o.body, -0.15), -0.32); P.armF = arm(shadeC(o.body, 0.06), 0.32);
+    if (o.shield) { const sh = box(0.08, 0.52, 0.42, o.shield, 0.12, -0.42, -0.08); sh.rotation.y = 0.1; P.armB.add(sh); }
+    g.add(P.armB, P.armF);
+    if (o.tool) P.armF.add(o.tool);
+    g.userData.P = P;
+    return g;
+  }
+  function shadeC(hex, amt) { return shade(hex.length === 7 ? hex : '#888888', amt); }
+
+  // tools and weapons hang from the hand and point along -y (the way the arm points)
+  function weapon(kind, blade) {
+    const t = new T.Group(), y0 = -0.56;
+    if (kind === 'bow') {
+      const b = mk(new T.TorusGeometry(0.45, 0.035, 4, 10, Math.PI * 0.76), lam(blade)); b.rotation.z = -Math.PI / 2 - Math.PI * 0.38; b.position.y = y0 + 0.35;
+      t.add(b, box(0.015, 0.015, 0.015, '#eeeeee', 0, y0 - 0.1, 0));
+      const s = box(0.6, 0.015, 0.015, '#e8e8e8', 0, y0 + 0.28, 0); t.add(s); t.userData.string = s;
+      const ar = box(0.035, 0.7, 0.035, '#d8c8a8', 0, -0.55, 0.03); t.add(ar); t.userData.arrow = ar;
+      return t;
+    }
+    if (kind === 'staff') {
+      t.add(mk(new T.CylinderGeometry(0.035, 0.045, 1.2, 5), '#6b4a2a', 0, y0 - 0.35, 0));
+      t.add(mk(new T.IcosahedronGeometry(0.09, 0), unlit(blade), 0, y0 - 1.0, 0), at(glow(blade, 0.7), 0, y0 - 1.0, 0));
+      return t;
+    }
+    const len = { dagger: 0.4, sword: 0.7, scimitar: 0.7, '2h': 1.1 }[kind] || 0.75, wide = kind === '2h' ? 0.11 : 0.075;
+    t.add(box(0.05, 0.2, 0.05, '#5a3a22', 0, y0 - 0.05, 0), box(0.06, 0.05, 0.26, '#c9a43a', 0, y0 - 0.16, 0));
+    const bl = box(0.025, len, wide, blade, 0, y0 - 0.18 - len / 2, 0);
+    if (kind === 'scimitar') { bl.rotation.x = 0.18; bl.position.z = 0.05; }
+    t.add(bl);
+    return t;
+  }
+  function heroTool3() {
+    const a = S.activity;
+    if (a === 'combat') {
+      const w = S.equip.weapon ? ITEMS[S.equip.weapon] : null;
+      if (wtype() === 'ranged') return weapon('bow', w && w.tier !== undefined ? TIER_COLORS[w.tier] : '#8a6a4a');
+      if (wtype() === 'magic') { const sp = curSpell(); return weapon('staff', sp ? sp.color : '#888888'); }
+      return w ? weapon(w.kind || 'sword', w.color || TIER_COLORS[w.tier] || '#c0c4cc') : null;
+    }
+    const t = new T.Group(), y0 = -0.56, tc = TOOL_OF[a] !== undefined ? TIER_COLORS[Math.min(4, S.tools[TOOL_OF[a]])] : '#888888';
+    const handle = l => mk(new T.CylinderGeometry(0.035, 0.035, l, 5), '#7a4e2a', 0, y0 - l / 2 + 0.1, 0);
+    if (a === 'woodcutting') { t.add(handle(0.8), box(0.22, 0.2, 0.05, tc, 0.11, y0 - 0.55, 0)); }
+    else if (a === 'mining') { t.add(handle(0.8)); const h = box(0.06, 0.07, 0.7, tc, 0, y0 - 0.65, 0); h.rotation.y = Math.PI / 2; t.add(h); }
+    else if (a === 'smithing') { t.add(handle(0.6), box(0.22, 0.16, 0.16, '#5b5f68', 0, y0 - 0.48, 0)); }
+    else if (a === 'fishing') { const r = handle(1.9); t.add(r); t.userData.tip = at(new T.Object3D(), 0, y0 - 1.75, 0); t.add(t.userData.tip); }
+    else if (a === 'cooking') t.add(handle(1.0));
+    else if (a === 'firemaking') t.add(box(0.18, 0.12, 0.12, '#7a6a5a', 0, y0 - 0.06, 0));
+    else if (a === 'fletching') t.add(box(0.04, 0.12, 0.04, '#5a3a22', 0, y0 - 0.06, 0), box(0.02, 0.3, 0.05, '#cfd4dc', 0, y0 - 0.26, 0));
+    else if (a === 'runecrafting') t.add(at(glow('#d2a0ff', 0.6, 0.9), 0, y0 - 0.1, 0));
+    else return null;
+    return t;
+  }
+
+  let heroObj = null, heroKey = '', petKey = '';
+  function syncHero() {
+    const gear = sl => S.equip[sl] ? ITEMS[S.equip[sl]] : null;
+    const body = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield');
+    const key = [S.activity, S.equip.weapon, body && body.color, helm && helm.id, legs && legs.color, shield && S.activity === 'combat' && shield.color,
+      wtype(), (curSpell() || {}).color, S.tools.axe, S.tools.pick].join('|');
+    if (key !== heroKey) {
+      heroKey = key;
+      if (heroObj) { scene.remove(heroObj); dispose(heroObj); }
+      const p = person({
+        body: body ? body.color || '#9aa0a8' : '#3f6fb5', leg: legs ? shade(legs.color, -0.08) : '#3b3550', skin: '#f1c27d', hair: '#6b3e1f',
+        helm: helm && shade(helm.color, -0.05), fullhelm: helm && helm.kind === 'fullhelm',
+        shield: shield && S.activity === 'combat' ? shield.color : null, tool: heroTool3(),
+      });
+      p.rotation.y = -0.6;
+      heroObj = group(p, shadow(0.45)); heroObj.userData.p = p; heroObj.userData.mats = mats(p);
+      scene.add(heroObj);
+    }
+    const p = heroObj.userData.p, P = p.userData.P;
+    const walking = R.phase === 'walk', dead = R.phase === 'dead';
+    const sw = walking ? Math.sin(time * 13) * 0.6 : 0;
+    heroObj.position.set((R.worldX - R.heroHit * 5 - (dead ? 30 : 0)) / U3, walking ? Math.abs(Math.sin(time * 13)) * 0.05 : 0, 0);
+    p.rotation.z = dead ? Math.PI / 2 : 0; p.position.y = dead ? 0.25 : 0;
+    P.legF.rotation.z = sw; P.legB.rotation.z = -sw;
+    P.armF.rotation.z = -heroArmAngle();
+    P.armB.rotation.z = walking ? -sw * 0.8 : S.activity === 'combat' && wtype() === 'ranged' ? 1.3 : 0.1;
+    const tool = P.armF.children[2];
+    if (tool && tool.userData.arrow) { const drawn = R.swing < 0.5; tool.userData.arrow.visible = drawn; tool.userData.string.position.y = drawn ? -0.2 : -0.37; }
+    const h = R.heroHit > 0.5 ? 0.45 : 0; flash(heroObj, h, 0, 0);
+  }
+
+  /* --- enemies --- */
+  function eyes(g, x, y, z, r, c) { g.add(box(0.05, r, r, c, x, y, z), box(0.05, r, r, c, x, y, -z)); }
+  function crown(y, s = 1) {
+    const c = mk(new T.CylinderGeometry(0.22 * s, 0.2 * s, 0.14 * s, 6, 1, true), lam('#f2c94c', { side: T.DoubleSide }), 0, y, 0);
+    const g = group(c); for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; g.add(mk(new T.ConeGeometry(0.05 * s, 0.14 * s, 4), '#f2c94c', Math.cos(a) * 0.2 * s, y + 0.13 * s, Math.sin(a) * 0.2 * s)); }
+    return g;
+  }
+  function buildEnemy(e) {
+    const d = e.d, id = e.id, g = new T.Group(), P = {};
+    // models are built facing -x (toward the hero); people reuse the hero builder and get turned round
+    if (d.shape === 'blob') {
+      P.body = mk(new T.IcosahedronGeometry(0.62, 1), lam(d.color), 0, 0.5, 0); P.body.scale.set(1.05, 0.85, 0.9);
+      g.add(P.body);
+      const f = group(); eyes(f, -0.62, 0.62, 0.18, 0.16, '#ffffff'); eyes(f, -0.66, 0.6, 0.2, 0.08, '#111111'); g.add(f); P.face = f;
+      g.add(at(mk(new T.IcosahedronGeometry(0.15, 0), unlit('#ffffff', { opacity: 0.35 })), -0.2, 0.9, 0.25));
+      if (d.boss) g.add(crown(1.0));
+      g.scale.setScalar(d.size);
+      g.add(shadow(0.75));
+    } else if (d.shape === 'quad') {
+      const low = id === 'lizard' ? 0.6 : 1, c = d.color, dk = shade(c, -0.15);
+      g.add(box(1.45, 0.55 * low + 0.1, 0.6, c, 0, 0.56 * low, 0));
+      for (const [lx, lz] of [[-0.48, 0.2], [-0.48, -0.2], [0.45, 0.2], [0.45, -0.2]]) g.add(box(0.15, 0.4 * low, 0.15, lz < 0 ? dk : c, lx, 0.2 * low, lz));
+      P.head = group(box(0.5, 0.46, 0.46, c, 0, 0, 0), box(0.36, 0.24, 0.3, c, -0.36, -0.08, 0), box(0.06, 0.07, 0.1, '#222222', -0.56, -0.02, 0));
+      eyes(P.head, -0.25, 0.1, 0.13, 0.06, id === 'wolf' ? '#ffd24a' : '#111111');
+      if (id !== 'lizard') P.head.add(mk(new T.ConeGeometry(0.08, 0.2, 4), dk, 0.05, 0.3, 0.14), mk(new T.ConeGeometry(0.08, 0.2, 4), dk, 0.05, 0.3, -0.14));
+      if (id === 'lizard') for (let k = 0; k < 5; k++) g.add(mk(new T.ConeGeometry(0.08, 0.22, 4), '#ffb04a', -0.4 + k * 0.2, 0.93 * low + 0.1, 0));
+      P.head.position.set(-0.85, 0.75 * low, 0); g.add(P.head);
+      const tail = box(0.75, id === 'rat' ? 0.05 : 0.14, id === 'rat' ? 0.05 : 0.14, id === 'rat' ? '#d9a3a3' : dk, 0, 0, 0);
+      tail.position.x = 0.36; P.tail = group(tail); P.tail.position.set(0.7, 0.55 * low, 0); P.tail.rotation.z = 0.4; g.add(P.tail);
+      if (d.breath) { P.fire = breath(1.8); P.fire.position.set(-1.45, 0.65 * low, 0); g.add(P.fire); }
+      g.scale.setScalar(d.size);
+      g.add(shadow(0.95));
+    } else if (d.shape === 'flyer') {
+      const fl = group(); fl.position.y = 1.9; g.add(fl); P.fly = fl;
+      fl.add(mk(new T.IcosahedronGeometry(0.3, 1), lam(d.color)));
+      fl.add(mk(new T.ConeGeometry(0.08, 0.3, 4), d.color, -0.05, 0.32, 0.14), mk(new T.ConeGeometry(0.08, 0.3, 4), d.color, -0.05, 0.32, -0.14));
+      eyes(fl, -0.28, 0.06, 0.1, 0.07, '#ff3b3b');
+      const wingShape = new T.Shape(); wingShape.moveTo(0, 0); wingShape.lineTo(0.85, 0.4); wingShape.lineTo(0.7, -0.1); wingShape.lineTo(0.45, 0.0); wingShape.lineTo(0.3, -0.2); wingShape.closePath();
+      const wm = () => lam(shade(d.color, -0.1), { side: T.DoubleSide });
+      P.wingR = group(mk(new T.ShapeGeometry(wingShape), wm())); P.wingR.position.set(0.1, 0, 0.05);
+      P.wingL = group(mk(new T.ShapeGeometry(wingShape), wm())); P.wingL.position.set(-0.1, 0, 0.05); P.wingL.scale.x = -1;
+      fl.add(P.wingR, P.wingL);
+      if (d.orb) fl.add(glow(d.orb, 1.6, 0.55));
+      g.add(shadow(0.4));
+    } else if (d.shape === 'humanoid') {
+      const sk = id === 'skeleton' || id === 'bonelord', gob = id.startsWith('gob');
+      let tool;
+      if (d.type === 'ranged') tool = weapon('bow', id === 'sentry' ? '#9fe8f5' : '#8a6a4a');
+      else if (d.type === 'magic') tool = weapon('staff', d.orb || '#c58bff');
+      else if (id === 'orc' || id === 'gobchief') { tool = new T.Group(); tool.add(mk(new T.CylinderGeometry(0.035, 0.035, 0.8, 5), '#5a3a22', 0, -0.9, 0), box(0.3, 0.26, 0.05, '#888888', 0.15, -1.15, 0)); }
+      else if (sk) { tool = new T.Group(); tool.add(box(0.07, 0.75, 0.07, '#8b7d6b', 0, -0.95, 0)); }
+      else { tool = new T.Group(); tool.add(mk(new T.CylinderGeometry(0.1, 0.04, 0.8, 5), '#6b4a2a', 0, -0.95, 0)); }
+      const p = person({
+        body: d.body, leg: sk ? '#d8d3c0' : shade(d.body, -0.2), skin: d.color, ribs: sk, tool,
+        eye: sk ? '#111111' : id === 'orc' ? '#ffdd33' : '#331',
+        hat: hd => {
+          if (gob) hd.add(mk(new T.ConeGeometry(0.07, 0.3, 4), d.color, -0.02, 0.05, 0.25), mk(new T.ConeGeometry(0.07, 0.3, 4), d.color, -0.02, 0.05, -0.25));
+          if (gob) { hd.children[hd.children.length - 1].rotation.x = -1.2; hd.children[hd.children.length - 2].rotation.x = 1.2; }
+          if (id === 'orc') hd.add(box(0.05, 0.1, 0.04, '#ffffff', 0.19, -0.14, 0.08), box(0.05, 0.1, 0.04, '#ffffff', 0.19, -0.14, -0.08));
+          if (id === 'troll' || id === 'frosttroll') hd.add(box(0.14, 0.12, 0.14, shade(d.color, -0.1), 0.23, -0.04, 0));
+          if (id === 'golem' || id === 'sentry') hd.add(mk(new T.ConeGeometry(0.09, 0.3, 4), '#c8f6ff', 0, 0.3, 0));
+          if (id === 'abyssal') hd.add(mk(new T.ConeGeometry(0.06, 0.3, 4), '#2a0a20', 0, 0.3, 0.12), mk(new T.ConeGeometry(0.06, 0.3, 4), '#2a0a20', 0, 0.3, -0.12));
+          if (id === 'cultist' || id === 'icemage') hd.add(box(0.44, 0.3, 0.44, d.body, -0.04, 0.1, 0));
+          if (d.boss) { const c = crown(0.28); hd.add(c); }
+        },
+      });
+      p.rotation.y = Math.PI + 0.6;
+      g.add(p); P.p = p;
+      g.scale.setScalar(d.size * 1.1);
+      g.add(shadow(0.45));
+    } else if (d.shape === 'dragon') {
+      const c = d.color, dk = shade(c, -0.18), D2 = new T.Group(); D2.position.x = 1;
+      D2.add(at(mk(new T.IcosahedronGeometry(1, 1), lam(c)), 0.25, 1.55, 0)); D2.children[0].scale.set(1.55, 0.78, 0.85);
+      D2.add(at(mk(new T.IcosahedronGeometry(0.9, 1), lam('#d9a35a')), 0.1, 1.25, 0.15)); D2.children[1].scale.set(1.1, 0.4, 0.7);
+      for (const [lx, lz] of [[-0.75, 0.45], [-0.75, -0.45], [0.95, 0.45], [0.95, -0.45]]) D2.add(box(0.4, 1.1, 0.4, lz < 0 ? shade(dk, -0.1) : dk, lx, 0.55, lz));
+      const neck = new T.Group(); neck.position.set(-0.9, 1.9, 0);
+      for (let k = 0; k < 4; k++) neck.add(box(0.5, 0.5, 0.48, k & 1 ? c : dk, -k * 0.3, k * 0.36, 0));
+      const head = new T.Group(); head.position.set(-1.35, 1.45, 0);
+      head.add(box(0.8, 0.42, 0.5, c, -0.1, 0, 0), box(0.5, 0.16, 0.42, dk, -0.25, -0.25, 0));
+      head.add(mk(new T.ConeGeometry(0.07, 0.5, 4), '#e8d8b0', 0.25, 0.4, 0.15), mk(new T.ConeGeometry(0.07, 0.5, 4), '#e8d8b0', 0.25, 0.4, -0.15));
+      head.children[2].rotation.z = 0.5; head.children[3].rotation.z = 0.5;
+      eyes(head, -0.12, 0.1, 0.2, 0.09, '#ffe04a');
+      neck.add(head); D2.add(neck); P.neck = neck;
+      P.fire = breath(3.6); P.fire.position.set(-1.9, 1.35, 0); P.fire.rotation.z = 0.5; neck.add(P.fire);
+      const tail = new T.Group(); tail.position.set(1.6, 1.4, 0);
+      for (let k = 0; k < 6; k++) tail.add(box(0.5, 0.36 - k * 0.04, 0.36 - k * 0.04, k & 1 ? c : dk, 0.3 + k * 0.45, -k * 0.08 + Math.sin(k) * 0.1, 0));
+      D2.add(tail); P.tail = tail;
+      for (let k = 0; k < 6; k++) D2.add(mk(new T.ConeGeometry(0.1, 0.35, 4), dk, -0.55 + k * 0.33, 2.25, 0));
+      const ws = new T.Shape(); ws.moveTo(0, 0); ws.lineTo(-0.6, 2.6); ws.lineTo(0.9, 2.0); ws.lineTo(2.2, 1.6); ws.lineTo(1.4, 0.1); ws.closePath();
+      const wingM = () => lam(shade(c, -0.25), { side: T.DoubleSide });
+      P.wingB = group(mk(new T.ShapeGeometry(ws), wingM())); P.wingB.position.set(-0.3, 2.0, -0.4);
+      P.wingF = group(mk(new T.ShapeGeometry(ws), wingM())); P.wingF.position.set(-0.3, 2.0, 0.45);
+      D2.add(P.wingB, P.wingF);
+      g.add(D2);
+      g.add(at(shadow(2.4), 1, 0, 0));
+    }
+    if (d.shape !== 'humanoid') g.rotation.y = d.shape === 'dragon' ? 0.25 : 0.45;
+    g.userData.P = P;
+    g.userData.mats = mats(g);
+    return g;
+  }
+  function breath(len) {
+    const m = unlit('#ff8a2a', { opacity: 0, depthWrite: false, blending: T.AdditiveBlending });
+    const f = mk(new T.ConeGeometry(len * 0.22, len, 8, 1, true), m);
+    f.rotation.z = -Math.PI / 2; f.position.x = -len / 2;
+    const g = group(f); g.userData.m = m; return g;
+  }
+
+  /* --- npcs, nodes, stations, events --- */
+  function buildNpc(e) {
+    const n = e.d, id = e.id;
+    const p = person({
+      body: n.body, leg: shade(n.body, -0.25), skin: n.skin, hair: '#4a3020',
+      hat: hd => {
+        if (id === 'wizard') hd.add(mk(new T.ConeGeometry(0.28, 0.6, 6), '#3a3a9a', 0, 0.48, 0));
+        if (id === 'guard') hd.add(box(0.42, 0.24, 0.42, '#8a8f98', -0.01, 0.12, 0));
+        if (id === 'lord') hd.add(crown(0.27));
+        if (id === 'golbin') { const a = mk(new T.ConeGeometry(0.07, 0.3, 4), n.skin, 0, 0.05, 0.25), b = mk(new T.ConeGeometry(0.07, 0.3, 4), n.skin, 0, 0.05, -0.25); a.rotation.x = 1.2; b.rotation.x = -1.2; hd.add(a, b); }
+        if (id === 'farmer') hd.add(mk(new T.CylinderGeometry(0.36, 0.36, 0.04, 8), '#d9b45a', 0, 0.2, 0), mk(new T.CylinderGeometry(0.2, 0.22, 0.2, 8), '#d9b45a', 0, 0.3, 0));
+      },
+    });
+    p.add(mk(new T.IcosahedronGeometry(0.09, 0), '#b08a3a', 0.12, 0.62, 0.24));
+    p.rotation.y = Math.PI + 0.6; p.scale.setScalar(0.95);
+    const g = group(p, shadow(0.4)); g.userData.P = p.userData.P; g.userData.mats = mats(g);
+    return g;
+  }
+  function buildNode(e) {
+    const g = new T.Group(), P = {};
+    if (e.kind === 'tree') {
+      const c = CANOPY[e.tier], t = new T.Group();
+      t.add(mk(new T.CylinderGeometry(0.2, 0.3, 2.1, 7), '#6b4426', 0, 1.05, 0));
+      t.add(at(mk(new T.IcosahedronGeometry(0.95, 0), lam(c)), 0, 2.5, 0));
+      t.add(at(mk(new T.IcosahedronGeometry(0.62, 0), lam(shade(c, -0.06))), -0.6, 2.05, 0.2), at(mk(new T.IcosahedronGeometry(0.62, 0), lam(shade(c, -0.04))), 0.6, 2.1, -0.15));
+      t.add(at(mk(new T.IcosahedronGeometry(0.42, 0), lam(shade(c, 0.08))), -0.15, 3.0, 0.25));
+      if (e.tier === 2) for (let k = 0; k < 7; k++) t.add(box(0.1, 0.1, 0.1, '#f0a040', -0.7 + hash(k) * 1.4, 2.0 + hash(k + 3) * 1.2, 0.6 + hash(k + 5) * 0.3));
+      if (e.tier === 4) { P.spark = group(); for (let k = 0; k < 6; k++) P.spark.add(mk(new T.OctahedronGeometry(0.06, 0), unlit('#f6e3ff'))); t.add(P.spark); }
+      g.add(t); P.t = t;
+      g.add(shadow(0.9));
+    } else if (e.kind === 'rock') {
+      const r = new T.Group();
+      r.add(at(mk(new T.DodecahedronGeometry(0.75, 0), lam('#6e6e78')), 0, 0.45, 0)); r.children[0].scale.set(1.3, 0.85, 1);
+      r.add(at(mk(new T.DodecahedronGeometry(0.4, 0), lam('#868692')), 0.55, 0.25, 0.35));
+      const oc = e.ess ? '#b48cff' : ORES[e.tier].color;
+      for (const [ox, oy, oz] of [[-0.5, 0.55, 0.45], [0.1, 0.95, 0.3], [0.55, 0.5, 0.55], [-0.15, 0.3, 0.7], [-0.75, 0.75, -0.1], [0.35, 0.8, -0.4]]) r.add(at(mk(new T.OctahedronGeometry(0.12, 0), e.ess ? unlit(oc) : lam(oc)), ox, oy, oz));
+      g.add(r); P.r = r;
+      g.add(shadow(1));
+    } else {
+      const w = new T.Group(); w.position.z = 1.0;
+      w.add(mk(new T.CylinderGeometry(1, 1.05, 0.06, 18), lam('#245b91'), 0, 0.02, 0));
+      w.add(mk(new T.CylinderGeometry(0.9, 0.9, 0.06, 18), lam('#3d82c9'), 0, 0.04, 0));
+      w.scale.set(1.9, 1, 0.8);
+      P.rip = []; for (let k = 0; k < 2; k++) { const r = mk(new T.RingGeometry(0.9, 1, 20), unlit('#ffffff', { opacity: 0.5, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.set(-0.3, 0.08, 1.0); P.rip.push(r); g.add(r); }
+      P.fish = box(0.4, 0.14, 0.1, TIER_COLORS[e.tier], 0, 0, 1.0); g.add(P.fish);
+      P.bob = mk(new T.IcosahedronGeometry(0.06, 0), '#e84a4a', 0, 0.06, 1.0); g.add(P.bob);
+      P.line = new T.Line(new T.BufferGeometry().setFromPoints(Array.from({ length: 9 }, () => new T.Vector3())), new T.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.7 }));
+      P.line.frustumCulled = false; scene.add(P.line); g.userData.line = P.line;
+      g.add(w);
+    }
+    g.userData.P = P; g.userData.mats = mats(g);
+    return g;
+  }
+  function flames(n, s) {
+    const f = new T.Group();
+    const cols = ['#ff5a1a', '#ff8a2a', '#ffb43a', '#ffe06a'];
+    for (let k = 0; k < n; k++) f.add(mk(new T.ConeGeometry(0.16 * s, 0.7 * s, 5), unlit(cols[k % 4], { opacity: 0.95 }), (k - n / 2 + 0.5) * 0.14 * s, 0.35 * s, (k & 1 ? 0.08 : -0.08) * s));
+    f.add(at(glow('#ffa040', 2.6 * s, 0.6), 0, 0.4 * s, 0.2));
+    return f;
+  }
+  function logs(g, c1, c2, w = 1.1) {
+    const a = mk(new T.CylinderGeometry(0.09, 0.09, w, 6), c1, 0, 0.1, 0.1); a.rotation.set(0, 0.5, Math.PI / 2);
+    const b = mk(new T.CylinderGeometry(0.09, 0.09, w, 6), c2, 0, 0.1, -0.1); b.rotation.set(0, -0.5, Math.PI / 2);
+    g.add(a, b);
+  }
+  function buildStation(e) {
+    const g = new T.Group(), P = {};
+    if (e.kind === 'furnace') {
+      g.add(box(1.5, 1.45, 1.1, '#6e6a72', 0, 0.72, 0), box(0.45, 1.0, 0.45, '#5c5860', -0.3, 1.9, -0.1));
+      for (let k = 0; k < 4; k++) g.add(box(1.52, 0.05, 1.12, '#5a565e', 0, 0.2 + k * 0.35, 0));
+      g.add(box(0.8, 0.6, 0.05, '#1c1214', 0, 0.55, 0.56));
+      P.glow = mk(new T.BoxGeometry(0.62, 0.4, 0.05), unlit('#ff9a3a'), 0, 0.5, 0.58); g.add(P.glow);
+      P.halo = at(glow('#ffa040', 2, 0.5), 0, 0.55, 0.8); g.add(P.halo);
+    } else if (e.kind === 'anvil') {
+      g.add(mk(new T.CylinderGeometry(0.38, 0.44, 0.55, 8), '#6b4426', 0, 0.27, 0));
+      g.add(box(0.4, 0.3, 0.3, '#2d3036', 0, 0.68, 0), box(1.0, 0.15, 0.34, '#41454d', -0.05, 0.9, 0));
+      const horn = mk(new T.ConeGeometry(0.12, 0.4, 4), '#41454d', 0.62, 0.9, 0); horn.rotation.z = -Math.PI / 2; g.add(horn);
+      P.bar = mk(new T.BoxGeometry(0.5, 0.07, 0.1), unlit('#ffa040'), -0.05, 1.01, 0); g.add(P.bar);
+      P.halo = at(glow('#ffa040', 1.3, 0.5), 0, 1.05, 0.2); g.add(P.halo);
+    } else if (e.kind === 'bench') {
+      g.add(box(1.7, 0.12, 0.8, '#8a5a32', 0, 0.85, 0));
+      for (const [lx, lz] of [[-0.7, 0.3], [-0.7, -0.3], [0.7, 0.3], [0.7, -0.3]]) g.add(box(0.12, 0.8, 0.12, '#6b4426', lx, 0.4, lz));
+      const bw = mk(new T.TorusGeometry(0.4, 0.035, 4, 10, Math.PI * 0.8), '#a06a3a', -0.2, 0.93, 0.1); bw.rotation.x = -Math.PI / 2; g.add(bw);
+      for (let k = 0; k < 3; k++) g.add(box(0.5, 0.03, 0.03, '#d8c8a8', 0.45, 0.93, -0.2 + k * 0.1));
+    } else if (e.kind === 'altar') {
+      g.add(box(1.3, 0.2, 1.0, '#5e5a6e', 0, 0.1, 0), box(1.0, 0.7, 0.75, '#7a768c', 0, 0.55, 0), box(1.2, 0.17, 0.9, '#8f8aa3', 0, 0.98, 0));
+      P.gem = mk(new T.OctahedronGeometry(0.25, 0), unlit('#d6b8ff'), 0, 1.45, 0); g.add(P.gem);
+      P.halo = at(glow('#be82ff', 2.4, 0.5), 0, 1.4, 0.2); g.add(P.halo);
+    } else if (e.kind === 'pyre') {
+      logs(g, '#6b4426', '#7a4e2a'); const top = mk(new T.CylinderGeometry(0.09, 0.09, 0.9, 6), '#5a3a22', 0, 0.28, 0); top.rotation.z = Math.PI / 2; g.add(top);
+      P.fl = flames(4, 1.3); P.fl.position.y = 0.3; g.add(P.fl);
+    } else {
+      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; g.add(mk(new T.DodecahedronGeometry(0.12, 0), '#7a7670', Math.cos(a) * 0.55, 0.06, Math.sin(a) * 0.4)); }
+      logs(g, '#6b4426', '#7a4e2a', 0.9);
+      P.fl = flames(3, 1); P.fl.position.y = 0.1; g.add(P.fl);
+      g.add(box(0.07, 1.0, 0.07, '#5a3a22', -0.65, 0.5, 0), box(0.07, 1.0, 0.07, '#5a3a22', 0.65, 0.5, 0), box(1.4, 0.06, 0.06, '#5a3a22', 0, 0.95, 0));
+      P.meat = box(0.32, 0.2, 0.2, '#c9774a', 0, 0.82, 0); g.add(P.meat);
+    }
+    g.add(shadow(e.kind === 'pyre' || e.kind === 'fire' ? 0.8 : 0.95));
+    g.userData.P = P; g.userData.mats = mats(g);
+    return g;
+  }
+  function buildEvent(ev) {
+    const g = new T.Group();
+    if (ev.type === 'chest') {
+      g.add(box(0.85, 0.5, 0.55, '#8a5a2b', 0, 0.25, 0), box(0.88, 0.25, 0.58, '#a56d35', 0, 0.62, 0));
+      g.add(box(0.9, 0.07, 0.6, '#f2c94c', 0, 0.5, 0), box(0.14, 0.18, 0.04, '#f2c94c', 0, 0.48, 0.3));
+      g.add(shadow(0.5));
+    } else if (ev.type === 'shrine') {
+      g.add(box(0.65, 0.15, 0.65, '#6f6c7a', 0, 0.08, 0), box(0.4, 0.78, 0.4, '#8d8a99', 0, 0.54, 0), box(0.6, 0.12, 0.6, '#a5a2b2', 0, 0.98, 0));
+      g.add(at(mk(new T.IcosahedronGeometry(0.15, 0), unlit('#d9c0ff')), 0, 1.2, 0), at(glow('#c8a0ff', 1.6, 0.7), 0, 1.2, 0.1));
+      g.add(shadow(0.45));
+    } else {
+      const s = mk(new T.OctahedronGeometry(0.32, 0), unlit('#ffe27a')); s.scale.set(1, 1, 0.45);
+      g.add(s, glow('#fff0a0', 1.4, 0.8)); g.userData.spin = s;
+    }
+    return g;
+  }
+
+  /* --- per-frame sync of the current target --- */
+  let entObj = null, entRef = null;
+  function buildEnt(e) { return e.kind === 'enemy' ? buildEnemy(e) : e.kind === 'npc' ? buildNpc(e) : CRAFTING.has(e.skill) ? buildStation(e) : buildNode(e); }
+  function dropEnt() { if (!entObj) return; scene.remove(entObj); if (entObj.userData.line) { scene.remove(entObj.userData.line); dispose(entObj.userData.line); } dispose(entObj); entObj = null; }
+  function syncEnt() {
+    const e = R.ent;
+    if (e !== entRef) { dropEnt(); entRef = e; if (e) { entObj = buildEnt(e); scene.add(entObj); } }
+    fireLight.intensity = 0;
+    if (!e) return;
+    const g = entObj, P = g.userData.P, dying = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
+    let x = e.x;
+    fade(g, dying);
+    if (e.kind === 'enemy') {
+      const d = e.d;
+      x += e.lunge * (d.type === 'melee' ? -18 : -5);
+      flash(g, e.hit > 0.5 ? 0.6 : 0, e.hit > 0.5 ? 0.6 : 0, e.hit > 0.5 ? 0.6 : 0);
+      if (d.shape === 'blob') { const q = 1 + 0.08 * Math.sin(time * 5); P.body.scale.set(1.05 * q, 0.85 / q, 0.9 * q); P.body.position.y = 0.5 / q; }
+      else if (d.shape === 'quad') { P.head.position.y = (d.id === 'lizard' ? 0.45 : 0.75) + Math.sin(time * 4) * 0.025; P.tail.rotation.z = 0.4 + Math.sin(time * 6) * 0.15; }
+      else if (d.shape === 'flyer') { const fl = Math.sin(time * 16); P.fly.position.y = 1.9 + Math.sin(time * 4) * 0.2; P.wingR.rotation.y = fl * 0.5; P.wingL.rotation.y = -fl * 0.5; P.wingR.rotation.z = fl * 0.35; P.wingL.rotation.z = -fl * 0.35; }
+      else if (d.shape === 'humanoid') { const PP = P.p.userData.P; PP.armF.rotation.z = -(d.type === 'melee' ? -0.5 - 1.6 * e.lunge : -1.5 - 0.25 * e.lunge); PP.armB.rotation.z = 0.15; }
+      else if (d.shape === 'dragon') { const fl = Math.sin(time * 3) * 0.35; P.wingB.rotation.z = fl; P.wingF.rotation.z = fl; P.tail.rotation.z = Math.sin(time * 2) * 0.08; P.neck.rotation.z = e.lunge * 0.15; }
+      if (P.fire) { P.fire.userData.m.opacity = e.lunge > 0.3 ? e.lunge * 0.65 : 0; P.fire.scale.y = 1 + Math.sin(time * 30) * 0.1; }
+    } else if (e.kind === 'npc') {
+      x += (1 - dying) * 70;
+      const PP = P, sw = e.dying ? Math.sin(time * 13) * 0.6 : 0;
+      PP.legF.rotation.z = sw; PP.legB.rotation.z = -sw; PP.armF.rotation.z = -(0.15 + Math.sin(time * 2) * 0.05); PP.armB.rotation.z = 0.1;
+      g.children[0].rotation.y = e.dying ? -0.6 : Math.PI + 0.6;
+      flash(g, e.hit > 0.5 ? 0.4 : 0, e.hit > 0.5 ? 0.4 : 0, 0);
+    } else if (e.kind === 'tree') {
+      x += Math.sin(time * 70) * e.hit * 3;
+      P.t.rotation.z = e.dying ? -(1 - dying) * 1.45 : 0;
+      fade(g, e.dying ? Math.min(1, dying * 2) : 1);
+      if (P.spark) P.spark.children.forEach((s, k) => s.position.set(Math.sin(time * 2 + k * 1.3) * 0.8, 2.4 + Math.cos(time * 1.7 + k) * 0.6, 0.9));
+    } else if (e.kind === 'rock') {
+      x += Math.sin(time * 70) * e.hit * 3;
+      P.r.scale.setScalar(0.55 + 0.45 * (e.yields / e.maxYields));
+    } else if (e.kind === 'pond') {
+      P.rip.forEach((r, k) => { const p = (time * 0.6 + k * 0.5) % 1; r.scale.set(0.15 + p * 0.9, 0.06 + p * 0.25, 1); r.material.opacity = 0.5 * (1 - p) * dying; });
+      P.fish.visible = e.hit > 0.2;
+      if (P.fish.visible) { const p = 1 - e.hit; P.fish.position.set(-0.3 - p * 1.25, 0.1 + Math.sin(p * Math.PI) * 1.25, 1.0); P.fish.rotation.z = 1 - p * 2; }
+      const show = S.activity === 'fishing' && R.phase === 'act' && R.ent === e;
+      P.bob.visible = P.line.visible = show;
+      P.bob.position.set(-0.3 + Math.sin(time * 2) * 0.08, 0.06 + Math.sin(time * 4) * 0.03, 1.0);
+      if (show && heroObj) {
+        heroObj.updateMatrixWorld(true);
+        const tool = heroObj.userData.p.userData.P.armF.children[2], tip = new T.Vector3();
+        if (tool && tool.userData.tip) tool.userData.tip.getWorldPosition(tip);
+        const end = new T.Vector3(x / U3 - 0.3 + Math.sin(time * 2) * 0.08, 0.08, 1.0), pos = P.line.geometry.attributes.position;
+        for (let i = 0; i < 9; i++) { const t = i / 8; pos.setXYZ(i, tip.x + (end.x - tip.x) * t, tip.y + (end.y - tip.y) * t - Math.sin(t * Math.PI) * 0.35, tip.z + (end.z - tip.z) * t); }
+        pos.needsUpdate = true;
+      }
+    } else {
+      const working = R.phase === 'act' && R.ent === e && !e.blocked;
+      if (P.fl) {
+        const on = e.kind !== 'pyre' || working || e.hit > 0;
+        P.fl.visible = on;
+        P.fl.children.forEach((f, k) => { if (!f.isSprite) f.scale.set(1, 0.8 + 0.3 * Math.sin(time * 11 + k * 1.7) + e.hit * 0.4, 1); });
+        if (on) fireLight.intensity = 1.1 + 0.25 * Math.sin(time * 13);
+        if (e.kind === 'pyre' && on && Math.random() < 0.4) particles.push({ wx: e.x + rand(-10, 10), y: GY - 50, vx: rand(-15, 15), vy: rand(-90, -50), life: 0.6, color: '#ffb347' });
+        if (P.meat) P.meat.visible = working;
+      }
+      if (P.glow) { const fl = working ? 0.7 + 0.3 * Math.sin(time * 9) : 0.35; P.glow.material.color.setRGB(1, 0.5 + 0.3 * fl, 0.15); P.halo.material.opacity = 0.6 * fl; if (working) fireLight.intensity = 0.8 * fl; if (working && Math.random() < 0.3) particles.push({ wx: e.x - 12, y: GY - 112, vx: rand(-8, 8), vy: rand(-40, -20), life: 0.8, color: 'rgba(120,120,120,0.6)' }); }
+      if (P.bar) { P.bar.visible = working; P.halo.visible = working; }
+      if (P.gem) { P.gem.rotation.y = time * (working ? 2 : 0.5); P.gem.position.y = 1.45 + Math.sin(time * 2) * 0.05; P.halo.material.opacity = working ? 0.6 : 0.3; }
+      if (e.kind === 'bench' && working && e.hit > 0.3) burst(e.x - R.worldX + HX, GY - 40, '#d8b888', 1);
+    }
+    g.position.set(x / U3, 0, 0);
+    fireLight.position.set(x / U3, 1.6, 1.2);
+  }
+
+  const evObjs = new Map();
+  function syncEvents() {
+    for (const [ev, o] of evObjs) if (!R.events.includes(ev)) { scene.remove(o); dispose(o); evObjs.delete(ev); }
+    for (const ev of R.events) {
+      let o = evObjs.get(ev);
+      if (!o) { o = buildEvent(ev); evObjs.set(ev, o); scene.add(o); }
+      const { y } = evScreen(ev);
+      const by = ev.type === 'chest' ? Math.abs(Math.sin(time * 4)) * 0.08 : ev.type === 'star' ? (GY - y) / U3 : 0;
+      o.position.set(ev.x / U3, by, 0);
+      if (o.userData.spin) o.userData.spin.rotation.y = time * 2;
+      fade(o, clamp((25 - ev.age) / 3, 0, 1));
+    }
+  }
+
+  /* --- public --- */
+  api.init = canvas3 => {
+    try {
+      renderer = new T.WebGLRenderer({ canvas: canvas3, antialias: true, powerPreference: 'high-performance' });
+    } catch (err) { return false; }
+    scene = new T.Scene();
+    camera = new T.PerspectiveCamera();
+    hemi = new T.HemisphereLight('#ffffff', '#4a4232', 0.8); scene.add(hemi);
+    sun = new T.DirectionalLight('#fff4e0', 0.65); sun.position.set(-4, 10, 7); scene.add(sun);
+    torch = new T.PointLight('#ffb060', 0, 14, 1.6); scene.add(torch);
+    fireLight = new T.PointLight('#ff9a40', 0, 7, 2); scene.add(fireLight);
+    shadowGeo = new T.CircleGeometry(1, 16);
+    shadowMat = new T.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.25, depthWrite: false });
+    const gc = document.createElement('canvas'); gc.width = gc.height = 64;
+    const gx = gc.getContext('2d'), rg = gx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(0.35, 'rgba(255,255,255,0.45)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+    gx.fillStyle = rg; gx.fillRect(0, 0, 64, 64);
+    glowTex = new T.CanvasTexture(gc);
+    chunkMat = new T.MeshLambertMaterial({ vertexColors: true });
+    lavaMat = new T.MeshBasicMaterial({ vertexColors: true });
+    api.resize();
+    return true;
+  };
+  let chunkMat;
+  api.resize = () => {
+    if (!renderer) return;
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.setSize(W, H, false);
+    zoneKey = -1;   // horizon moves with the view size, so rebuild the sky
+  };
+  api.reset = () => { dropEnt(); entRef = null; heroKey = ''; zoneKey = -1; };
+  api.render = (shx, shy) => {
+    syncChunks(); syncHero(); syncEnt(); syncEvents();
+    // centre the camera on the screen and skew nothing: z = 0 maps 1:1 onto the 2D overlay
+    const n = 0.5, k = n / D, half = W / 2 / U3;
+    camera.position.set(R.worldX / U3 + (W / 2 - HX) / U3 - shx / U3, CAM_Y + shy / U3, D);
+    camera.projectionMatrix.makePerspective(-half * k, half * k, (GY / U3 - CAM_Y) * k, ((GY - H) / U3 - CAM_Y) * k, n, 200);
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    torch.position.set(R.worldX / U3 + 0.6, 2.6, 1.6);
+    if (lavaMat) { const p = 0.85 + 0.15 * Math.sin(time * 3); lavaMat.color.setRGB(p, p, p); }
+    renderer.render(scene, camera);
+  };
+  return api;
+})();
+
 
 /* ================= WORLD MAP ================= */
 const MAP_LAND = { tree: '#6db24a', pine: '#2f6b35', stalag: '#4d465c', rock: '#e4ebf4', dead: '#4f5f38', crystal: '#2b5f6d', house: '#7cbf58' };
@@ -3070,6 +3853,7 @@ document.addEventListener('click', ev => {
     case 'rup': buyRup(id); break;
     case 'gtier': S.gsel[S.activity] = +id; resetEncounter(); break;
     case 'mute': S.muted = !S.muted; b.textContent = S.muted ? '🔇' : '🔊'; break;
+    case 'gfx': S.gfx = G3.on ? '2d' : '3d'; applyGfx(); save(); break;
     case 'export': {
       const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
       openModal(`<h2>📤 Export save</h2><p class="muted">Copy this code and keep it somewhere safe, or paste it into the game on another device.</p>
@@ -3167,6 +3951,7 @@ function init() {
   if (away > 60) catchUp(away);
   log('Welcome! Your hero sets off on the endless road.');
   $('#mute').textContent = S.muted ? '🔇' : '🔊';
+  applyGfx();
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (ios && !navigator.standalone && !S.tipA2HS && location.protocol === 'https:' && !/claude/.test(location.hostname)) {
     S.tipA2HS = true;
