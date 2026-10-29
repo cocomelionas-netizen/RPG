@@ -138,6 +138,35 @@
   .quest.ready { border-color: #6b5a24; }
   .quest .bar { margin-top: 3px; }
   .check { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  /* world map */
+  .map { position: relative; width: 100%; aspect-ratio: 3 / 2; border-radius: 10px; overflow: hidden; background: #0b2a3d; border: 1px solid var(--line); }
+  .map canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .loc {
+    position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: none; border: 0; padding: 0; min-height: 0; z-index: 1;
+  }
+  .loc:hover:not(:disabled), button.loc.sel { background: none; border: 0; }
+  .loc .pin {
+    position: relative; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 21px;
+    background: rgba(20, 18, 28, 0.82); border: 2px solid #c9b27a; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
+  }
+  .loc .nm {
+    font-size: 11.5px; font-weight: 700; color: #fff; white-space: nowrap; padding: 1px 6px; border-radius: 6px;
+    background: rgba(10, 14, 22, 0.6); text-shadow: 0 1px 2px #000;
+  }
+  .loc.sel .pin { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(242, 201, 76, 0.35), 0 3px 8px rgba(0, 0, 0, 0.55); }
+  .loc.locked .pin { filter: grayscale(1); opacity: 0.75; }
+  .loc .me { position: absolute; right: -10px; top: -10px; font-size: 15px; font-style: normal; animation: bob 1.2s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-3px); } }
+  @media (prefers-reduced-motion: reduce) { .loc .me { animation: none; } }
+  .locpanel { margin-top: 10px; }
+  .locpanel .locname { font-size: 16px; }
+  .acticons { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin: 10px 0; }
+  .acticons button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; }
+  .acticons .big { font-size: 24px; }
+  .acticons button.doing { border-color: var(--good); }
+  .item.on { border: 1px solid var(--good); }
+  .drops { letter-spacing: 2px; }
   .check input { width: 18px; height: 18px; }
   #modal h2 { margin: 0 0 10px; font-size: 18px; }
   #modal ul { padding-left: 18px; margin: 6px 0 14px; }
@@ -146,6 +175,13 @@
     #scene { width: min(100%, calc(60vh * 3)); width: min(100%, calc(60dvh * 3)); margin: 0 auto; }
   }
   @media (max-width: 700px) {
+    .map { aspect-ratio: 1 / 1; }
+    .acticons { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .acticons button { padding: 6px 2px; font-size: 11px; min-height: 0; }
+    .acticons .big { font-size: 20px; }
+    .acticons small { font-size: 10px; }
+    .loc .pin { width: 36px; height: 36px; font-size: 18px; }
+    .loc .nm { font-size: 10.5px; }
     header { padding-block: max(8px, env(safe-area-inset-top)) 8px; gap: 4px 12px; font-size: 13px; }
     header h1 { font-size: 16px; width: 100%; }
     #mute { margin-left: auto; }
@@ -205,7 +241,7 @@
   <main>
     <section class="card">
       <nav class="tabs">
-        <button data-tab="activity" class="sel"><span class="ti">🧭</span><span class="tl">Activity</span></button>
+        <button data-tab="activity" class="sel"><span class="ti">🗺️</span><span class="tl">Map</span></button>
         <button data-tab="skills"><span class="ti">📈</span><span class="tl">Skills</span></button>
         <button data-tab="inventory"><span class="ti">🎒</span><span class="tl">Bag</span></button>
         <button data-tab="craft"><span class="ti">🔨</span><span class="tl">Craft</span></button>
@@ -418,6 +454,34 @@ const ZONES = [
     th: { sky: ['#0a0412', '#3a1050'], far: '#2a0c3a', mid: '#1e0a2c', near: '#12061c', ground: '#2a1638', dirt: '#140a1c', sun: '#c070ff', decor: 'spike' } },
 ];
 
+// a riverside hub with every crafting station and no monsters
+ZONES.push({ name: 'Riverbend', town: true, tier: 0, enemies: [],
+  th: { sky: ['#86c9f5', '#e6f5ff'], far: '#b3d3e3', mid: '#86c46a', near: '#5a8f4a', ground: '#6aa646', dirt: '#8a6a44', sun: '#fff3a0', decor: 'house' } });
+const TOWN = ZONES.length - 1;
+// where each place sits on the world map and what can be done there (res lists the resource tiers on offer)
+const LOC = [
+  { icon: '🌾', x: .40, y: .78, desc: 'Rolling fields where every adventurer starts out.',
+    res: { woodcutting: [0, 1], mining: [0, 1], fishing: [0, 1] }, stations: ['cooking'] },
+  { icon: '🌲', x: .25, y: .43, desc: 'Old pines, goblin camps and wolves in the shadows.',
+    res: { woodcutting: [0, 1, 2, 3], mining: [0, 1], fishing: [1, 2] }, stations: ['cooking', 'fletching'] },
+  { icon: '🦇', x: .50, y: .52, desc: 'Tunnels full of ore veins, rune essence and the restless dead.',
+    res: { mining: [0, 1, 2, 3], fishing: [2] }, ess: true, stations: ['smithing', 'runecrafting'] },
+  { icon: '🏔️', x: .67, y: .25, desc: 'Every kind of ore lies under the snow, guarded by orcs and trolls.',
+    res: { mining: [0, 1, 2, 3, 4], woodcutting: [3], fishing: [3] }, stations: ['smithing'] },
+  { icon: '🐉', x: .85, y: .50, desc: 'Lava fields around the Dragon\'s nest. The heat forges the finest metal.',
+    res: { mining: [3, 4], woodcutting: [4] }, stations: ['smithing'] },
+  { icon: '🐸', x: .15, y: .19, desc: 'Fog, rotting trees and lights that lure travellers away.',
+    res: { woodcutting: [2, 3, 4], fishing: [2, 3, 4] }, ess: true, stations: ['cooking', 'runecrafting'] },
+  { icon: '💎', x: .65, y: .81, desc: 'Glowing crystal halls watched over by golems.',
+    res: { mining: [2, 3, 4] }, ess: true, stations: ['fletching', 'runecrafting'] },
+  { icon: '🌀', x: .88, y: .84, desc: 'A tear in the world. Demons and shades drift out of it.',
+    res: { mining: [4], fishing: [4] }, ess: true, stations: ['runecrafting'] },
+  { icon: '🏘️', x: .19, y: .70, desc: 'A quiet river town with a forge, a campfire, a fletcher\'s bench and a rune altar.',
+    res: { fishing: [0, 1, 2] }, stations: ['smithing', 'cooking', 'fletching', 'runecrafting'] },
+];
+LOC.forEach((l, i) => Object.assign(ZONES[i], l));
+const GATHERING = ['woodcutting', 'mining', 'fishing'];
+
 /* ===== Shops ===== */
 const SHOP = [
   { id: 'bread', n: 1, cost: 5 },
@@ -513,7 +577,7 @@ function newState() {
     zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0 }, cookSel: -1, tipEvent: false,
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
-    gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', muted: false, tipA2HS: false,
+    gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
     kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {},
   };
 }
@@ -547,7 +611,8 @@ function applySave(data) {
     if (!data.csel && data.smithSel !== undefined) S.csel.smithing = data.smithSel;
   } else S = base;
   recalcLevels(); recalcBonuses();
-  if (S.activity === 'combat' && !zoneOpen(S.zone)) S.zone = bestZone();
+  if (!S.zone || S.zone >= ZONES.length) S.zone = 0;
+  fitZone();
 }
 
 /* ================= HELPERS ================= */
@@ -593,6 +658,25 @@ function zoneOpen(i) {
   const z = ZONES[i];
   if (z.slayer) return LV.slayer >= z.slayer;
   return i === 0 || (S.bosses[i - 1] && combatLevel() >= z.req);
+}
+// Slayer areas need Slayer level for everything; other places can always be visited to gather and craft
+function locOpen(i) { const z = ZONES[i]; return !z.slayer || LV.slayer >= z.slayer; }
+function locTiers(skill, z = S.zone) { return (ZONES[z].res && ZONES[z].res[skill]) || []; }
+function locHas(i, act) {
+  const z = ZONES[i];
+  if (act === 'combat') return z.enemies.length > 0;
+  if (CRAFTING.has(act)) return (z.stations || []).includes(act);
+  return locTiers(act, i).length > 0 || (act === 'mining' && !!z.ess);
+}
+// the open place where the hero can gather the highest tier of a resource
+function bestLocFor(skill) {
+  let best = 0, bestT = -1;
+  ZONES.forEach((z, i) => {
+    if (!locOpen(i)) return;
+    const t = Math.max(-1, ...locTiers(skill, i).filter(t => LV[skill] >= GATHER_REQ[t]));
+    if (t > bestT || (t === bestT && i === S.zone)) { best = i; bestT = t; }
+  });
+  return best;
 }
 function bestZone() { let b = 0; for (let i = 1; i < MAIN_ZONES; i++) if (zoneOpen(i)) b = i; return b; }
 function combatLevel() { return Math.floor((Math.max((LV.attack + LV.strength) / 2, LV.ranged, LV.magic) + LV.defence + LV.hitpoints) / 3); }
@@ -647,7 +731,12 @@ function gatherTier(skill) {
   return t;
 }
 // the tier the hero actually gathers: the player's pick, or the best unlocked one
-function chosenTier(skill) { const sel = S.gsel[skill]; return sel < 0 ? gatherTier(skill) : Math.min(sel, gatherTier(skill)); }
+function chosenTier(skill) {
+  const ok = locTiers(skill).filter(t => LV[skill] >= GATHER_REQ[t]);
+  const sel = S.gsel[skill];
+  if (sel >= 0 && ok.includes(sel)) return sel;
+  return ok.length ? ok[ok.length - 1] : -1;
+}
 function gatherTime(skill, tier) { return GATHER_TIME[tier] * (1 - 0.12 * S.tools[TOOL_OF[skill]]) / (1 + BON.gather / 100); }
 function nodeTime(e) { return e.ess ? gatherTime('mining', 0) * ESSENCE_TIME / GATHER_TIME[0] : gatherTime(e.skill, e.tier); }
 function stationTime(e) { return e.skill === 'cooking' ? COOK_TIME : CRAFT[e.skill].time; }
@@ -715,7 +804,7 @@ function spawnEntity() {
     if (auto && S.zone !== S.task.zone) S.zone = S.task.zone;
     const z = ZONES[S.zone];
     const id = z.boss && S.zk[S.zone] >= BOSS_EVERY ? z.boss
-      : auto ? S.task.id : z.enemies[Math.floor(Math.random() * z.enemies.length)];
+      : auto ? S.task.id : S.ctarget && z.enemies.includes(S.ctarget) ? S.ctarget : z.enemies[Math.floor(Math.random() * z.enemies.length)];
     const d = ENEMIES[id];
     // archers and mages keep their distance
     const stop = (d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0);
@@ -724,8 +813,9 @@ function spawnEntity() {
     const kind = { smithing: 'anvil', cooking: 'fire', fletching: 'bench', runecrafting: 'altar' }[act];
     R.ent = { kind, skill: act, crafts: STATION_CRAFTS, t: 0, x, stop: 62, hit: 0, swung: false, blocked: false };
   } else {
-    const ess = act === 'mining' && S.gsel.mining === -2;
-    const tier = ess ? 0 : chosenTier(act);
+    const ess = act === 'mining' && S.gsel.mining === -2 && !!ZONES[S.zone].ess;
+    if (!ess && chosenTier(act) < 0) S.zone = bestLocFor(act);   // nothing here the hero can gather yet
+    const tier = ess ? 0 : Math.max(0, chosenTier(act));
     const yields = randi(3, 6);
     const kind = act === 'woodcutting' ? 'tree' : act === 'mining' ? 'rock' : 'pond';
     const stop = kind === 'pond' ? 135 : kind === 'tree' ? 58 : 62;
@@ -988,10 +1078,25 @@ function gatherTick(dt) {
 
 function setActivity(a) {
   if (S.activity === a) return;
-  if (CRAFTING.has(a) && !CRAFTING.has(S.activity)) S.prevAct = S.activity;
+  if (CRAFTING.has(a) && !CRAFTING.has(S.activity)) { S.prevAct = S.activity; S.prevZone = S.zone; }
   S.activity = a;
-  if (a === 'combat' && !zoneOpen(S.zone)) S.zone = bestZone();
+  fitZone();
   resetEncounter();
+}
+// move the hero somewhere the current activity can actually be done
+function fitZone() {
+  const a = S.activity;
+  if (a === 'combat') { if (!locHas(S.zone, 'combat') || !zoneOpen(S.zone)) S.zone = bestZone(); }
+  else if (CRAFTING.has(a)) { if (!locHas(S.zone, a) || !locOpen(S.zone)) S.zone = TOWN; }
+  else if (!locOpen(S.zone) || !locHas(S.zone, a)) S.zone = bestLocFor(a);
+}
+// used by the world map: go to a place and start an activity there
+function travel(z, a) {
+  if (!locOpen(z) || !locHas(z, a) || (a === 'combat' && !zoneOpen(z))) return;
+  if (S.zone !== z && S.autoSlayer && a === 'combat' && S.task && z !== S.task.zone) { S.autoSlayer = false; log('🧭 Auto Slayer paused while you pick your own area.'); }
+  if (S.zone !== z) log(`🗺️ Travelling to ${ZONES[z].name}`);
+  S.zone = z;
+  if (S.activity === a) resetEncounter(); else setActivity(a);
 }
 function setZone(i) {
   if (S.activity === 'combat' && !zoneOpen(i)) return;
@@ -1045,6 +1150,7 @@ function craftTick(dt) {
     if (e.blockT > 3) {
       const back = S.prevAct || 'combat';
       log(`↩️ Nothing left for ${SKILLS[skill].name} – back to ${back}.`);
+      if (S.prevZone !== undefined && locOpen(S.prevZone)) S.zone = S.prevZone;
       setActivity(back);
     }
     return;
@@ -1420,6 +1526,12 @@ function drawBackground(z) {
     else if (th.decor === 'pine') { for (let k = 0; k < 3; k++) poly([x - (26 - k * 6) * s, by - (20 + k * 26) * s, x + (26 - k * 6) * s, by - (20 + k * 26) * s, x, by - (60 + k * 28) * s], c); rr(x - 4 * s, by - 22 * s, 8 * s, 22 * s, 1, c); }
     else if (th.decor === 'stalag') poly([x - 16 * s, by, x + 16 * s, by, x + 2 * s, by - 70 * s], c);
     else if (th.decor === 'rock') { poly([x - 34 * s, by, x - 20 * s, by - 30 * s, x + 6 * s, by - 42 * s, x + 30 * s, by - 18 * s, x + 36 * s, by], c); poly([x - 8 * s, by - 36 * s, x + 6 * s, by - 42 * s, x + 20 * s, by - 29 * s], '#f4f8fc'); }
+    else if (th.decor === 'house') {
+      rr(x - 18 * s, by - 30 * s, 36 * s, 30 * s, 2, shade(c, 0.12));
+      poly([x - 24 * s, by - 28 * s, x, by - 50 * s, x + 24 * s, by - 28 * s], ['#b5533c', '#8a4a32', '#6f7a3a'][i & 1 ? 1 : (i % 3 === 0 ? 2 : 0)]);
+      rr(x - 5 * s, by - 16 * s, 10 * s, 16 * s, 1, shade(c, -0.15));
+      rr(x + 8 * s, by - 24 * s, 6 * s, 6 * s, 1, '#ffe8a0');
+    }
     else if (th.decor === 'dead') {
       rr(x - 3 * s, by - 70 * s, 6 * s, 70 * s, 2, c);
       ctx.strokeStyle = c; ctx.lineWidth = 3 * s;
@@ -2025,6 +2137,125 @@ function draw() {
   drawHud();
 }
 
+/* ================= WORLD MAP ================= */
+const MAP_LAND = { tree: '#6db24a', pine: '#2f6b35', stalag: '#4d465c', rock: '#e4ebf4', dead: '#4f5f38', crystal: '#2b5f6d', house: '#7cbf58' };
+let mapCache = null;
+function mapBlob(m, x, y, r, seed, color) {
+  m.fillStyle = color; m.beginPath();
+  for (let a = 0; a <= 48; a++) {
+    const t = a / 48 * Math.PI * 2;
+    const k = 1 + 0.16 * Math.sin(t * 3 + seed * 1.7) + 0.09 * Math.sin(t * 5 + seed * 3.1) + 0.05 * Math.sin(t * 9 + seed);
+    const px = x + Math.cos(t) * r * k * 1.2, py = y + Math.sin(t) * r * k * 0.82;
+    if (a) m.lineTo(px, py); else m.moveTo(px, py);
+  }
+  m.closePath(); m.fill();
+}
+// deterministic spots inside an island
+function mapSpots(s, n, seed) {
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    const a = hash(seed * 31 + k) * Math.PI * 2, d = Math.sqrt(hash(seed * 17 + k * 3)) * 0.78;
+    out.push([s.x + Math.cos(a) * s.r * d * 1.15, s.y + Math.sin(a) * s.r * d * 0.75, hash(seed * 7 + k)]);
+  }
+  return out.sort((p, q) => p[1] - q[1]);
+}
+function mapTri(m, x, y, w, h, c) { m.fillStyle = c; m.beginPath(); m.moveTo(x - w / 2, y); m.lineTo(x, y - h); m.lineTo(x + w / 2, y); m.closePath(); m.fill(); }
+function mapDecor(m, s) {
+  const z = s.z, d = z.th.decor, r = s.r, U = r / 0.1;
+  if (d === 'tree' || d === 'house') {
+    for (const [x, y, q] of mapSpots(s, d === 'house' ? 6 : 10, s.i)) {
+      if (q < 0.35) { m.fillStyle = '#d9c46a'; m.fillRect(x - r * .1, y - r * .04, r * .2, r * .08); continue; }
+      m.fillStyle = '#3f8f3a'; m.beginPath(); m.arc(x, y, r * (0.07 + q * 0.04), 0, 7); m.fill();
+    }
+    if (d === 'house') {
+      m.strokeStyle = '#4fa3d8'; m.lineWidth = r * 0.07; m.beginPath();
+      m.moveTo(s.x - r * 1.1, s.y + r * 0.2); m.quadraticCurveTo(s.x, s.y - r * 0.15, s.x + r * 1.1, s.y + r * 0.35); m.stroke();
+      for (const [x, y, q] of mapSpots(s, 7, s.i + 50)) {
+        m.fillStyle = '#efe4cc'; m.fillRect(x - r * .07, y - r * .07, r * .14, r * .1);
+        mapTri(m, x, y - r * .06, r * .2, r * .1, q < .5 ? '#b5533c' : '#7a4a8a');
+      }
+    }
+  } else if (d === 'pine') {
+    for (const [x, y, q] of mapSpots(s, 26, s.i)) mapTri(m, x, y, r * 0.16, r * (0.22 + q * 0.12), q < .5 ? '#1d4a26' : '#245a2e');
+  } else if (d === 'stalag') {
+    m.fillStyle = '#16121e'; m.beginPath(); m.ellipse(s.x, s.y + r * .15, r * .32, r * .2, 0, 0, 7); m.fill();
+    for (const [x, y, q] of mapSpots(s, 12, s.i)) mapTri(m, x, y, r * .14, r * (.15 + q * .15), q < .5 ? '#6a6278' : '#59516a');
+  } else if (d === 'rock') {
+    for (const [x, y, q] of mapSpots(s, 9, s.i)) {
+      const hgt = r * (0.4 + q * 0.35), wd = r * (0.45 + q * 0.2);
+      mapTri(m, x, y, wd, hgt, '#9aa8ba'); mapTri(m, x - wd * 0.06, y - hgt * 0.6, wd * 0.38, hgt * 0.4, '#ffffff');
+    }
+  } else if (d === 'spike' && z.th.lava) {
+    for (const [x, y, q] of mapSpots(s, 8, s.i)) mapTri(m, x, y, r * .35, r * (.35 + q * .25), '#2a120e');
+    m.strokeStyle = '#ff7a2a'; m.lineWidth = r * 0.04; m.lineCap = 'round';
+    for (let k = 0; k < 4; k++) { m.beginPath(); m.moveTo(s.x - r * .8 + k * r * .4, s.y + r * .4); m.quadraticCurveTo(s.x - r * .5 + k * r * .4, s.y, s.x - r * .3 + k * r * .35, s.y - r * .3); m.stroke(); }
+  } else if (d === 'spike') {
+    const g = m.createRadialGradient(s.x, s.y, 1, s.x, s.y, r * 0.9);
+    g.addColorStop(0, 'rgba(200,110,255,0.8)'); g.addColorStop(1, 'rgba(60,10,90,0)');
+    m.fillStyle = g; m.beginPath(); m.arc(s.x, s.y, r * 0.9, 0, 7); m.fill();
+    m.strokeStyle = 'rgba(230,180,255,0.7)'; m.lineWidth = r * 0.04; m.beginPath();
+    for (let t = 0; t < 14; t += 0.2) { const rr2 = r * 0.06 * t; m.lineTo(s.x + Math.cos(t) * rr2 * 1.2, s.y + Math.sin(t) * rr2 * 0.8); }
+    m.stroke();
+  } else if (d === 'dead') {
+    m.strokeStyle = '#2a2a1a'; m.lineWidth = r * 0.03;
+    for (const [x, y] of mapSpots(s, 12, s.i)) { m.beginPath(); m.moveTo(x, y); m.lineTo(x, y - r * .22); m.lineTo(x - r * .08, y - r * .3); m.moveTo(x, y - r * .15); m.lineTo(x + r * .08, y - r * .24); m.stroke(); }
+    m.fillStyle = 'rgba(220,235,220,0.25)';
+    for (const [x, y] of mapSpots(s, 5, s.i + 9)) { m.beginPath(); m.ellipse(x, y, r * .35, r * .1, 0, 0, 7); m.fill(); }
+  } else if (d === 'crystal') {
+    for (const [x, y, q] of mapSpots(s, 12, s.i)) { mapTri(m, x, y, r * .1, r * (.2 + q * .2), q < .5 ? '#7fe0f0' : '#b8f4ff'); }
+  }
+}
+function paintMap(w, h, dpr) {
+  const c = document.createElement('canvas'); c.width = w * dpr; c.height = h * dpr;
+  const m = c.getContext('2d'); m.scale(dpr, dpr);
+  const U = Math.min(w, h);
+  const g = m.createRadialGradient(w * .5, h * .5, U * .1, w * .5, h * .5, Math.max(w, h) * .75);
+  g.addColorStop(0, '#17617a'); g.addColorStop(1, '#0a2335');
+  m.fillStyle = g; m.fillRect(0, 0, w, h);
+  m.strokeStyle = 'rgba(140,215,230,0.13)'; m.lineWidth = Math.max(1, U * 0.004); m.lineCap = 'round';
+  for (let k = 0; k < 30; k++) {
+    const x0 = hash(k + 7) * w, y0 = hash(k + 3) * h;
+    m.beginPath(); m.moveTo(x0, y0); m.bezierCurveTo(x0 + U * .06, y0 - U * .03, x0 + U * .12, y0 + U * .03, x0 + U * .18, y0); m.stroke();
+  }
+  const isl = ZONES.map((z, i) => ({ z, i, x: z.x * w, y: z.y * h, r: U * (z.town ? 0.075 : 0.095) }));
+  for (const sp of isl) mapBlob(m, sp.x, sp.y, sp.r * 1.4, sp.i, 'rgba(90,190,200,0.22)');
+  for (const sp of isl) mapBlob(m, sp.x, sp.y, sp.r * 1.12, sp.i, sp.z.th.cave ? '#5a5466' : sp.z.th.lava ? '#3a2420' : sp.z.slayer && !sp.z.th.sun ? '#3a2a4a' : '#e6cf8f');
+  for (const sp of isl) {
+    const land = sp.z.th.lava ? '#4a221a' : sp.z.th.decor === 'spike' ? '#2a1438' : MAP_LAND[sp.z.th.decor] || sp.z.th.ground;
+    mapBlob(m, sp.x, sp.y, sp.r, sp.i, land);
+    mapDecor(m, sp);
+  }
+  // roads between places: the story road in sand, side paths to Slayer areas in red
+  const road = (a, b, color) => {
+    const p = isl[a], q = isl[b];
+    m.strokeStyle = color; m.lineWidth = Math.max(2, U * 0.007); m.setLineDash([U * 0.014, U * 0.012]);
+    m.beginPath(); m.moveTo(p.x, p.y); m.quadraticCurveTo((p.x + q.x) / 2 + (q.y - p.y) * 0.15, (p.y + q.y) / 2 - (q.x - p.x) * 0.15, q.x, q.y); m.stroke();
+  };
+  [[TOWN, 0], [0, 1], [1, 2], [2, 3], [3, 4]].forEach(([a, b]) => road(a, b, 'rgba(246,226,170,0.85)'));
+  [[1, 5], [2, 6], [4, 7]].forEach(([a, b]) => road(a, b, 'rgba(232,106,106,0.75)'));
+  m.setLineDash([]);
+  // clouds in the corners
+  for (const [cx, cy] of [[0, 0], [w, 0], [0, h], [w, h]]) {
+    for (let k = 0; k < 6; k++) {
+      const a = hash(cx + cy + k) * Math.PI * 2, d = U * (0.04 + hash(k + cx) * 0.08);
+      m.fillStyle = k % 2 ? 'rgba(214,228,234,0.95)' : 'rgba(236,244,247,0.95)';
+      m.beginPath(); m.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, U * (0.06 + hash(k * 5 + cy) * 0.05), 0, 7); m.fill();
+    }
+  }
+  return c;
+}
+function drawMap() {
+  const cv = document.getElementById('mapcv');
+  if (!cv) return;
+  const box = cv.parentElement.getBoundingClientRect();
+  const w = Math.round(box.width), h = Math.round(box.height);
+  if (!w || !h) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!mapCache || mapCache.w !== w || mapCache.h !== h) mapCache = { w, h, img: paintMap(w, h, dpr) };
+  cv.width = w * dpr; cv.height = h * dpr;
+  cv.getContext('2d').drawImage(mapCache.img, 0, 0);
+}
+
 /* ================= UI ================= */
 
 const $ = s => document.querySelector(s);
@@ -2038,17 +2269,6 @@ function itemLabel(id) {
 function zoneEnemies(z) {
   return [...new Set(z.enemies)].map(id => `${TYPE_ICON[ENEMIES[id].type]} ${ENEMIES[id].name}`).join(', ');
 }
-function zoneButton(z, i) {
-  const combat = S.activity === 'combat', locked = combat && !zoneOpen(i);
-  let sub;
-  if (!combat) sub = 'Scenery only';
-  else if (z.slayer) sub = locked ? `Requires Slayer level ${z.slayer}` : `💀 Slayer area`;
-  else if (locked) { const prev = i > 0 && !S.bosses[i - 1] ? ENEMIES[ZONES[i - 1].boss].name : null; sub = prev ? `Beat ${prev} · combat ${z.req}` : `Requires combat level ${z.req}`; }
-  else sub = `<span class="boss">👑 ${S.bosses[i] ? '✔ ' : ''}${ENEMIES[z.boss].name} · ${S.zk[i]}/${BOSS_EVERY}</span>`;
-  return `<button class="zone ${S.zone === i ? 'sel' : ''}" ${locked ? 'disabled' : ''} data-a="zone" data-id="${i}">
-    <b>${locked ? '🔒 ' : ''}${z.name}</b><small>${sub}</small>${combat ? `<small>${zoneEnemies(z)}</small>` : ''}</button>`;
-}
-
 function htmlCombatPanel() {
   const wt = wtype(), mode = attackMode(), ct = combatType();
   let h = `<div class="row"><b>Weapon:</b> ${S.equip.weapon ? itemLabel(S.equip.weapon) : 'Fists'} <span class="tag">${TYPE_ICON[ct]} ${TYPE_NAME[ct]}</span></div>`;
@@ -2074,38 +2294,86 @@ function htmlCombatPanel() {
   return h;
 }
 
+const ACT_ORDER = ['combat', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting'];
+const STATION_NAME = { smithing: '🔨 Anvil', cooking: '🔥 Campfire', fletching: '🪶 Fletching bench', runecrafting: '🔮 Rune altar' };
+let mapSel = null, mapAct = null;
+function actIcon(a) { return a === 'combat' ? '⚔️' : SKILLS[a].icon; }
+function enemyLevel(d) { return Math.round((d.atk + d.def) / 2); }
+function dropIcons(d) { return [...new Set(d.drops.map(x => ITEMS[x[0]].icon))].join(''); }
+
 function htmlActivity() {
-  const acts = [['combat', '⚔️', 'Combat'], ['woodcutting', '🪓', 'Woodcutting'], ['mining', '⛏️', 'Mining'], ['fishing', '🎣', 'Fishing'],
-    ['smithing', '🔨', 'Smithing'], ['cooking', '🍳', 'Cooking'], ['fletching', '🪶', 'Fletching'], ['runecrafting', '🔮', 'Runecrafting']];
-  let h = '<h3>What to do on the road?</h3><div class="acts">' + acts.map(([id, ic, n]) =>
-    `<button class="act ${S.activity === id ? 'sel' : ''}" data-a="activity" data-id="${id}"><span class="big">${ic}</span>${n}
-     <small>${id === 'combat' ? 'Combat level ' + combatLevel() : 'Level ' + LV[id]}</small></button>`).join('') + '</div>';
-  h += '<h3>Zone</h3><div class="zones">' + ZONES.slice(0, MAIN_ZONES).map((z, i) => zoneButton(z, i)).join('') + '</div>';
-  h += '<h3>💀 Slayer areas</h3><div class="zones">' + ZONES.slice(MAIN_ZONES).map((z, k) => zoneButton(z, MAIN_ZONES + k)).join('') + '</div>';
-  h += '<div class="info">';
-  if (S.activity === 'combat') h += htmlCombatPanel();
-  else if (S.activity === 'cooking') {
-    const t = cookTarget();
-    h += `<b>Cooking:</b> ${S.cookSel < 0 ? 'best fish available' : FISH_N[S.cookSel]}${t >= 0 ? ` <span class="muted">(now: ${FISH_N[t]}, ${has('fish' + t)} left)</span>` : ' – <span class="need">no fish to cook</span>'}
-      <p class="muted">${COOK_TIME}s per fish. Burnt fish gives no XP – higher Cooking burns less.</p>
-      <button data-tab="cooking">Choose fish</button>`;
-  } else if (CRAFTING.has(S.activity)) {
-    const sk = S.activity, r = CRAFT[sk].recipes[S.csel[sk]];
-    h += `<b>${SKILLS[sk].name}:</b> ${recipeCount(r) > 1 ? recipeCount(r) + '× ' : ''}${itemLabel(r.out)}<br><small>${matsHtml(r.mats)}</small>
-      <p class="muted">${CRAFT[sk].time}s per craft · ${r.xp} XP. Your hero works at ${CRAFT[sk].place} on the road until materials run out – even while you are away.</p>
-      <button data-tab="${sk}">Choose recipe</button>`;
-  } else {
-    const sk = S.activity, best = gatherTier(sk), ess = sk === 'mining' && S.gsel.mining === -2;
-    const t = chosenTier(sk);
-    const names = sk === 'woodcutting' ? TREE_N : sk === 'mining' ? METAL.map(m => m + ' Ore') : FISH_N;
-    h += ess ? `<b>Target:</b> Rune Essence<br><span class="muted">${(gatherTime('mining', 0) * ESSENCE_TIME / GATHER_TIME[0]).toFixed(2)}s per item · ${ESSENCE_XP} XP · used for Runecrafting</span>`
-      : `<b>Target:</b> ${names[t]}<br><span class="muted">${gatherTime(sk, t).toFixed(2)}s per item · ${GATHER_XP[t]} XP · tool level ${S.tools[TOOL_OF[sk]]}/4</span>`;
-    h += `<div class="chips"><button class="${S.gsel[sk] === -1 ? 'sel' : ''}" data-a="gtier" data-id="-1">Best</button>` +
-      names.map((n, i) => `<button class="${S.gsel[sk] === i ? 'sel' : ''}" data-a="gtier" data-id="${i}" ${i > best ? 'disabled' : ''}>${i > best ? '🔒 ' : ''}${n}</button>`).join('') +
-      (sk === 'mining' ? `<button class="${ess ? 'sel' : ''}" data-a="gtier" data-id="-2">🔹 Rune Essence</button>` : '') + '</div>';
-    if (best < 4) h += `<p class="muted">Next tier (${names[best + 1]}): ${SKILLS[sk].name} level ${GATHER_REQ[best + 1]}. Pick a lower tier if Smithing, Fletching or Cooking can't use your current one yet.</p>`;
+  if (mapSel === null) mapSel = S.zone;
+  const acts = ACT_ORDER.filter(a => locHas(mapSel, a));
+  if (!acts.includes(mapAct)) mapAct = mapSel === S.zone && acts.includes(S.activity) ? S.activity : acts[0];
+  let h = '<div class="map" id="worldmap"><canvas id="mapcv"></canvas>' + ZONES.map((z, i) => {
+    const locked = !locOpen(i);
+    const cls = ['loc', i === mapSel ? 'sel' : '', locked ? 'locked' : ''].join(' ');
+    return `<button class="${cls}" style="left:${z.x * 100}%;top:${z.y * 100}%" data-a="loc" data-id="${i}" aria-label="${z.name}">
+      <span class="pin">${locked ? '🔒' : z.icon}${i === S.zone ? '<i class="me">🧍</i>' : ''}</span><span class="nm">${z.name}</span></button>`;
+  }).join('') + '</div>';
+  const z = ZONES[mapSel];
+  const kind = z.town ? 'Town' : z.slayer ? `💀 Slayer area · Slayer ${z.slayer}` : `Region ${mapSel + 1} · combat ${z.req}+`;
+  h += `<div class="info locpanel"><div class="row" style="justify-content:space-between"><b class="locname">${z.icon} ${z.name}</b><span class="tag">${kind}</span></div>
+    <p class="muted">${z.desc}${mapSel === S.zone ? ' <b>Your hero is here.</b>' : ''}</p>`;
+  if (!locOpen(mapSel)) return h + `<p class="need">Reach Slayer level ${z.slayer} to enter (you are ${LV.slayer}).</p></div>`;
+  h += '<div class="acticons">' + acts.map(a => `<button class="${a === mapAct ? 'sel' : ''} ${S.zone === mapSel && S.activity === a ? 'doing' : ''}" data-a="mapact" data-id="${a}">
+    <span class="big">${actIcon(a)}</span>${a === 'combat' ? 'Combat' : SKILLS[a].name}<small>${a === 'combat' ? 'Combat ' + combatLevel() : 'Level ' + LV[a]}</small></button>`).join('') + '</div>';
+  h += htmlLocAct(mapSel, mapAct) + '</div>';
+  if (mapAct === 'combat' && S.activity === 'combat' && S.zone === mapSel) h += `<div class="info">${htmlCombatPanel()}</div>`;
+  return h;
+}
+
+function htmlLocAct(i, a) {
+  const z = ZONES[i], here = S.zone === i && S.activity === a;
+  if (a === 'combat') {
+    if (!zoneOpen(i)) {
+      const prev = i > 0 && i < MAIN_ZONES && !S.bosses[i - 1] ? ENEMIES[ZONES[i - 1].boss].name : null;
+      return `<p class="need">${prev ? `Defeat ${prev} and reach combat level ${z.req} to fight here.` : `Reach combat level ${z.req} to fight here (you are ${combatLevel()}).`}</p>`;
+    }
+    const ct = combatType();
+    const mon = (id, boss) => {
+      const d = ENEMIES[id], t = BEATS[ct] === d.type ? 1 : BEATS[d.type] === ct ? -1 : 0;
+      const on = here && !boss && S.ctarget === id;
+      return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">${boss ? '👑' : TYPE_ICON[d.type]}</span>
+        <span class="nm"><b>${d.name}</b> <span class="tag">Lv ${enemyLevel(d)}</span> <span class="tag ${t > 0 ? 'good' : t < 0 ? 'bad' : ''}">${TYPE_ICON[d.type]} ${TYPE_NAME[d.type]}${t > 0 ? ' · strong' : t < 0 ? ' · weak' : ''}</span>${onTask({ id }) ? ' <span class="tag good">💀 task</span>' : ''}<br>
+        <small>❤️ ${fmt(d.hp)} · 💥 ${d.maxHit} max hit · 🛡️ ${d.def} defence · ${d.speed}s</small><br>
+        <small>Drops: <span class="drops">🪙${dropIcons(d)}</span> · defeated ${fmt(S.kc[id] || 0)}</small></span></div>
+        <div class="btns">${boss ? `<small>${S.bosses[i] ? '✔ Beaten · ' : ''}Appears after ${BOSS_EVERY} kills here (${S.zk[i]}/${BOSS_EVERY})</small>`
+          : on ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="${id}">⚔️ Fight</button>`}</div></div>`;
+    };
+    const mixOn = here && !S.ctarget;
+    return `<div class="grid">
+      <div class="item ${mixOn ? 'on' : ''}"><div class="top"><span class="ic">🎲</span><span class="nm"><b>Fight everything</b><br><small>Meet whatever comes down the road here</small></span></div>
+      <div class="btns">${mixOn ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="mix">⚔️ Fight</button>`}</div></div>`
+      + [...new Set(z.enemies)].map(id => mon(id)).join('') + (z.boss ? mon(z.boss, true) : '') + '</div>';
   }
-  return h + '</div>';
+  if (GATHERING.includes(a)) {
+    const names = a === 'woodcutting' ? TREE_N : a === 'mining' ? METAL.map(m => m + ' Ore') : FISH_N;
+    const item = t => (a === 'woodcutting' ? 'log' : a === 'mining' ? 'ore' : 'fish') + t;
+    const node = a === 'woodcutting' ? '🌳' : a === 'mining' ? '🪨' : '🐟';
+    const cur = here ? (S.gsel.mining === -2 && a === 'mining' && z.ess ? 'ess' : chosenTier(a)) : null;
+    let h = '<div class="grid">' + locTiers(a, i).map(t => {
+      const locked = LV[a] < GATHER_REQ[t], on = cur === t;
+      return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">${node}</span>
+        <span class="nm"><b><span class="tier" style="background:${TIER_COLORS[t]}"></span>${names[t]}</b><br>
+        <small>${locked ? '🔒 ' : ''}${SKILLS[a].name} ${GATHER_REQ[t]} · ${gatherTime(a, t).toFixed(1)}s · ${GATHER_XP[t]} XP · you have ${fmt(has(item(t)))}</small></span></div>
+        <div class="btns">${on ? `<button class="sel" disabled>${SKILLS[a].icon} Working…</button>` : `<button data-a="gather" data-z="${i}" data-skill="${a}" data-id="${t}" ${locked ? 'disabled' : ''}>${SKILLS[a].icon} ${a === 'fishing' ? 'Fish' : a === 'mining' ? 'Mine' : 'Chop'}</button>`}</div></div>`;
+    }).join('');
+    if (a === 'mining' && z.ess) {
+      const on = cur === 'ess';
+      h += `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">🔹</span><span class="nm"><b>Rune Essence</b><br>
+        <small>Mining 1 · ${(gatherTime('mining', 0) * ESSENCE_TIME / GATHER_TIME[0]).toFixed(1)}s · ${ESSENCE_XP} XP · for Runecrafting · you have ${fmt(has('essence'))}</small></span></div>
+        <div class="btns">${on ? '<button class="sel" disabled>⛏️ Working…</button>' : `<button data-a="gather" data-z="${i}" data-skill="mining" data-id="-2">⛏️ Mine</button>`}</div></div>`;
+    }
+    return h + '</div>';
+  }
+  // crafting station
+  const detail = a === 'cooking'
+    ? (cookTarget() >= 0 ? `Cooking ${S.cookSel < 0 ? 'your best fish' : FISH_N[S.cookSel]} · ${has('fish' + cookTarget())} raw fish` : '<span class="need">No raw fish to cook</span>')
+    : (() => { const r = CRAFT[a].recipes[S.csel[a]]; return `Recipe: ${recipeCount(r) > 1 ? recipeCount(r) + '× ' : ''}${itemLabel(r.out)} · ${matsHtml(r.mats)}`; })();
+  return `<div class="item ${here ? 'on' : ''}"><div class="top"><span class="ic">${actIcon(a)}</span><span class="nm"><b>${STATION_NAME[a]}</b><br><small>${detail}</small></span></div>
+    <div class="btns">${here ? `<button class="sel" disabled>${actIcon(a)} Working…</button>` : `<button data-a="station" data-z="${i}" data-id="${a}">${actIcon(a)} Work here</button>`}
+    <button data-tab="${a}">${a === 'cooking' ? 'Choose fish' : 'Choose recipe'}</button></div></div>`;
 }
 
 function htmlSkills() {
@@ -2216,7 +2484,7 @@ function htmlSlayer() {
       <div class="row"><button data-a="tasktravel">⚔️ Travel there</button><button data-a="taskskip" ${S.scoins < 25 ? 'disabled' : ''}>Skip – 25 coins</button></div>`;
   } else h += `<p class="muted">The Slayer master hands out monsters to hunt from the areas you can reach. Kills on task give Slayer XP and coins, plus a bonus when the task is done.</p><button data-a="newtask">💀 Get a task</button>`;
   if (S.ownsAutoSlayer) h += `<label class="check"><input type="checkbox" id="autoslayer" data-a="autoslayer" ${S.autoSlayer ? 'checked' : ''}> Auto Slayer: travel to the task and take a new one when it's done</label>`;
-  h += '</div><h3>Slayer areas</h3><div class="grid">' + ZONES.slice(MAIN_ZONES).map(z =>
+  h += '</div><h3>Slayer areas</h3><div class="grid">' + ZONES.filter(z => z.slayer).map(z =>
     `<div class="item"><div class="top"><span class="ic">${LV.slayer >= z.slayer ? '💀' : '🔒'}</span><span class="nm"><b>${z.name}</b><br><small>Slayer ${z.slayer} · ${zoneEnemies(z)}</small></span></div></div>`).join('') + '</div>';
   h += '<h3>Slayer shop</h3><div class="grid">' + SLAYER_SHOP.map((it, i) => {
     const d = it.id === 'autoslayer' ? it : ITEMS[it.id], owned = it.id === 'autoslayer' && S.ownsAutoSlayer;
@@ -2285,7 +2553,7 @@ function htmlProgress() {
 function renderTab(force) {
   if (force) lastHtml = '';
   const html = { activity: htmlActivity, skills: htmlSkills, inventory: htmlBag, craft: htmlCraft, slayer: htmlSlayer, quests: htmlQuests, progress: htmlProgress }[tab]();
-  if (html !== lastHtml) { $('#tab-content').innerHTML = html; lastHtml = html; }
+  if (html !== lastHtml) { $('#tab-content').innerHTML = html; lastHtml = html; if (tab === 'activity') drawMap(); }
 }
 
 function renderHero() {
@@ -2369,6 +2637,7 @@ function openTab(name, scroll) {
   const al = TAB_ALIAS[name];
   if (al) { name = al[0]; if (name === 'craft') craftSub = al[1]; else bagSub = al[1]; }
   else if (name === 'craft' && CRAFTING.has(S.activity)) craftSub = S.activity;
+  if (name === 'activity' && tab !== 'activity') { mapSel = null; mapAct = null; }
   tab = name;
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('sel', b.dataset.tab === name));
   renderTab(true);
@@ -2406,11 +2675,16 @@ document.addEventListener('click', ev => {
     case 'buy': buy(+id, n); break;
     case 'newtask': newTask(); break;
     case 'taskskip': skipTask(); break;
-    case 'tasktravel': if (S.task && zoneOpen(S.task.zone)) { setActivity('combat'); setZone(S.task.zone); openTab('activity', true); } break;
+    case 'tasktravel': if (S.task && zoneOpen(S.task.zone)) { S.ctarget = S.task.id; travel(S.task.zone, 'combat'); resetEncounter(); openTab('activity', true); } break;
     case 'autoslayer': S.autoSlayer = b.checked; break;
     case 'slayerbuy': buySlayer(+id); break;
     case 'qstart': startQuest(id); break;
     case 'qclaim': claimQuest(id); break;
+    case 'loc': mapSel = +id; mapAct = null; break;
+    case 'mapact': mapAct = id; break;
+    case 'fight': S.ctarget = id === 'mix' ? null : id; travel(+b.dataset.z, 'combat'); resetEncounter(); break;
+    case 'gather': S.gsel[b.dataset.skill] = +id; travel(+b.dataset.z, b.dataset.skill); resetEncounter(); break;
+    case 'station': travel(+b.dataset.z, id); break;
     case 'sell': sell(id, n); break;
     case 'equip': equip(id); break;
     case 'unequip': unequip(id); break;
@@ -2510,7 +2784,7 @@ function frame(now) {
 
 function init() {
   resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('resize', () => { resizeCanvas(); drawMap(); });
   load();
   const away = (Date.now() - (S.last || Date.now())) / 1000;
   if (away > 60) catchUp(away);
