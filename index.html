@@ -143,6 +143,35 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .chips.sub { margin: 0 0 12px; }
   .chips button small { display: block; font-size: 11px; }
+  .osrs { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin-top: 8px; }
+  .opanel { background: #3e3529; border: 2px solid #1d1813; box-shadow: inset 0 0 0 1px #5d503c; border-radius: 6px; padding: 10px; flex: 1 1 250px; }
+  .opanel.inv { flex: 2 1 300px; }
+  .opanel h3 { color: #ff981f; margin: 0 0 10px; font-size: 14px; text-shadow: 1px 1px 0 #000; }
+  .opanel h3 small { color: #c8b48a; font-weight: 400; text-shadow: none; }
+  .opanel .muted { color: #b8a684; }
+  .doll { display: grid; grid-template-columns: repeat(3, 52px); gap: 6px 16px; justify-content: center; margin: 0 auto 12px; }
+  .doll.sm { grid-template-columns: repeat(3, 42px); gap: 4px 12px; margin: 4px auto 8px; }
+  .slot { position: relative; width: 52px; height: 52px; min-height: 0; padding: 0; border-radius: 4px; background: #2b2520;
+    border: 1px solid #16120d; box-shadow: inset 0 0 0 1px #4d4232; display: flex; align-items: center; justify-content: center; }
+  .doll.sm .slot { width: 42px; height: 42px; }
+  .slot:hover { box-shadow: inset 0 0 0 1px #ff981f; }
+  .slot .si { font-size: 28px; line-height: 1; filter: drop-shadow(1px 2px 0 rgba(0,0,0,.7)); }
+  .doll.sm .slot .si { font-size: 22px; }
+  .slot .si.ph { opacity: .2; filter: grayscale(1); }
+  .slot .sn { position: absolute; top: 2px; left: 3px; font: 700 12px/1 system-ui, sans-serif; color: #ffff00; text-shadow: 1px 1px 0 #000; }
+  .slot .sn.w { color: #fff; } .slot .sn.g { color: #00ff80; }
+  .slot.up::after { content: '▲'; position: absolute; right: 3px; bottom: 2px; font-size: 10px; color: #3fe03f; text-shadow: 1px 1px 0 #000; }
+  .invgrid { display: grid; grid-template-columns: repeat(auto-fill, 52px); gap: 6px; justify-content: center; }
+  .eqstats { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; font-size: 12.5px; color: #ffcf8a; }
+  .eqstats b { color: #fff; text-align: right; }
+  .imenu .ihead { display: flex; gap: 12px; align-items: center; }
+  .imenu .big { font-size: 38px; }
+  .imenu .opts { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+  .imenu .opts button { text-align: left; }
+  .uqs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .uq { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #2f2a44; color: var(--muted); }
+  .uq.got { background: #2e4a2a; color: #c8f0b8; }
+  .item.boss { box-shadow: inset 0 0 0 1px #6b5a24; }
   .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #2f2a44; color: var(--muted); }
   .tag.good { background: #1f3a24; color: var(--good); } .tag.bad { background: #3f2024; color: var(--bad); }
   .quest { border: 1px solid transparent; }
@@ -362,7 +391,7 @@ const SMITH_ITEMS = [
   { key: 'platelegs',  name: 'Platelegs',  off: 16, bars: 3, slot: 'legs',   arm: 0.35, icon: '👖' },
   { key: 'platebody',  name: 'Platebody',  off: 18, bars: 5, slot: 'body',   arm: 0.6,  icon: '🥋' },
 ];
-const ARMOUR_SLOTS = ['helm', 'body', 'legs', 'shield'];
+const ARMOUR_SLOTS = ['helm', 'body', 'legs', 'shield', 'cape', 'hands', 'feet'];
 const WOOD = ['Birch', 'Oak', 'Maple', 'Yew', 'Magic'];
 const TREE_N = ['Birch', 'Oak', 'Maple', 'Yew', 'Magic Tree'];
 const LOG_N = ['Birch Logs', 'Oak Logs', 'Maple Logs', 'Yew Logs', 'Magic Logs'];
@@ -377,7 +406,6 @@ const TOOL_COST = [300, 3000, 20000, 80000];
 const TOOL_NAMES = { axe: 'Axe', pick: 'Pickaxe', rod: 'Fishing Rod' };
 const TOOL_OF = { woodcutting: 'axe', mining: 'pick', fishing: 'rod' };
 const COOK_TIME = 2.0, STATION_CRAFTS = 10;
-const BOSS_EVERY = 20;   // zone kills before the zone boss shows up
 const MAIN_ZONES = 5;    // zones 0-4 form the story road; the rest are Slayer areas
 
 const ITEMS = {};
@@ -427,6 +455,20 @@ defItem('amu_def',    { name: 'Amulet of Warding', icon: '📿', value: 300, slo
 defItem('amu_str',    { name: 'Amulet of Strength', icon: '📿', value: 400, slot: 'amulet', dmg: 0.1, type: 'Equipment', note: '+10% max hit' });
 defItem('amu_slayer', { name: 'Slayer Amulet', icon: '💀', value: 300, slot: 'amulet', slay: 0.2, type: 'Equipment', note: '+20% damage and Slayer XP on task' });
 defItem('amu_fury',   { name: 'Amulet of Fury', icon: '🔱', value: 3000, slot: 'amulet', acc: 0.06, dmg: 0.1, dr: 0.05, type: 'Equipment', note: '+6% accuracy, +10% max hit, +5% damage reduction' });
+// gloves, boots and capes fill the rest of the OSRS equipment screen
+defItem('gloves0', { name: 'Leather Gloves', icon: '🧤', color: '#8a5a32', value: 30, slot: 'hands', armor: 1, req: 1, type: 'Equipment' });
+defItem('boots0',  { name: 'Leather Boots', icon: '🥾', color: '#6b4426', value: 30, slot: 'feet', armor: 1, req: 1, type: 'Equipment' });
+defItem('cape0',   { name: 'Red Cape', icon: '🧣', color: '#b5302a', value: 40, slot: 'cape', armor: 1, req: 1, type: 'Equipment' });
+// boss uniques (bonus keys work like the amulets: acc, dmg, dr, slay)
+defItem('slimegloves',   { name: 'Slime Gloves', icon: '🧤', color: '#5fd35f', unique: true, value: 300, slot: 'hands', armor: 3, req: 5, type: 'Equipment' });
+defItem('gobboots',      { name: 'Goblin War Boots', icon: '🥾', color: '#6f8a3a', unique: true, value: 600, slot: 'feet', armor: 4, req: 15, type: 'Equipment' });
+defItem('bonering',      { name: 'Ring of the Bone Lord', icon: '💍', color: '#efe9d6', unique: true, value: 1200, slot: 'ring', acc: 0.04, type: 'Equipment', note: '+4% accuracy' });
+defItem('frostcape',     { name: 'Frost Cape', icon: '🧣', color: '#9fd8f0', unique: true, value: 2000, slot: 'cape', armor: 6, dr: 0.03, req: 40, type: 'Equipment', note: '+3% damage reduction' });
+defItem('firecape',      { name: 'Dragonfire Cape', icon: '🧣', color: '#e0453a', unique: true, value: 6000, slot: 'cape', armor: 9, dmg: 0.05, req: 60, type: 'Equipment', note: '+5% max hit' });
+defItem('dboots',        { name: 'Dragon Boots', icon: '🥾', color: '#c0302a', unique: true, value: 4000, slot: 'feet', armor: 7, req: 60, type: 'Equipment' });
+defItem('bogring',       { name: 'Ring of the Bog', icon: '💍', color: '#6a8a3a', unique: true, value: 1200, slot: 'ring', slay: 0.1, type: 'Equipment', note: '+10% damage and Slayer XP on task' });
+defItem('crystalgloves', { name: 'Crystal Gauntlets', icon: '🧤', color: '#9fe8f5', unique: true, value: 3000, slot: 'hands', armor: 6, acc: 0.03, req: 50, type: 'Equipment', note: '+3% accuracy' });
+defItem('abyssring',     { name: 'Ring of the Abyss', icon: '💍', color: '#b46bff', unique: true, value: 8000, slot: 'ring', dmg: 0.06, acc: 0.03, type: 'Equipment', note: '+6% max hit, +3% accuracy' });
 defItem('bread',   { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
 defItem('burnt',   { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
 defItem('bones',   { name: 'Bones', icon: '🦴', value: 3, bury: 5, pp: 1, type: 'Misc' });
@@ -478,6 +520,12 @@ const PETS = [
   { id: 'wolf',    name: 'Fang',        icon: '🐺', skill: 'slayer',      desc: '+5% Slayer XP', from: 'Slayer tasks' },
   { id: 'slimey',  name: 'Slimey',      icon: '🫧', gold: 5,  desc: '+5% gold', from: 'King Slime' },
   { id: 'drake',   name: 'Baby Dragon', icon: '🐉', dmg: 0.05, desc: '+5% max hit', from: 'the Dragon' },
+  { id: 'chieflet', name: 'Lil\' Chief', icon: '👺', acc: 0.03, desc: '+3% accuracy', from: 'the Goblin Chief' },
+  { id: 'skully',  name: 'Skully',      icon: '💀', dr: 0.03, desc: '+3% damage reduction', from: 'the Bone Lord' },
+  { id: 'frosty',  name: 'Frosty',      icon: '🐻‍❄️', gold: 5, desc: '+5% gold', from: 'the Frost Troll' },
+  { id: 'bogsy',   name: 'Bogsy',       icon: '🐸', dr: 0.03, desc: '+3% damage reduction', from: 'the Bog Mother' },
+  { id: 'shard',   name: 'Shard',       icon: '🔷', acc: 0.04, desc: '+4% accuracy', from: 'the Crystal Warden' },
+  { id: 'voidling', name: 'Voidling',   icon: '👾', dmg: 0.05, desc: '+5% max hit', from: 'the Abyssal Overlord' },
 ];
 const PET_CHANCE = 1 / 3000;   // per skill action
 
@@ -531,6 +579,9 @@ const ENEMIES = {
   bonelord: { name: 'Bone Lord',      type: 'magic',  hp: 1300, maxHit: 30, atk: 42, def: 40, speed: 2.6, gold: [400, 700], shape: 'humanoid', size: 1.4, color: '#efe9d6', body: '#6b5fa0', orb: '#7dffb0', boss: true, drops: [['bigbones', 1, 3, 5], ['ore_coal', 1, 6, 12], ['gem', .4, 1, 2]] },
   frosttroll: { name: 'Frost Troll',  type: 'melee',  hp: 3200, maxHit: 50, atk: 62, def: 62, speed: 3.0, gold: [900, 1500], shape: 'humanoid', size: 1.85, color: '#a8d8f0', body: '#3a5470', boss: true, drops: [['bigbones', 1, 3, 6], ['ore_mithril', 1, 6, 12], ['gem', .6, 1, 3]] },
   dragon:   { name: 'Dragon',         type: 'magic',  hp: 15000, maxHit: 110, atk: 95, def: 95, speed: 3.2, gold: [2000, 3500], shape: 'dragon', size: 1, color: '#9b2222', breath: true, boss: true, drops: [['dragonbones', 1, 1, 2], ['scale', 1, 1, 2], ['gem', 1, 1, 3]] },
+  bogmother: { name: 'Bog Mother',    type: 'melee',  hp: 1500, maxHit: 24, atk: 34, def: 32, speed: 2.6, gold: [250, 450], shape: 'blob',     size: 2.4, color: '#4f6f2f', boss: true, drops: [['bigbones', 1, 2, 3], ['essence', 1, 10, 20], ['gem', .25, 1, 1]] },
+  warden:   { name: 'Crystal Warden',  type: 'ranged', hp: 5000, maxHit: 50, atk: 66, def: 68, speed: 2.6, gold: [900, 1600], shape: 'humanoid', size: 1.8, color: '#c8f6ff', body: '#2f7f99', orb: '#9fe8ff', boss: true, drops: [['ore_runite', .6, 2, 4], ['gem', .5, 1, 2]] },
+  overlord: { name: 'Abyssal Overlord', type: 'melee', hp: 12000, maxHit: 72, atk: 88, def: 86, speed: 2.8, gold: [2500, 4000], shape: 'humanoid', size: 2.0, color: '#9a3a8a', body: '#1e0618', orb: '#c050ff', boss: true, drops: [['ore_runite', 1, 3, 6], ['gem', .8, 1, 2], ['bigbones', 1, 2, 4]] },
   // Slayer areas
   bog:      { name: 'Bog Horror',     type: 'melee',  hp: 300,  maxHit: 18, atk: 28, def: 26, speed: 2.4, gold: [15, 30],   shape: 'blob',     size: 1.4, color: '#5a7a3a', drops: [['bones', 1, 1, 2], ['essence', .5, 3, 6], ['gem', .03, 1, 1]] },
   wisp:     { name: "Will-o'-Wisp",   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 22, speed: 2.0, gold: [12, 26],   shape: 'flyer',    size: 1,   color: '#a8f0ff', orb: '#c8ffff', drops: [['essence', 1, 4, 8], ['rune', .4, 5, 10], ['gem', .04, 1, 1]] },
@@ -552,13 +603,30 @@ const ZONES = [
   { name: 'Dragon\'s Lair',  req: 70, tier: 4, boss: 'dragon', enemies: ['lizard', 'imp', 'drakeknight'],
     th: { sky: ['#2a0808', '#c2481e'], far: '#5a1a14', mid: '#3a1410', near: '#1c0806', ground: '#2b1a17', dirt: '#140b09', sun: '#ffb347', decor: 'spike', lava: true } },
   // Slayer areas: opened by Slayer level instead of bosses
-  { name: 'Haunted Swamp',   slayer: 10, tier: 1, enemies: ['bog', 'wisp'],
+  { name: 'Haunted Swamp',   slayer: 10, tier: 1, boss: 'bogmother', enemies: ['bog', 'wisp'],
     th: { sky: ['#2c3a2a', '#7d8f6a'], far: '#4a5a42', mid: '#34452e', near: '#1e2a1a', ground: '#3e4a2a', dirt: '#2a2a1a', sun: '#d8e0a0', decor: 'dead' } },
-  { name: 'Crystal Caverns', slayer: 35, tier: 3, enemies: ['golem', 'sentry'],
+  { name: 'Crystal Caverns', slayer: 35, tier: 3, boss: 'warden', enemies: ['golem', 'sentry'],
     th: { sky: ['#0d1a24', '#1f4a5a'], far: '#1c3a48', mid: '#24505e', near: '#10303c', ground: '#3a6a78', dirt: '#1a3038', sun: null, decor: 'crystal', cave: true } },
-  { name: 'Abyssal Rift',    slayer: 65, tier: 4, enemies: ['abyssal', 'shade'],
+  { name: 'Abyssal Rift',    slayer: 65, tier: 4, boss: 'overlord', enemies: ['abyssal', 'shade'],
     th: { sky: ['#0a0412', '#3a1050'], far: '#2a0c3a', mid: '#1e0a2c', near: '#12061c', ground: '#2a1638', dirt: '#140a1c', sun: '#c070ff', decor: 'spike' } },
 ];
+
+// boss mechanics: styles = attack styles it switches between, enrage = attacks faster below 30% HP
+Object.assign(ENEMIES.kingslime, { enrage: true });
+Object.assign(ENEMIES.gobchief, { styles: ['melee', 'ranged'] });
+Object.assign(ENEMIES.bonelord, { styles: ['magic', 'ranged'] });
+Object.assign(ENEMIES.frosttroll, { enrage: true });
+Object.assign(ENEMIES.dragon, { styles: ['magic', 'melee'], enrage: true });
+Object.assign(ENEMIES.bogmother, { styles: ['melee', 'magic'] });
+Object.assign(ENEMIES.warden, { styles: ['ranged', 'magic'], enrage: true });
+Object.assign(ENEMIES.overlord, { styles: ['melee', 'magic', 'ranged'], enrage: true });
+// unique drops: [item, chance, min, max]
+const BOSS_UNIQUES = {
+  kingslime: [['slimegloves', 1 / 8]], gobchief: [['gobboots', 1 / 10]], bonelord: [['bonering', 1 / 14]], frosttroll: [['frostcape', 1 / 14]],
+  dragon: [['firecape', 1 / 10], ['dboots', 1 / 16]], bogmother: [['bogring', 1 / 12]],
+  warden: [['crystalgloves', 1 / 12], ['cbow', 1 / 50]], overlord: [['abyssring', 1 / 16], ['whip', 1 / 30], ['sstaff', 1 / 40]],
+};
+for (const [id, list] of Object.entries(BOSS_UNIQUES)) for (const [it, ch] of list) ENEMIES[id].drops.push([it, ch, 1, 1]);
 
 // a riverside hub with every crafting station and no monsters
 ZONES.push({ name: 'Riverbend', town: true, tier: 0, enemies: [],
@@ -595,6 +663,9 @@ const SHOP = [
   { id: 'arrow0', n: 50, cost: 60 },
   { id: 'rune', n: 50, cost: 75 },
   { id: 'essence', n: 50, cost: 60 },
+  { id: 'gloves0', n: 1, cost: 40 },
+  { id: 'boots0', n: 1, cost: 40 },
+  { id: 'cape0', n: 1, cost: 60 },
 ];
 const SLAYER_SHOP = [
   { id: 'amu_slayer', cost: 150 },
@@ -612,22 +683,31 @@ const QUESTS = [
   { id: 'q4',  name: "A Fisherman's Tale", desc: 'Catch and cook a proper meal.', obj: [{ t: 'gather', skill: 'fishing', n: 40 }, { t: 'cook', n: 20 }], rew: { xp: { fishing: 300 }, items: { cooked1: 15 } } },
   { id: 'q5',  name: "The Archer's Path", req: 'q2', desc: 'Fletch your first arrows and bow.', obj: [{ t: 'fletch', n: 5 }], rew: { xp: { ranged: 300 }, items: { arrow0: 150 } } },
   { id: 'q6',  name: 'Runes of Power', req: 'q2', desc: 'Mine Rune Essence and bind it into runes.', obj: [{ t: 'gather', skill: 'essence', n: 20 }, { t: 'rc', n: 5 }], rew: { xp: { magic: 300 }, items: { rune: 150, staff0: 1 } } },
-  { id: 'q7',  name: 'Slime Monarchy', req: 'q1', desc: 'Dethrone the King Slime.', obj: [{ t: 'boss', z: 0 }], rew: { gold: 300, items: { amu_acc: 1 } } },
-  { id: 'q8',  name: 'Goblin Trouble', req: 'q7', desc: 'Clear the archers out of the Dark Forest.', obj: [{ t: 'kill', id: 'gobarcher', n: 20 }, { t: 'boss', z: 1 }], rew: { gold: 800, items: { amu_def: 1 } } },
+  { id: 'q7',  name: 'Slime Monarchy', req: 'q1', desc: 'A giant slime rules the meadow from a hidden hollow. Thin out its court, then lure it out with a peace offering.', obj: [{ t: 'kill', id: 'slime', n: 25 }, { t: 'kill', id: 'rat', n: 10 }, { t: 'bring', id: 'bread', n: 10 }], rew: { gold: 300, items: { amu_acc: 1 }, boss: 'kingslime' } },
+  { id: 'q8',  name: 'Goblin Trouble', req: 'q7', desc: 'The goblins only let traders into the chief\'s camp. Scare off the archers and bring bronze to trade.', obj: [{ t: 'kill', id: 'gobarcher', n: 20 }, { t: 'bring', id: 'bar0', n: 5 }], rew: { gold: 800, items: { amu_def: 1 }, boss: 'gobchief' } },
   { id: 'q9',  name: 'Bones of the Earth', req: 'q8', desc: 'Lay the fallen to rest.', obj: [{ t: 'bury', n: 100 }], rew: { xp: { prayer: 1500 } } },
   { id: 'q10', name: 'The Hunter', req: 'q8', desc: 'Complete Slayer tasks for the Slayer master.', obj: [{ t: 'tasks', n: 3 }], rew: { scoins: 200, xp: { slayer: 1000 } } },
-  { id: 'q11', name: 'Into the Dark', req: 'q8', desc: 'Silence the Bone Lord in the Shadow Caves.', obj: [{ t: 'kill', id: 'cultist', n: 25 }, { t: 'boss', z: 2 }], rew: { gold: 3000, items: { gem: 3 } } },
-  { id: 'q12', name: 'Frozen Peaks', req: 'q11', desc: 'Break the Frost Troll\'s hold on the mountains.', obj: [{ t: 'kill', id: 'icemage', n: 30 }, { t: 'boss', z: 3 }], rew: { gold: 10000, items: { scale: 1 } } },
+  { id: 'q11', name: 'Into the Dark', req: 'q8', desc: 'The cultists guard the way to the Bone Lord\'s crypt. Break the cult and bring bones and runes for the seal.', obj: [{ t: 'kill', id: 'cultist', n: 25 }, { t: 'bring', id: 'bones', n: 20 }, { t: 'bring', id: 'rune', n: 50 }], rew: { gold: 3000, items: { gem: 3 }, boss: 'bonelord' } },
+  { id: 'q12', name: 'Frozen Peaks', req: 'q11', desc: 'The Frost Troll lives on a peak only climbers reach. Defeat the ice mages and bring steel spikes and food for the climb.', obj: [{ t: 'kill', id: 'icemage', n: 30 }, { t: 'bring', id: 'bar2', n: 10 }, { t: 'bring', id: 'cooked2', n: 10 }], rew: { gold: 10000, items: { scale: 1 }, boss: 'frosttroll' } },
   { id: 'q13', name: 'Master of Arms', req: 'q11', desc: 'Train every combat style.', obj: [{ t: 'level', skill: 'strength', n: 50 }, { t: 'level', skill: 'ranged', n: 50 }, { t: 'level', skill: 'magic', n: 50 }], rew: { gold: 20000, xp: { hitpoints: 5000 } } },
   { id: 'q15', name: 'Light Fingers', req: 'q1', desc: 'The Riverbend fence wants proof you can lift a purse.', obj: [{ t: 'steal', n: 40 }], rew: { gold: 400, xp: { thieving: 400 } } },
   { id: 'q16', name: 'Keep the Fires Burning', req: 'q1', desc: 'The road gets cold at night.', obj: [{ t: 'burn', n: 50 }], rew: { xp: { firemaking: 600 }, items: { log1: 30 } } },
-  { id: 'q14', name: 'Dragonslayer', req: 'q12', desc: 'End the Dragon at the end of the road.', obj: [{ t: 'boss', z: 4 }], rew: { gold: 50000, items: { dragonbones: 10 } } },
+  { id: 'q14', name: 'Dragonslayer', req: 'q12', desc: 'The Dragon sleeps on an island past the lava. Beat its knights, then bring planks and adamant for a boat that can survive the crossing.', obj: [{ t: 'kill', id: 'drakeknight', n: 20 }, { t: 'bring', id: 'log3', n: 30 }, { t: 'bring', id: 'bar4', n: 10 }], rew: { gold: 50000, items: { dragonbones: 10 }, boss: 'dragon' } },
+  { id: 'q17', name: 'Mother of the Bog', req: 'q10', desc: 'Something huge stirs under the Haunted Swamp. Hunt its brood and bring essence to draw it up.', obj: [{ t: 'kill', id: 'bog', n: 30 }, { t: 'bring', id: 'essence', n: 40 }], rew: { gold: 2000, scoins: 100, boss: 'bogmother' } },
+  { id: 'q18', name: 'Heart of Crystal', req: 'q17', desc: 'The Crystal Warden guards the heart of the caverns. Shatter its servants and bring gems to open the vault.', obj: [{ t: 'kill', id: 'golem', n: 25 }, { t: 'kill', id: 'sentry', n: 25 }, { t: 'bring', id: 'gem', n: 3 }], rew: { gold: 15000, scoins: 300, boss: 'warden' } },
+  { id: 'q19', name: 'Into the Abyss', req: 'q18', desc: 'The Abyssal Overlord rules the rift. Cut a path through its demons and bring runes to hold the portal open.', obj: [{ t: 'kill', id: 'abyssal', n: 40 }, { t: 'kill', id: 'shade', n: 30 }, { t: 'bring', id: 'rune', n: 300 }], rew: { gold: 40000, scoins: 600, boss: 'overlord' } },
 ];
+
+// every boss lives in its own lair, opened by a quest as in OSRS; fight it as often as you like
+const BOSS_PETS = { kingslime: ['slimey', 1 / 30], gobchief: ['chieflet', 1 / 40], bonelord: ['skully', 1 / 50], frosttroll: ['frosty', 1 / 50],
+  dragon: ['drake', 1 / 40], bogmother: ['bogsy', 1 / 40], warden: ['shard', 1 / 50], overlord: ['voidling', 1 / 60] };
+const BOSSES = ZONES.map((z, i) => z.boss && { id: z.boss, zone: i, quest: QUESTS.find(q => q.rew.boss === z.boss).id }).filter(Boolean);
+const QUEST_V = 2;   // entry quests replaced the old 'defeat the boss' quests
 
 /* ================= STATE ================= */
 
 const SAVE_KEY = 'begalinis-kelias-v1';
-const BOSS_ACH = ['Slime Royalty', 'Chief Toppler', 'Bone Breaker', 'Frostbite', 'Dragonslayer'];
+const BOSS_ACH = ['Slime Royalty', 'Chief Toppler', 'Bone Breaker', 'Frostbite', 'Dragonslayer', 'Bog Drainer', 'Crystal Shatterer', 'Abyss Walker'];
 const SKILL_ACH = { attack: 'Duelist', strength: 'Brute', defence: 'Bulwark', hitpoints: 'Iron Body', ranged: 'Marksman',
   magic: 'Archmage', prayer: 'Devout', slayer: 'Hunter', woodcutting: 'Lumberjack', mining: 'Prospector', fishing: 'Angler',
   smithing: 'Blacksmith', cooking: 'Chef', fletching: 'Fletcher', runecrafting: 'Runesmith', thieving: 'Pickpocket', firemaking: 'Pyromancer' };
@@ -637,7 +717,7 @@ const ACH = [
   { id: 'kill100', name: 'Monster Hunter', desc: 'Defeat 100 enemies', bonus: ['gold', 2], test: () => S.kills >= 100 },
   { id: 'kill1k', name: 'Monster Slayer', desc: 'Defeat 1,000 enemies', bonus: ['gold', 3], test: () => S.kills >= 1000 },
   { id: 'kill10k', name: 'Legend of the Road', desc: 'Defeat 10,000 enemies', bonus: ['gold', 5], test: () => S.kills >= 10000 },
-  ...BOSS_ACH.map((name, i) => ({ id: 'boss' + i, name, desc: () => `Defeat ${ENEMIES[ZONES[i].boss].name}`, bonus: ['xp', i === 4 ? 5 : 2], test: () => S.bosses[i] })),
+  ...BOSSES.map((b, i) => ({ id: 'boss' + i, name: BOSS_ACH[i], desc: () => `Defeat ${ENEMIES[b.id].name}`, bonus: ['xp', b.id === 'dragon' || b.id === 'overlord' ? 5 : 2], test: () => bossBeaten(b) })),
   { id: 'dist1k', name: 'Wanderer', desc: 'Walk 1,000 m', bonus: ['gather', 2], test: () => S.dist >= 1000 },
   { id: 'dist10k', name: 'Pilgrim', desc: 'Walk 10,000 m', bonus: ['gather', 3], test: () => S.dist >= 10000 },
   { id: 'dist100k', name: 'The Endless Road', desc: 'Walk 100,000 m', bonus: ['gather', 5], test: () => S.dist >= 100000 },
@@ -684,14 +764,14 @@ let uiDirty = true;
 function newState() {
   return {
     v: 1, gold: 25, skills: Object.fromEntries(Object.keys(SKILLS).map(k => [k, 0])),
-    inv: { bread: 5 }, equip: { weapon: null, shield: null, helm: null, body: null, legs: null, amulet: null }, tools: { axe: 0, pick: 0, rod: 0 },
+    inv: { bread: 5 }, equip: { weapon: null, shield: null, helm: null, body: null, legs: null, amulet: null, cape: null, hands: null, feet: null, ring: null }, tools: { axe: 0, pick: 0, rod: 0 },
     activity: 'combat', zone: 0, hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
     styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: -1, prayer: null, pp: 0, autoBury: true,
     zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0 }, cookSel: -1, tipEvent: false,
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
-    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {},
+    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {},
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -728,20 +808,26 @@ function migrateMetals(data) {
 function applySave(data) {
   const base = newState();
   if (data && data.v === 1) {
+    const def = newState();   // base's nested objects are replaced by the save's, so merge defaults from a fresh copy
     S = Object.assign(base, data);
-    S.skills = Object.assign(base.skills, data.skills);
+    S.skills = Object.assign(def.skills, data.skills);
     // older saves had no Strength: start it where Attack was so combat level doesn't drop
     if (data.skills && data.skills.strength === undefined) S.skills.strength = data.skills.attack || 0;
     S.tools = Object.assign({ axe: 0, pick: 0, rod: 0 }, data.tools);
-    S.equip = Object.assign(base.equip, data.equip);
+    S.equip = Object.assign(def.equip, data.equip);
     if (!data.smithV) migrateMetals(data);
-    S.stats = Object.assign(base.stats, data.stats);
+    S.stats = Object.assign(def.stats, data.stats);
     S.stats.g = Object.assign({}, data.stats && data.stats.g);
-    S.rup = Object.assign(base.rup, data.rup);
-    S.gsel = Object.assign(base.gsel, data.gsel);
-    S.styles = Object.assign(base.styles, data.styles);
+    S.rup = Object.assign(def.rup, data.rup);
+    S.gsel = Object.assign(def.gsel, data.gsel);
+    S.styles = Object.assign(def.styles, data.styles);
     if (!data.styles && data.style) S.styles.melee = data.style === 'defence' ? 'defence' : 'attack';
-    S.csel = Object.assign(base.csel, data.csel);
+    S.csel = Object.assign(def.csel, data.csel);
+    if (data.qv !== QUEST_V) {
+      for (const q of QUESTS) if (S.quests[q.id] && S.quests[q.id].s === 'active') S.quests[q.id].base = q.obj.map(objVal);
+      S.qv = QUEST_V;
+    }
+    S.clog = Object.assign({}, data.clog);
     if (!data.csel && data.smithSel !== undefined) S.csel.smithing = data.smithSel;
   } else S = base;
   recalcLevels(); recalcBonuses();
@@ -835,7 +921,9 @@ function attackMode() {
 }
 function combatType() { const m = attackMode(); return m === 'unarmed' ? 'melee' : m; }
 function styleOf() { return S.styles[combatType()]; }
-function amu(k) { return S.equip.amulet ? (ITEMS[S.equip.amulet][k] || 0) : 0; }
+// bonuses from worn items: amulet, ring, cape and gloves can carry acc / dmg / dr / slay
+function amu(k) { let v = 0; for (const sl in S.equip) if (S.equip[sl]) v += ITEMS[S.equip[sl]][k] || 0; return v; }
+function petB(k) { return PETS.reduce((a, p) => a + (S.pets[p.id] && p[k] || 0), 0); }
 function activePrayer() { return S.prayer ? PRAYERS.find(p => p.id === S.prayer) : null; }
 function pray(k) { const p = activePrayer(); return (p && p[k]) || 0; }
 function weaponPower() { return S.equip.weapon && attackMode() !== 'unarmed' ? ITEMS[S.equip.weapon].power : 0; }
@@ -845,7 +933,7 @@ function playerMaxHit() {
   const base = m === 'ranged' ? 4 + LV.ranged * 0.7 + p * 0.8 + ITEMS[bestArrow()].power
     : m === 'magic' ? curSpell().max + LV.magic * 0.35 + p
     : 4 + LV.strength * 0.7 + p;
-  return Math.floor(base * (1 + amu('dmg') + pray('dmg') + (S.pets.drake ? 0.05 : 0)));
+  return Math.floor(base * (1 + amu('dmg') + pray('dmg') + petB('dmg')));
 }
 function accuracyLevel() {
   const m = attackMode();
@@ -857,11 +945,13 @@ function playerSpeed() {
   return m === 'ranged' ? (S.styles.ranged === 'rapid' ? 1.3 : 1.6) : m === 'magic' ? 2.2 : m === 'melee' && w && w.speed ? w.speed : 1.8;
 }
 // +1: the hero's style beats the enemy's, -1: the enemy's beats the hero's
-function triangle(e) { const p = combatType(); return BEATS[p] === e.d.type ? 1 : BEATS[e.d.type] === p ? -1 : 0; }
+// bosses switch attack styles mid-fight, so use the style of the current attack
+function etype(e) { return e.style || e.d.type; }
+function triangle(e) { const p = combatType(), t = etype(e); return BEATS[p] === t ? 1 : BEATS[t] === p ? -1 : 0; }
 function onTask(e) { return !!(S.task && e.id === S.task.id); }
-function playerHitChance(e) { return clamp(0.6 + (accuracyLevel() - e.def) * 0.03 + amu('acc') + pray('acc'), 0.1, 0.97); }
+function playerHitChance(e) { return clamp(0.6 + (accuracyLevel() - e.def) * 0.03 + amu('acc') + pray('acc') + petB('acc'), 0.1, 0.97); }
 function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue()) * 0.02, 0.15, 0.95); }
-function damageReduction() { return Math.min(0.6, armorValue() * 0.012 + LV.defence * 0.002 + amu('dr') + pray('dr')); }
+function damageReduction() { return Math.min(0.6, armorValue() * 0.012 + LV.defence * 0.002 + amu('dr') + pray('dr') + petB('dr')); }
 
 function tierReq(skill, t) { return skill === 'mining' ? ORES[t].lvl : GATHER_REQ[t]; }
 function tierXp(skill, t) { return skill === 'mining' ? ORES[t].xp : GATHER_XP[t]; }
@@ -896,7 +986,7 @@ function recalcBonuses() {
   for (const a of ACH) if (S.ach[a.id]) BON[a.bonus[0]] += a.bonus[1];
 }
 function xpMult() { return 1 + BON.xp / 100 + 0.15 * S.rup.wisdom; }
-function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune + (S.pets.slimey ? 0.05 : 0); }
+function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune + petB('gold') / 100; }
 function petFor(skill) { return PETS.some(p => p.skill === skill && S.pets[p.id]); }
 function rollPet(id, chance) {
   if (S.pets[id] || Math.random() >= chance) return;
@@ -962,12 +1052,12 @@ function spawnEntity() {
     const auto = S.autoSlayer && S.task && zoneOpen(S.task.zone);
     if (auto && S.zone !== S.task.zone) S.zone = S.task.zone;
     const z = ZONES[S.zone];
-    const id = z.boss && S.zk[S.zone] >= BOSS_EVERY ? z.boss
-      : auto ? S.task.id : S.ctarget && z.enemies.includes(S.ctarget) ? S.ctarget : z.enemies[Math.floor(Math.random() * z.enemies.length)];
+    const lair = S.ctarget && S.ctarget === z.boss && bossOpen(bossOf(z.boss));
+    const id = auto ? S.task.id : lair || (S.ctarget && z.enemies.includes(S.ctarget)) ? S.ctarget : z.enemies[Math.floor(Math.random() * z.enemies.length)];
     const d = ENEMIES[id];
     // archers and mages keep their distance
     const stop = (d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0);
-    R.ent = { kind: 'enemy', id, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0, pend: 0 };
+    R.ent = { kind: 'enemy', id, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0, pend: 0, style: d.styles ? d.styles[0] : d.type, swap: randi(3, 5) };
   } else if (act === 'thieving') {
     const list = (ZONES[S.zone].npcs || []).filter(id => LV.thieving >= NPCS[id].lvl);
     const id = S.tsel && list.includes(S.tsel) ? S.tsel : list[Math.floor(Math.random() * list.length)] || 'man';
@@ -1098,13 +1188,14 @@ function combatTick(dt) {
   if (R.pendingHit > 0) { R.pendingHit -= dt; if (R.pendingHit <= 0) playerHit(e, R.shot); }
   if (e.hp <= 0) { killEnemy(e); return; }
   if (e.atkT <= 0) {
-    e.atkT += e.d.speed;
+    bossMechanics(e);
+    e.atkT += e.d.speed * (e.enraged ? 0.7 : 1);
     e.lunge = 1;
-    const ranged = e.d.type !== 'melee' && !e.d.breath;
+    const ranged = etype(e) !== 'melee' && !(e.d.breath && etype(e) === 'magic');
     e.pend = ranged ? 0.3 : 0.1;
     if (ranged) {
       const ex = entScreenX(e), ey = GY - entHeight(e) * 0.6;
-      shoot(ex - 10, ey, HX + 6, GY - 44, e.d.type === 'ranged' ? 'arrow' : 'orb', e.d.orb || '#c58bff', e.pend);
+      shoot(ex - 10, ey, HX + 6, GY - 44, etype(e) === 'ranged' ? 'arrow' : 'orb', e.d.orb || '#c58bff', e.pend);
     }
   }
   if (e.pend > 0) { e.pend -= dt; if (e.pend <= 0) enemyHit(e); }
@@ -1112,11 +1203,31 @@ function combatTick(dt) {
   if (S.hp <= 0) die();
 }
 
+function bossMechanics(e) {
+  const d = e.d;
+  if (d.styles && --e.swap <= 0) {
+    e.style = d.styles[(d.styles.indexOf(e.style) + 1) % d.styles.length];
+    e.swap = randi(3, 5);
+    floatText(entScreenX(e), GY - entHeight(e) - 40, `${TYPE_ICON[e.style]} ${TYPE_NAME[e.style]}!`, '#ffe27a', 1.3, 1.1);
+  }
+  if (d.enrage && !e.enraged && e.hp < e.maxHp * 0.3) {
+    e.enraged = true;
+    floatText(entScreenX(e), GY - entHeight(e) - 60, '😡 Enraged!', '#ff7a5a', 1.6, 1.2);
+    log(`😡 ${d.name} is enraged and attacks faster!`, 'lg-bad');
+  }
+  // the hero swaps to the matching protection prayer when it knows it, like flicking prayers in OSRS
+  const p = activePrayer();
+  if (p && p.protect && p.protect !== etype(e)) {
+    const want = PRAYERS.find(x => x.protect === etype(e));
+    if (want && LV.prayer >= want.lvl) S.prayer = want.id;
+  }
+}
+
 function enemyHit(e) {
   if (Math.random() >= enemyHitChance(e)) { hitsplat(HX, GY - 42, 0, 'miss', true); return; }
   const tri = triangle(e);
   const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
-  const mult = (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === e.d.type ? 0.5 : 1);
+  const mult = (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === etype(e) ? 0.5 : 1);
   const dmg = Math.max(1, Math.round(raw * mult));
   S.hp -= dmg;
   addXp('defence', dmg * 0.5);
@@ -1179,9 +1290,9 @@ function die() {
   S.gold -= lost; S.deaths++; R.deathStreak++;
   S.hp = 0; R.phase = 'dead'; R.deadT = 20;
   if (R.ent.d.boss) {
-    // let the player farm the zone again before the boss comes back
-    S.zk[S.zone] = Math.floor(BOSS_EVERY / 2);
-    log(`👑 ${R.ent.d.name} will return after ${BOSS_EVERY - S.zk[S.zone]} more kills.`, 'lg-bad');
+    // leave the lair after a death so an idle hero doesn't keep dying to it
+    S.ctarget = null;
+    log(`👑 You escape ${R.ent.d.name}'s lair. Gear up and try again from the map.`, 'lg-bad');
   }
   log(`💀 You were defeated by ${R.ent.d.name} and dropped ${fmt(lost)} gold. Recovering...`, 'lg-bad');
   uiDirty = true;
@@ -1198,7 +1309,7 @@ function killEnemy(e) {
     const n = randi(mn, mx);
     if (ITEMS[id].bury && S.autoBury) bury(id, n, true); else give(id, n);
     got.push(`${n}× ${ITEMS[id].name}`);
-    if (ITEMS[id].unique) S.stats.uniques++;
+    if (ITEMS[id].unique) { S.stats.uniques++; S.clog[id] = (S.clog[id] || 0) + n; }
     if (ITEMS[id].value >= 150) { log(`✨ Rare drop: ${ITEMS[id].icon} ${ITEMS[id].name}!`, 'lg-xp'); showBanner(`✨ Rare drop: ${ITEMS[id].name}!`); }
   }
   log(`⚔️ Defeated ${e.d.name} (${got.join(', ')})`, 'lg-gold');
@@ -1209,18 +1320,16 @@ function killEnemy(e) {
   if (!SIM) { R.shake = Math.max(R.shake, e.d.boss ? 12 : 4); R.freeze = e.d.boss ? 0.2 : 0.08; }
   if (onTask(e)) slayerKill(e);
   const z = S.zone;
-  if (e.id === 'kingslime') rollPet('slimey', 1 / 30);
-  if (e.id === 'dragon') rollPet('drake', 1 / 40);
+  if (BOSS_PETS[e.id]) rollPet(...BOSS_PETS[e.id]);
   if (e.d.boss) {
-    S.zk[z] = 0;
-    if (!S.bosses[z]) {
+    if (z < MAIN_ZONES && !S.bosses[z]) {
       S.bosses[z] = true;
       const nxt = z + 1 < MAIN_ZONES ? ZONES[z + 1] : null;
       log(`👑 ${e.d.name} defeated for the first time!` + (nxt ? ` ${nxt.name} opens at combat level ${nxt.req}.` : ''), 'lg-xp');
       showBanner(nxt ? `👑 ${nxt.name} unlocked!` : '🏆 The Dragon is slain!');
       if (!nxt && !SIM) victory();
-    } else showBanner(`👑 ${e.d.name} defeated!`);
-  } else if (ZONES[z].boss) S.zk[z] = Math.min(BOSS_EVERY, S.zk[z] + 1);
+    } else showBanner(`👑 ${e.d.name} defeated! (kill count ${fmt(S.kc[e.id])})`);
+  }
   R.phase = 'done'; R.doneT = 0.6; e.dying = true;
   uiDirty = true;
 }
@@ -1393,7 +1502,7 @@ function craftTick(dt) {
 function victory() {
   openModal(`<h2>🏆 Victory!</h2><p>You slew the Dragon at the end of the Endless Road.</p>
     <ul><li>Distance travelled: ${fmt(S.dist)} m</li><li>Enemies defeated: ${fmt(S.kills)}</li><li>Deaths: ${S.deaths}</li></ul>
-    <p class="muted">The road goes on – train every skill to 99. The Dragon returns every ${BOSS_EVERY} kills.</p>
+    <p class="muted">The road goes on – train every skill to 99. You can return to the Dragon's lair any time for its uniques.</p>
     <button data-a="close">Keep playing</button>`);
 }
 
@@ -1435,7 +1544,7 @@ function isUpgrade(id) {
   if (!canEquip(id)) return false;
   if (it.twoHanded && S.equip.shield) return false;
   if (it.slot === 'shield' && S.equip.weapon && ITEMS[S.equip.weapon].twoHanded) return false;
-  if (!cur) return it.slot !== 'amulet' && (it.slot !== 'weapon' || it.wtype === 'melee');
+  if (!cur) return it.slot !== 'amulet' && it.slot !== 'ring' && (it.slot !== 'weapon' || it.wtype === 'melee');
   const c = ITEMS[cur];
   if (it.slot === 'weapon') return c.wtype === it.wtype && weaponDps(c) < weaponDps(it);
   if (ARMOUR_SLOTS.includes(it.slot)) return c.armor < it.armor;
@@ -1529,10 +1638,11 @@ function objVal(o) {
     case 'burn': return S.stats.burned;
     case 'boss': return S.bosses[o.z] ? 1 : 0;
     case 'level': return LV[o.skill];
+    case 'bring': return has(o.id);
   }
   return 0;
 }
-const ABSOLUTE_OBJ = new Set(['boss', 'level']);
+const ABSOLUTE_OBJ = new Set(['boss', 'level', 'bring']);
 function objNeed(o) { return o.t === 'boss' ? 1 : o.n; }
 function objProgress(q, k) {
   const o = q.obj[k], v = objVal(o);
@@ -1552,8 +1662,13 @@ function objText(o) {
     case 'burn': return 'Burn logs';
     case 'boss': return `Defeat ${ENEMIES[ZONES[o.z].boss].name}`;
     case 'level': return `Reach ${SKILLS[o.skill].name} level`;
+    case 'bring': return `Bring ${ITEMS[o.id].icon} ${ITEMS[o.id].name}`;
   }
 }
+function bossOf(id) { return BOSSES.find(b => b.id === id); }
+function bossBeaten(b) { return (S.kc[b.id] || 0) > 0 || (b.zone < MAIN_ZONES && S.bosses[b.zone]); }
+// old saves that already beat a boss keep its lair
+function bossOpen(b) { return questState(QUESTS.find(q => q.id === b.quest)) === 'done' || bossBeaten(b); }
 function questState(q) { return S.quests[q.id] ? S.quests[q.id].s : (!q.req || (S.quests[q.req] && S.quests[q.req].s === 'done')) ? 'open' : 'locked'; }
 function questReady(q) { return questState(q) === 'active' && q.obj.every((o, k) => objProgress(q, k) >= objNeed(o)); }
 function questsDone() { return QUESTS.filter(q => questState(q) === 'done').length; }
@@ -1566,6 +1681,7 @@ function startQuest(id) {
 function claimQuest(id) {
   const q = QUESTS.find(x => x.id === id);
   if (!q || !questReady(q)) return;
+  for (const o of q.obj) if (o.t === 'bring') take(o.id, o.n);   // quest items are handed over
   S.quests[id] = { s: 'done' };
   const w = q.rew;
   if (w.gold) S.gold += w.gold;
@@ -1574,6 +1690,7 @@ function claimQuest(id) {
   for (const [sk, xp] of Object.entries(w.xp || {})) addXp(sk, xp);
   log(`📜 Quest complete: ${q.name}! ${rewardText(w)}`, 'lg-gold');
   showBanner(`📜 Quest complete: ${q.name}`); sfx('chest');
+  if (w.boss) log(`👑 ${ENEMIES[w.boss].name}'s lair is open! Find it on the map in ${ZONES[bossOf(w.boss).zone].name}.`, 'lg-xp');
 }
 function rewardText(w) {
   const parts = [];
@@ -1581,6 +1698,7 @@ function rewardText(w) {
   if (w.scoins) parts.push(`${w.scoins} Slayer coins`);
   for (const [it, n] of Object.entries(w.items || {})) parts.push(`${n}× ${ITEMS[it].name}`);
   for (const [sk, xp] of Object.entries(w.xp || {})) parts.push(`${fmt(xp)} ${SKILLS[sk].name} XP`);
+  if (w.boss) parts.push(`👑 access to ${ENEMIES[w.boss].name}'s lair`);
   return parts.join(', ');
 }
 
@@ -2410,9 +2528,10 @@ function drawHud() {
     rr(10, py, ctx.measureText(t).width + 16, ph, 6, 'rgba(30,80,120,0.75)');
     ctx.fillStyle = '#d8efff'; ctx.fillText(t, 18, py + ph / 2);
   }
-  if (S.activity === 'combat' && (z.boss || S.task)) {
-    const ready = z.boss && S.zk[S.zone] >= BOSS_EVERY;
-    const t = z.boss ? (ready ? '👑 Boss incoming!' : `👑 ${S.zk[S.zone]} / ${BOSS_EVERY}`) : `💀 ${S.task.left} left`;
+  const lair = S.ctarget && ENEMIES[S.ctarget] && ENEMIES[S.ctarget].boss ? S.ctarget : null;
+  if (S.activity === 'combat' && (lair || S.task)) {
+    const ready = !!lair;
+    const t = lair ? `👑 KC ${fmt(S.kc[lair] || 0)}` : `💀 ${S.task.left} left`;
     font(600, 13);
     const bw = ctx.measureText(t).width + 20;
     rr(W - 10 - bw, 10, bw, lh, 6, ready ? 'rgba(150,100,0,0.8)' : 'rgba(0,0,0,0.45)');
@@ -2435,7 +2554,7 @@ function drawHud() {
     if (e.kind === 'enemy') {
       const top = Math.max(GY - entHeight(e) - 24, 34 * FS + 26);
       const tri = triangle(e);
-      const name = (e.d.boss ? '👑 ' : '') + TYPE_ICON[e.d.type] + ' ' + e.d.name + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
+      const name = (e.d.boss ? '👑 ' : '') + TYPE_ICON[etype(e)] + ' ' + e.d.name + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
       // name colour shows the combat triangle: green = your style is strong here, red = weak
       font(e.d.boss ? 700 : 600, e.d.boss ? 14 : 12); ctx.textAlign = 'center';
       ctx.fillStyle = tri > 0 ? '#9dffa0' : tri < 0 ? '#ffaaa0' : e.d.boss ? '#ffe27a' : '#fff';
@@ -2779,11 +2898,12 @@ const G3 = (() => {
   // a box-limbed OSRS style person facing +x; o: body, leg, skin, hair, helm, shield, ribs, hat
   function person(o) {
     const g = new T.Group(), P = {};
-    const leg = c => { const p = new T.Group(); p.add(box(0.17, 0.62, 0.17, c, 0, -0.31, 0)); p.add(box(0.22, 0.08, 0.19, shadeC(c, -0.25), 0.03, -0.6, 0)); return p; };
+    const leg = c => { const p = new T.Group(); p.add(box(0.17, 0.62, 0.17, c, 0, -0.31, 0)); p.add(box(0.22, 0.08, 0.19, o.boots || shadeC(c, -0.25), 0.03, -0.6, 0)); return p; };
     P.legB = at(leg(shadeC(o.leg, -0.12)), 0, 0.62, -0.11); P.legF = at(leg(o.leg), 0, 0.62, 0.11);
     const torso = box(0.32, 0.64, 0.5, o.body, 0, 0.93, 0);
     const belt = box(0.34, 0.08, 0.52, shadeC(o.body, -0.35), 0, 0.64, 0);
     g.add(P.legB, P.legF, torso, belt);
+    if (o.cape) { const c = box(0.05, 0.9, 0.46, o.cape, -0.19, 0.76, 0); c.rotation.z = -0.06; g.add(c); }
     if (o.ribs) for (let k = 0; k < 3; k++) g.add(box(0.02, 0.05, 0.38, '#7a7466', 0.17, 0.82 + k * 0.13, 0));
     const head = new T.Group(); head.position.y = 1.46;
     head.add(box(0.36, 0.38, 0.36, o.skin, 0, 0, 0));
@@ -2794,7 +2914,7 @@ const G3 = (() => {
     } else if (o.hair) head.add(box(0.4, 0.12, 0.4, o.hair, -0.02, 0.2, 0), box(0.1, 0.25, 0.4, o.hair, -0.17, 0.06, 0));
     if (o.hat) o.hat(head);
     g.add(head); P.head = head;
-    const arm = (c, z) => { const p = new T.Group(); p.position.set(0, 1.18, z); p.add(box(0.14, 0.48, 0.14, c, 0, -0.24, 0)); p.add(box(0.13, 0.12, 0.13, o.skin, 0, -0.53, 0)); return p; };
+    const arm = (c, z) => { const p = new T.Group(); p.position.set(0, 1.18, z); p.add(box(0.14, 0.48, 0.14, c, 0, -0.24, 0)); p.add(box(0.13, 0.12, 0.13, o.gloves || o.skin, 0, -0.53, 0)); return p; };
     P.armB = arm(shadeC(o.body, -0.15), -0.32); P.armF = arm(shadeC(o.body, 0.06), 0.32);
     if (o.shield) { const sh = box(0.08, 0.52, 0.42, o.shield, 0.12, -0.42, -0.08); sh.rotation.y = 0.1; P.armB.add(sh); }
     g.add(P.armB, P.armF);
@@ -2852,7 +2972,8 @@ const G3 = (() => {
   function syncHero() {
     const gear = sl => S.equip[sl] ? ITEMS[S.equip[sl]] : null;
     const body = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield');
-    const key = [S.activity, S.equip.weapon, body && body.color, helm && helm.id, legs && legs.color, shield && S.activity === 'combat' && shield.color,
+    const cape = gear('cape'), hands = gear('hands'), feet = gear('feet');
+    const key = [S.activity, S.equip.weapon, body && body.color, helm && helm.id, legs && legs.color, shield && S.activity === 'combat' && shield.color, S.equip.cape, S.equip.hands, S.equip.feet,
       wtype(), (curSpell() || {}).color, S.tools.axe, S.tools.pick].join('|');
     if (key !== heroKey) {
       heroKey = key;
@@ -2861,6 +2982,7 @@ const G3 = (() => {
         body: body ? body.color || '#9aa0a8' : '#3f6fb5', leg: legs ? shade(legs.color, -0.08) : '#3b3550', skin: '#f1c27d', hair: '#6b3e1f',
         helm: helm && shade(helm.color, -0.05), fullhelm: helm && helm.kind === 'fullhelm',
         shield: shield && S.activity === 'combat' ? shield.color : null, tool: heroTool3(),
+        cape: cape && cape.color, gloves: hands && hands.color, boots: feet && feet.color,
       });
       p.rotation.y = -0.6;
       heroObj = group(p, shadow(0.45)); heroObj.userData.p = p; heroObj.userData.mats = mats(p);
@@ -2939,8 +3061,8 @@ const G3 = (() => {
           if (gob) { hd.children[hd.children.length - 1].rotation.x = -1.2; hd.children[hd.children.length - 2].rotation.x = 1.2; }
           if (id === 'orc') hd.add(box(0.05, 0.1, 0.04, '#ffffff', 0.19, -0.14, 0.08), box(0.05, 0.1, 0.04, '#ffffff', 0.19, -0.14, -0.08));
           if (id === 'troll' || id === 'frosttroll') hd.add(box(0.14, 0.12, 0.14, shade(d.color, -0.1), 0.23, -0.04, 0));
-          if (id === 'golem' || id === 'sentry') hd.add(mk(new T.ConeGeometry(0.09, 0.3, 4), '#c8f6ff', 0, 0.3, 0));
-          if (id === 'abyssal') hd.add(mk(new T.ConeGeometry(0.06, 0.3, 4), '#2a0a20', 0, 0.3, 0.12), mk(new T.ConeGeometry(0.06, 0.3, 4), '#2a0a20', 0, 0.3, -0.12));
+          if (id === 'golem' || id === 'sentry' || id === 'warden') hd.add(mk(new T.ConeGeometry(0.09, 0.3, 4), '#c8f6ff', 0, 0.3, 0));
+          if (id === 'abyssal' || id === 'overlord') hd.add(mk(new T.ConeGeometry(0.06, 0.3, 4), '#2a0a20', 0, 0.3, 0.12), mk(new T.ConeGeometry(0.06, 0.3, 4), '#2a0a20', 0, 0.3, -0.12));
           if (id === 'cultist' || id === 'icemage') hd.add(box(0.44, 0.3, 0.44, d.body, -0.04, 0.1, 0));
           if (d.boss) { const c = crown(0.28); hd.add(c); }
         },
@@ -3127,7 +3249,7 @@ const G3 = (() => {
       else if (d.shape === 'flyer') { const fl = Math.sin(time * 16); P.fly.position.y = 1.9 + Math.sin(time * 4) * 0.2; P.wingR.rotation.y = fl * 0.5; P.wingL.rotation.y = -fl * 0.5; P.wingR.rotation.z = fl * 0.35; P.wingL.rotation.z = -fl * 0.35; }
       else if (d.shape === 'humanoid') { const PP = P.p.userData.P; PP.armF.rotation.z = -(d.type === 'melee' ? -0.5 - 1.6 * e.lunge : -1.5 - 0.25 * e.lunge); PP.armB.rotation.z = 0.15; }
       else if (d.shape === 'dragon') { const fl = Math.sin(time * 3) * 0.35; P.wingB.rotation.z = fl; P.wingF.rotation.z = fl; P.tail.rotation.z = Math.sin(time * 2) * 0.08; P.neck.rotation.z = e.lunge * 0.15; }
-      if (P.fire) { P.fire.userData.m.opacity = e.lunge > 0.3 ? e.lunge * 0.65 : 0; P.fire.scale.y = 1 + Math.sin(time * 30) * 0.1; }
+      if (P.fire) { P.fire.userData.m.opacity = e.lunge > 0.3 && etype(e) === 'magic' ? e.lunge * 0.65 : 0; P.fire.scale.y = 1 + Math.sin(time * 30) * 0.1; }
     } else if (e.kind === 'npc') {
       x += (1 - dying) * 70;
       const PP = P, sw = e.dying ? Math.sin(time * 13) * 0.6 : 0;
@@ -3423,6 +3545,31 @@ function htmlActivity() {
   return h;
 }
 
+function bossMechText(d) {
+  const m = [];
+  if (d.styles) m.push('switches between ' + d.styles.map(t => TYPE_ICON[t] + ' ' + TYPE_NAME[t]).join(', ') + ' – a protection prayer follows it');
+  if (d.enrage) m.push('attacks faster below 30% HP');
+  return m.join(' · ');
+}
+function bossCard(b, fromMap) {
+  const d = ENEMIES[b.id], q = QUESTS.find(x => x.id === b.quest), open = bossOpen(b);
+  const on = S.activity === 'combat' && S.zone === b.zone && S.ctarget === b.id;
+  const uniq = (BOSS_UNIQUES[b.id] || []).map(([it, ch]) => `<span class="uq ${S.clog[it] ? 'got' : ''}">${ITEMS[it].icon} ${ITEMS[it].name} · 1/${Math.round(1 / ch)}</span>`).join('');
+  const [petId, petCh] = BOSS_PETS[b.id], pet = PETS.find(x => x.id === petId);
+  let btn;
+  if (!open) {
+    const st = questState(q);
+    btn = `<small class="need">🔒 Lair opens with the quest <b>${q.name}</b>${st === 'active' ? ' (in progress)' : st === 'locked' ? ' (finish earlier quests first)' : ''}</small><button data-tab="quests">📜 Quests</button>`;
+  } else if (!zoneOpen(b.zone)) btn = `<small class="need">🔒 Reach ${ZONES[b.zone].name} first</small>`;
+  else btn = on ? '<button class="sel" disabled>👑 Fighting…</button>' : `<button data-a="fight" data-z="${b.zone}" data-id="${b.id}">👑 Enter lair</button>`;
+  const mech = bossMechText(d);
+  return `<div class="item boss ${on ? 'on' : ''}"><div class="top"><span class="ic">👑</span>
+    <span class="nm"><b>${d.name}</b> <span class="tag">Lv ${enemyLevel(d)}</span> ${(d.styles || [d.type]).map(t => `<span class="tag">${TYPE_ICON[t]} ${TYPE_NAME[t]}</span>`).join(' ')}${fromMap ? '' : ` <span class="tag">📍 ${ZONES[b.zone].name}</span>`}<br>
+    <small>❤️ ${fmt(d.hp)} · 💥 ${d.maxHit} max hit · 🛡️ ${d.def} defence · kill count <b>${fmt(S.kc[b.id] || 0)}</b></small><br>
+    ${mech ? `<small>⚠️ ${mech}</small><br>` : ''}<span class="uqs">${uniq}<span class="uq ${S.pets[petId] ? 'got' : ''}">${S.pets[petId] ? pet.icon : '🐾'} Pet ${S.pets[petId] ? pet.name : '???'} · 1/${Math.round(1 / petCh)}</span></span></span></div>
+    <div class="btns">${btn}</div></div>`;
+}
+
 function htmlLocAct(i, a) {
   const z = ZONES[i], here = S.zone === i && S.activity === a;
   if (a === 'combat') {
@@ -3431,21 +3578,20 @@ function htmlLocAct(i, a) {
       return `<p class="need">${prev ? `Defeat ${prev} and reach combat level ${z.req} to fight here.` : `Reach combat level ${z.req} to fight here (you are ${combatLevel()}).`}</p>`;
     }
     const ct = combatType();
-    const mon = (id, boss) => {
+    const mon = id => {
       const d = ENEMIES[id], t = BEATS[ct] === d.type ? 1 : BEATS[d.type] === ct ? -1 : 0;
-      const on = here && !boss && S.ctarget === id;
-      return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">${boss ? '👑' : TYPE_ICON[d.type]}</span>
+      const on = here && S.ctarget === id;
+      return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">${TYPE_ICON[d.type]}</span>
         <span class="nm"><b>${d.name}</b> <span class="tag">Lv ${enemyLevel(d)}</span> <span class="tag ${t > 0 ? 'good' : t < 0 ? 'bad' : ''}">${TYPE_ICON[d.type]} ${TYPE_NAME[d.type]}${t > 0 ? ' · strong' : t < 0 ? ' · weak' : ''}</span>${onTask({ id }) ? ' <span class="tag good">💀 task</span>' : ''}<br>
         <small>❤️ ${fmt(d.hp)} · 💥 ${d.maxHit} max hit · 🛡️ ${d.def} defence · ${d.speed}s</small><br>
         <small>Drops: <span class="drops">🪙${dropIcons(d)}</span> · defeated ${fmt(S.kc[id] || 0)}</small></span></div>
-        <div class="btns">${boss ? `<small>${S.bosses[i] ? '✔ Beaten · ' : ''}Appears after ${BOSS_EVERY} kills here (${S.zk[i]}/${BOSS_EVERY})</small>`
-          : on ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="${id}">⚔️ Fight</button>`}</div></div>`;
+        <div class="btns">${on ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="${id}">⚔️ Fight</button>`}</div></div>`;
     };
     const mixOn = here && !S.ctarget;
     return `<div class="grid">
       <div class="item ${mixOn ? 'on' : ''}"><div class="top"><span class="ic">🎲</span><span class="nm"><b>Fight everything</b><br><small>Meet whatever comes down the road here</small></span></div>
       <div class="btns">${mixOn ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="mix">⚔️ Fight</button>`}</div></div>`
-      + [...new Set(z.enemies)].map(id => mon(id)).join('') + (z.boss ? mon(z.boss, true) : '') + '</div>';
+      + [...new Set(z.enemies)].map(id => mon(id)).join('') + (z.boss ? bossCard(bossOf(z.boss), true) : '') + '</div>';
   }
   if (GATHERING.includes(a)) {
     const names = locTiers(a, i).reduce((o, t) => (o[t] = tierName(a, t), o), {});
@@ -3513,31 +3659,86 @@ function itemStats(it) {
   return [it.heal && 'heals ' + it.heal, it.power && (it.slot ? `${TYPE_ICON[it.wtype]} power +${it.power}` : 'arrow power +' + it.power),
     it.armor && `${it.slot} armour +${it.armor}`, it.speed && it.slot && `${it.speed}s`, it.twoHanded && 'two-handed', it.note, it.req && 'Lv ' + it.req, it.bury && `bury: ${it.bury} Prayer XP`].filter(Boolean).join(' · ');
 }
+const DOLL = ['', 'helm', '', 'cape', 'amulet', 'ammo', 'weapon', 'body', 'shield', '', 'legs', '', 'hands', 'feet', 'ring'];
+const SLOT_ICON = { helm: '⛑️', cape: '🧣', amulet: '📿', ammo: '➶', weapon: '🗡️', body: '🥋', shield: '🛡️', legs: '👖', hands: '🧤', feet: '🥾', ring: '💍' };
+const SLOT_NAME = { helm: 'Head', cape: 'Cape', amulet: 'Neck', ammo: 'Ammo', weapon: 'Weapon', body: 'Body', shield: 'Shield', legs: 'Legs', hands: 'Hands', feet: 'Feet', ring: 'Ring' };
+const SLOT_HINT = { helm: 'Smith helms at the anvil.', body: 'Smith platebodies and chainbodies at the anvil.', legs: 'Smith platelegs at the anvil.', shield: 'Smith kiteshields at the anvil.',
+  weapon: 'Smith weapons, or fletch bows.', cape: 'Buy a cape in the Shop – bosses drop better ones.', hands: 'Buy gloves in the Shop – bosses drop better ones.',
+  feet: 'Buy boots in the Shop – bosses drop better ones.', ring: 'Rings drop from bosses.', amulet: 'Amulets come from the Slayer shop and rare drops.' };
+// OSRS stack numbers: yellow, then white in thousands (K), then green in millions (M)
+function stackText(n) { return n < 100000 ? [fmt(n), ''] : n < 1e7 ? [Math.floor(n / 1000) + 'K', 'w'] : [Math.floor(n / 1e6) + 'M', 'g']; }
+function slotHtml(id, n, attrs, ph, extra = '') {
+  const it = id && ITEMS[id];
+  const st = it && (n > 1 || it.type === 'Ammo') ? stackText(n) : null;
+  const bg = it && it.color ? ` style="background:radial-gradient(circle at 50% 55%, ${it.color}66 0%, ${it.color}00 68%), #2b2520"` : '';
+  return `<button class="slot ${extra}" ${attrs}${bg} aria-label="${it ? it.name : 'Empty'}">${it ? `<span class="si">${it.icon}</span>` : `<span class="si ph">${ph}</span>`}${st ? `<span class="sn ${st[1]}">${st[0]}</span>` : ''}</button>`;
+}
+function dollHtml(small) {
+  return `<div class="doll ${small ? 'sm' : ''}">` + DOLL.map(sl => {
+    if (!sl) return '<span></span>';
+    if (sl === 'ammo') { const a = wtype() === 'magic' ? (has('rune') ? 'rune' : null) : bestArrow(); return slotHtml(a, a ? has(a) : 0, 'data-a="eslot" data-id="ammo"', SLOT_ICON.ammo); }
+    return slotHtml(S.equip[sl], 1, `data-a="eslot" data-id="${sl}"`, SLOT_ICON[sl]);
+  }).join('') + '</div>';
+}
+function eqStatsHtml() {
+  const ct = combatType(), pct = v => Math.round(v * 100);
+  const rows = [['Attack style', `${TYPE_ICON[ct]} ${TYPE_NAME[ct]}`], ['Max hit', playerMaxHit()], ['Accuracy', Math.round(accuracyLevel())],
+    ['Attack speed', playerSpeed() + 's'], ['Armour', armorValue()], ['Damage reduction', pct(damageReduction()) + '%']];
+  const bon = [['acc', 'accuracy'], ['dmg', 'max hit'], ['dr', 'damage reduction'], ['slay', 'on task']].filter(([k]) => amu(k)).map(([k, n]) => `+${pct(amu(k))}% ${n}`);
+  if (bon.length) rows.push(['Item bonuses', bon.join(', ')]);
+  return '<div class="eqstats">' + rows.map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join('') + '</div>';
+}
+const INV_ORDER = ['Equipment', 'Ammo', 'Food', 'Bars', 'Ores', 'Resources', 'Misc'];
+function invIds() {
+  const ord = id => { const k = INV_ORDER.indexOf(ITEMS[id].type); return k < 0 ? 99 : k; };
+  return Object.keys(S.inv).filter(id => S.inv[id] > 0).sort((a, b) => ord(a) - ord(b) || (ITEMS[a].tier || 0) - (ITEMS[b].tier || 0) || a.localeCompare(b));
+}
+function itemMenu(id) {
+  const it = ITEMS[id], n = has(id);
+  if (!it || !n) return;
+  const worn = it.slot && S.equip[it.slot] && ITEMS[S.equip[it.slot]];
+  const sk = it.slot && reqSkill(it);
+  openModal(`<div class="imenu"><div class="ihead"><span class="big">${it.icon}</span><div><b>${it.name}</b><br><small class="muted">${it.type} · ${fmt(n)} in bag · ${fmt(it.value)} gold each</small></div></div>
+    ${itemStats(it) ? `<p>${itemStats(it)}</p>` : ''}
+    ${worn ? `<p class="muted">Worn now: ${worn.icon} ${worn.name}${itemStats(worn) ? ' · ' + itemStats(worn) : ''}</p>` : ''}
+    ${it.slot && !canEquip(id) ? `<p class="need">Requires ${SKILLS[sk].name} level ${it.req}</p>` : ''}
+    <div class="opts">
+      ${it.slot ? `<button data-a="equip" data-id="${id}" data-close="1" ${canEquip(id) ? '' : 'disabled'}>${it.slot === 'weapon' ? '🗡️ Wield' : '🧥 Wear'}</button>` : ''}
+      ${it.bury ? `<button data-a="bury" data-id="${id}" data-close="1">🦴 Bury all</button>` : ''}
+      <button data-a="sell" data-id="${id}" data-n="1" data-close="1">🪙 Sell 1 (${fmt(it.value)} gold)</button>
+      ${n > 1 ? `<button data-a="sell" data-id="${id}" data-n="999999" data-close="1">🪙 Sell all (${fmt(it.value * n)} gold)</button>` : ''}
+      <button data-a="close">Cancel</button></div></div>`);
+}
+function slotMenu(sl) {
+  if (sl === 'ammo') {
+    const a = bestArrow();
+    openModal(`<h2>➶ Ammo</h2><p class="muted">${wtype() === 'magic' ? `Spells use runes – you have ${fmt(has('rune'))}.` : `Your hero always fires the best arrows in the bag${a ? ` – now ${ITEMS[a].name} ×${fmt(has(a))}` : ' – you have none'}.`}</p><button data-a="close">Close</button>`);
+    return;
+  }
+  const id = S.equip[sl];
+  if (id) {
+    const it = ITEMS[id];
+    openModal(`<div class="imenu"><div class="ihead"><span class="big">${it.icon}</span><div><b>${it.name}</b><br><small class="muted">Worn · ${SLOT_NAME[sl]}</small></div></div>
+      ${itemStats(it) ? `<p>${itemStats(it)}</p>` : ''}<div class="opts"><button data-a="unequip" data-id="${sl}" data-close="1">Remove</button><button data-a="close">Cancel</button></div></div>`);
+    return;
+  }
+  const opts = invIds().filter(x => ITEMS[x].slot === sl);
+  openModal(`<div class="imenu"><h2>${SLOT_ICON[sl]} ${SLOT_NAME[sl]}</h2><p class="muted">${opts.length ? 'Wear something from your bag:' : 'Nothing for this slot in your bag. ' + SLOT_HINT[sl]}</p>
+    <div class="opts">${opts.map(x => `<button data-a="equip" data-id="${x}" data-close="1" ${canEquip(x) ? '' : 'disabled'}>${ITEMS[x].icon} ${ITEMS[x].name}${itemStats(ITEMS[x]) ? ` <small>· ${itemStats(ITEMS[x])}</small>` : ''}</button>`).join('')}
+    <button data-a="close">Close</button></div></div>`);
+}
 function htmlBag() {
   const nav = subNav('bagsub', bagSub, [['items', '🎒 Items'], ['shop', '🏪 Shop']]);
   if (bagSub === 'shop') return nav + htmlShop();
-  const ids = Object.keys(S.inv);
-  if (!ids.length) return nav + '<p class="muted">Your bag is empty. Go gather resources or fight!</p>';
-  const groups = {};
-  for (const id of ids) (groups[ITEMS[id].type] = groups[ITEMS[id].type] || []).push(id);
+  const ids = invIds();
   const total = ids.reduce((a, id) => a + ITEMS[id].value * S.inv[id], 0);
-  let h = nav + `<span class="muted">Total value: <b class="lg-gold">${fmt(total)}</b> gold</span>`;
-  for (const g of ['Equipment', 'Ammo', 'Food', 'Bars', 'Ores', 'Resources', 'Misc']) {
-    if (!groups[g]) continue;
-    h += `<h3>${g}</h3><div class="grid">` + groups[g].sort().map(id => {
-      const it = ITEMS[id];
-      return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${itemLabel(id)}<br>
-        <small>${it.value} 🪙${itemStats(it) ? ' · ' + itemStats(it) : ''}</small></span>
-        <span class="ct">${fmt(S.inv[id])}</span></div>
-        <div class="btns">${it.slot ? `<button data-a="equip" data-id="${id}" ${canEquip(id) ? '' : 'disabled'}>Equip</button>` : ''}
-        ${it.bury ? `<button data-a="bury" data-id="${id}">Bury all</button>` : ''}
-        <button data-a="sell" data-id="${id}" data-n="1">Sell 1</button>
-        <button data-a="sell" data-id="${id}" data-n="999999">Sell all</button></div></div>`;
-    }).join('') + '</div>';
-  }
-  return h;
+  return nav + `<div class="osrs">
+    <div class="opanel"><h3>Worn equipment</h3>${dollHtml()}${eqStatsHtml()}</div>
+    <div class="opanel inv"><h3>Inventory <small>${ids.length} stacks · ${fmt(total)} gold</small></h3>
+      ${ids.length ? `<div class="invgrid">${ids.map(id => slotHtml(id, S.inv[id], `data-a="islot" data-id="${id}"`, '', ITEMS[id].slot && isUpgrade(id) ? 'up' : '')).join('')}</div>
+      <p class="muted">Tap an item to wear, bury or sell it. ▲ marks an upgrade.</p>` : '<p class="muted">Your bag is empty. Go gather resources or fight!</p>'}</div>
+  </div>`;
 }
-
 function matsHtml(mats) {
   return Object.entries(mats).map(([id, n]) => `<span class="${has(id) >= n ? 'have' : 'need'}">${n}× ${ITEMS[id].name} (${has(id)})</span>`).join(', ');
 }
@@ -3606,7 +3807,7 @@ function htmlShop() {
       <span class="nm">${TOOL_NAMES[tool]}<br><small>Level ${l} / 4 · speed +${l * 12}%</small></span></div>
       <div class="btns">${l >= 4 ? '<button disabled>Maxed</button>' : `<button data-a="tool" data-id="${tool}" ${S.gold < cost ? 'disabled' : ''}>Upgrade – ${fmt(cost)} 🪙</button>`}</div></div>`;
   }
-  h += '</div><h3>Supplies</h3><div class="grid">' + SHOP.map((it, i) => {
+  h += '</div><h3>Supplies and gear</h3><div class="grid">' + SHOP.map((it, i) => {
     const d = ITEMS[it.id];
     return `<div class="item"><div class="top"><span class="ic">${d.icon}</span>
       <span class="nm">${it.n > 1 ? it.n + '× ' : ''}${d.name}<br><small>${itemStats(d) || d.type} · ${it.cost} 🪙</small></span><span class="ct">${fmt(has(it.id))}</span></div>
@@ -3636,11 +3837,20 @@ function htmlSlayer() {
   return h;
 }
 
+let questSub = 'quests';
+function htmlBosses() {
+  const uq = Object.values(BOSS_UNIQUES).flat(), got = uq.filter(([it]) => S.clog[it]).length;
+  return `<p class="muted">Each boss has its own lair, like in OSRS. Finish the boss's quest to get in, then fight it as often as you like for its uniques and pet.
+    Bosses beaten <b>${BOSSES.filter(bossBeaten).length} / ${BOSSES.length}</b> · Collection log <b>${got} / ${uq.length}</b></p>
+    <div class="grid">` + BOSSES.map(b => bossCard(b)).join('') + '</div>';
+}
 function htmlQuests() {
+  const nav = subNav('questsub', questSub, [['quests', '📜 Quests'], ['bosses', '👑 Bosses']]);
+  if (questSub === 'bosses') return nav + htmlBosses();
   const by = st => QUESTS.filter(q => questState(q) === st);
   const card = q => {
     const st = questState(q), ready = questReady(q);
-    let h = `<div class="item quest ${ready ? 'ready' : ''}"><div class="top"><span class="ic">${st === 'done' ? '✅' : ready ? '🎁' : '📜'}</span>
+    let h = `<div class="item quest ${ready ? 'ready' : ''} ${q.rew.boss ? 'boss' : ''}"><div class="top"><span class="ic">${st === 'done' ? '✅' : ready ? '🎁' : q.rew.boss ? '👑' : '📜'}</span>
       <span class="nm"><b>${q.name}</b><br><small>${q.desc}</small></span></div>`;
     if (st !== 'done') h += q.obj.map((o, k) => {
       const need = objNeed(o), have = st === 'active' ? Math.max(0, objProgress(q, k)) : 0;
@@ -3651,7 +3861,7 @@ function htmlQuests() {
     if (ready) h += `<div class="btns"><button data-a="qclaim" data-id="${q.id}">🎁 Claim reward</button></div>`;
     return h + '</div>';
   };
-  let h = `<p class="muted">Quests give gold, items and XP. Progress counts from the moment you start a quest. Completed: <b>${questsDone()} / ${QUESTS.length}</b></p>`;
+  let h = nav + `<p class="muted">Quests give gold, items and XP, and open the boss lairs. Kills count from the moment you start a quest; items you bring are handed over when you claim it. Completed: <b>${questsDone()} / ${QUESTS.length}</b></p>`;
   const active = by('active'), open = by('open'), done = by('done');
   if (active.length) h += '<h3>Active</h3><div class="grid">' + active.map(card).join('') + '</div>';
   if (open.length) h += '<h3>Available</h3><div class="grid">' + open.map(card).join('') + '</div>';
@@ -3686,7 +3896,7 @@ function htmlProgress() {
   }).join('') + '</div>';
   h += `<h3>Statistics</h3><div class="info stats">
     <span>Distance walked <b>${fmt(S.dist)} m</b></span><span>Enemies defeated <b>${fmt(S.kills)}</b></span>
-    <span>Deaths <b>${fmt(S.deaths)}</b></span><span>Bosses beaten <b>${S.bosses.filter(Boolean).length} / 5</b></span>
+    <span>Deaths <b>${fmt(S.deaths)}</b></span><span>Bosses beaten <b>${BOSSES.filter(bossBeaten).length} / ${BOSSES.length}</b></span>
     <span>Road finds <b>${fmt(S.stats.events)}</b></span><span>Items smithed <b>${fmt(S.stats.smithed)}</b></span>
     <span>Fish cooked <b>${fmt(S.stats.cooked)}</b></span><span>Total level <b>${totalLevel()}</b></span>
     <span>Fletched <b>${fmt(S.stats.fletched)}</b></span><span>Runes crafted <b>${fmt(S.stats.rc)}</b></span>
@@ -3708,20 +3918,14 @@ function renderTab(force) {
 
 function renderHero() {
   const mh = maxHp();
-  const eq = slot => S.equip[slot]
-    ? `<span>${itemLabel(S.equip[slot])}</span><button data-a="unequip" data-id="${slot}">Unequip</button>`
-    : '<span class="muted">—</span>';
-  const slot = (icon, name, sl) => `<div class="eq"><span class="muted">${icon} ${name}</span></div><div class="eq">${eq(sl)}</div>`;
   const ammo = wtype() === 'ranged' ? (bestArrow() ? `${ITEMS[bestArrow()].name} ×${fmt(has(bestArrow()))}` : '<span class="need">none</span>')
     : wtype() === 'magic' ? `🔮 ${fmt(has('rune'))} runes` : null;
   const pr = activePrayer();
   const html = `<h3>Hero</h3>
     <div class="row" style="justify-content:space-between"><span>❤️ ${Math.ceil(Math.max(0, S.hp))} / ${mh}</span><span class="muted">Combat level ${combatLevel()}</span></div>
     <div class="bar hp" style="margin:6px 0 10px"><i style="width:${(clamp(S.hp / mh, 0, 1) * 100).toFixed(1)}%"></i></div>
-    <div class="eq"><span class="muted">${TYPE_ICON[wtype()]} Weapon</span></div><div class="eq">${eq('weapon')}</div>
-    ${slot('🛡️', 'Shield', 'shield')}${slot('⛑️', 'Helm', 'helm')}${slot('🥋', 'Body', 'body')}${slot('👖', 'Legs', 'legs')}
-    <div class="eq"><span class="muted">Armour total</span><span>${armorValue()}</span></div>
-    <div class="eq"><span class="muted">📿 Amulet</span></div><div class="eq">${eq('amulet')}</div>
+    ${dollHtml(true)}
+    <div class="eq"><span class="muted">💥 Max hit · 🛡️ Armour</span><span>${playerMaxHit()} · ${armorValue()}</span></div>
     ${ammo ? `<div class="eq"><span class="muted">Ammo</span><span>${ammo}</span></div>` : ''}
     <div class="eq"><span class="muted">🍽️ Food</span><span>${foodCount()}</span></div>
     <div class="eq"><span class="muted">🙏 Prayer</span><span>${pr ? pr.icon + ' ' + pr.name + ' · ' : ''}${fmt(S.pp)} pts</span></div>
@@ -3761,7 +3965,13 @@ function nextGoal() {
   const best = bestZone();
   if (S.activity === 'combat' && S.zone < best) return { t: `${ZONES[best].name} is open – travel there`, tab: 'activity' };
   if (!questsDone() && !Object.keys(S.quests).length) return { t: 'Open 📜 Quests and start "First Steps"', tab: 'quests' };
-  if (!S.bosses[best]) return { t: `Defeat ${ENEMIES[ZONES[best].boss].name} in ${ZONES[best].name} (appears after ${BOSS_EVERY} kills: ${S.zk[best]}/${BOSS_EVERY})`, tab: 'activity' };
+  if (!S.bosses[best]) {
+    const b = bossOf(ZONES[best].boss), q = QUESTS.find(x => x.id === b.quest), st = questState(q), bn = ENEMIES[b.id].name;
+    if (bossOpen(b)) return { t: S.ctarget === b.id ? `Defeat ${bn} in its lair` : `Enter ${bn}'s lair (Map → ${ZONES[best].name} → ⚔️ Combat)`, tab: 'activity' };
+    if (st === 'active') return { t: `Finish the quest "${q.name}" to open ${bn}'s lair`, tab: 'quests' };
+    if (st === 'open') return { t: `Start the quest "${q.name}" – it opens ${bn}'s lair`, tab: 'quests' };
+    return { t: `Finish your quests to unlock "${q.name}"`, tab: 'quests' };
+  }
   const nz = best + 1;
   if (nz < MAIN_ZONES) return { t: `Reach combat level ${ZONES[nz].req} to enter ${ZONES[nz].name} (now ${combatLevel()})`, tab: 'skills' };
   if (!S.task) return { t: 'Get a 💀 Slayer task for Slayer XP and coins', tab: 'slayer' };
@@ -3816,7 +4026,11 @@ document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-a]');
   if (!b || b.disabled) return;
   const id = b.dataset.id, n = +b.dataset.n || 1;
+  if (b.dataset.close) closeModal();
   switch (b.dataset.a) {
+    case 'islot': itemMenu(id); break;
+    case 'eslot': slotMenu(id); break;
+    case 'questsub': questSub = id; break;
     case 'activity': setActivity(id); break;
     case 'zone': setZone(+id); break;
     case 'style': S.styles[combatType()] = id; break;
