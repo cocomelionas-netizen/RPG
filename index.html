@@ -6,6 +6,10 @@
 <meta name="theme-color" content="#14121c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Endless Road">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Endless Road</title>
 <style>
   :root {
@@ -21,16 +25,23 @@
     --xp: #6aa8ff;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
   html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+  html, body { overscroll-behavior: none; }
+  #scene, button, nav, #goal, header { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  body.modal-open { overflow: hidden; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   header {
     display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+    padding-top: max(10px, env(safe-area-inset-top));
+    background: var(--panel); border-bottom: 1px solid var(--line);
   }
-  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; display: flex; align-items: center; gap: 10px; }
+  #mute { padding: 2px 8px; min-height: 0; font-size: 16px; line-height: 1.2; }
   header .stat { color: var(--muted); display: inline-block; }
   header .stat b { color: var(--text); }
   #gold b { color: var(--accent); }
@@ -52,6 +63,7 @@
     background: #2b2540; border: 1px solid #4a3f6e; display: flex; gap: 8px; align-items: center;
   }
   #goal b { color: var(--accent); white-space: nowrap; }
+  #ticker { display: none; }
   nav.tabs button.alert { position: relative; }
   nav.tabs button.alert::after {
     content: ''; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
@@ -61,7 +73,7 @@
   @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
   nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); }
-  nav.tabs button { flex: 1 1 auto; }
+  nav.tabs button { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 6px; }
   #tab-content { padding: 12px; min-height: 260px; }
   button {
     font: inherit; color: var(--text); background: var(--panel2);
@@ -100,7 +112,7 @@
   aside .card { padding: 12px; margin-bottom: 12px; }
   .eq { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
   .eq button { padding: 2px 8px; font-size: 12px; }
-  #log { max-height: 260px; overflow-y: auto; font-size: 12.5px; display: flex; flex-direction: column; gap: 2px; }
+  #log { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
   #log div { padding: 2px 0; border-bottom: 1px dashed #2c283b; }
   .lg-good { color: var(--good); }
   .lg-bad { color: var(--bad); }
@@ -112,17 +124,23 @@
     display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10;
   }
   #modal[hidden] { display: none; }
-  #modal .card { max-width: 440px; width: 100%; padding: 18px; max-height: 80vh; overflow-y: auto; }
+  #modal .card { max-width: 440px; width: 100%; padding: 18px; max-height: 80vh; max-height: 80dvh; overflow-y: auto; overscroll-behavior: contain; }
+  #modal textarea { width: 100%; min-height: 110px; font: 12px/1.4 ui-monospace, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 16px; }
+  .stats span { display: flex; justify-content: space-between; gap: 8px; }
+  .stats b { font-variant-numeric: tabular-nums; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   #modal h2 { margin: 0 0 10px; font-size: 18px; }
   #modal ul { padding-left: 18px; margin: 6px 0 14px; }
   /* phone + touch rules last so they override the base styles */
   @media (orientation: landscape) and (max-height: 500px) {
-    #scene { width: min(100%, calc(60vh * 3)); margin: 0 auto; }
+    #scene { width: min(100%, calc(60vh * 3)); width: min(100%, calc(60dvh * 3)); margin: 0 auto; }
   }
   @media (max-width: 700px) {
-    header { padding: 8px 16px; gap: 10px; font-size: 13px; }
+    header { padding-block: max(8px, env(safe-area-inset-top)) 8px; gap: 4px 12px; font-size: 13px; }
     header h1 { font-size: 16px; width: 100%; }
-    .wrap { padding: 0 0 16px; }
+    #mute { margin-left: auto; }
+    .wrap { padding: 0 0 calc(76px + env(safe-area-inset-bottom)); }
     #stage {
       position: sticky; top: 0; z-index: 5; background: var(--bg);
       padding: 8px max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
@@ -130,6 +148,24 @@
     }
     #scene { border-radius: 8px; }
     #goal { margin-top: 6px; font-size: 13px; padding: 6px 10px; }
+    #ticker {
+      display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 18px;
+    }
+    /* thumb-reachable tab bar */
+    nav.tabs {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; flex-wrap: nowrap; gap: 2px;
+      padding: 4px max(6px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+      background: var(--panel); border-top: 1px solid var(--line); border-bottom: 0;
+    }
+    nav.tabs button {
+      flex: 1 1 0; min-width: 0; flex-direction: column; gap: 1px; padding: 5px 0; min-height: 50px;
+      background: transparent; border-color: transparent;
+    }
+    nav.tabs button.sel { background: #2e2a1c; border-color: #6b5a24; }
+    nav.tabs .ti { font-size: 19px; line-height: 1.1; }
+    nav.tabs .tl { font-size: 10px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    small, .muted { font-size: 13px; }
     main { padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); margin-top: 6px; }
     #tab-content { padding: 10px; }
     .acts { grid-template-columns: 1fr 1fr; }
@@ -145,7 +181,7 @@
 </head>
 <body>
 <header>
-  <h1>🗺️ Endless Road</h1>
+  <h1>🗺️ Endless Road <button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button></h1>
   <span class="stat" id="gold">Gold: <b>0</b></span>
   <span class="stat" id="cmb">Combat level: <b>1</b></span>
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
@@ -155,17 +191,18 @@
   <div id="stage">
     <canvas id="scene"></canvas>
     <div id="goal"></div>
+    <div id="ticker"></div>
   </div>
   <main>
     <section class="card">
       <nav class="tabs">
-        <button data-tab="activity" class="sel">🧭 Activity</button>
-        <button data-tab="skills">📈 Skills</button>
-        <button data-tab="inventory">🎒 Inventory</button>
-        <button data-tab="smithing">🔨 Smithing</button>
-        <button data-tab="cooking">🍳 Cooking</button>
-        <button data-tab="shop">🏪 Shop</button>
-        <button data-tab="progress">🏆 Progress</button>
+        <button data-tab="activity" class="sel"><span class="ti">🧭</span><span class="tl">Activity</span></button>
+        <button data-tab="skills"><span class="ti">📈</span><span class="tl">Skills</span></button>
+        <button data-tab="inventory"><span class="ti">🎒</span><span class="tl">Inventory</span></button>
+        <button data-tab="smithing"><span class="ti">🔨</span><span class="tl">Smithing</span></button>
+        <button data-tab="cooking"><span class="ti">🍳</span><span class="tl">Cooking</span></button>
+        <button data-tab="shop"><span class="ti">🏪</span><span class="tl">Shop</span></button>
+        <button data-tab="progress"><span class="ti">🏆</span><span class="tl">Progress</span></button>
       </nav>
       <div id="tab-content"></div>
     </section>
@@ -177,6 +214,8 @@
       </div>
       <div class="card row">
         <button data-a="save">💾 Save</button>
+        <button data-a="export">📤 Export</button>
+        <button data-a="import">📥 Import</button>
         <button data-a="reset">🗑️ Reset</button>
       </div>
     </aside>
@@ -215,7 +254,7 @@ const COOKED_N = ['Cooked Roach', 'Cooked Perch', 'Cooked Pike', 'Cooked Salmon'
 const GATHER_REQ = [1, 15, 30, 50, 70];
 const GATHER_TIME = [3, 3.5, 4, 4.5, 5];
 const GATHER_XP = [10, 20, 35, 55, 80];
-const TOOL_COST = [200, 1500, 8000, 40000];
+const TOOL_COST = [300, 3000, 20000, 80000];
 const TOOL_NAMES = { axe: 'Axe', pick: 'Pickaxe', rod: 'Fishing Rod' };
 const TOOL_OF = { woodcutting: 'axe', mining: 'pick', fishing: 'rod' };
 const SMITH_TIME = 2.4, COOK_TIME = 2.0, STATION_CRAFTS = 10;
@@ -228,12 +267,12 @@ for (let t = 0; t < 5; t++) {
   defItem('ore' + t,    { name: METAL[t] + ' Ore', icon: '🪨', tier: t, value: [3, 7, 14, 28, 55][t], type: 'Resources' });
   defItem('fish' + t,   { name: 'Raw ' + FISH_N[t], icon: '🐟', tier: t, value: [2, 5, 10, 20, 40][t], type: 'Resources' });
   defItem('cooked' + t, { name: COOKED_N[t], icon: '🍽️', tier: t, value: [5, 12, 25, 50, 100][t], heal: [20, 45, 80, 120, 170][t], type: 'Food' });
-  defItem('sword' + t,  { name: METAL[t] + ' Sword', icon: '🗡️', tier: t, value: [30, 90, 250, 600, 1500][t], slot: 'weapon', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Equipment' });
-  defItem('armor' + t,  { name: METAL[t] + ' Armour', icon: '🥋', tier: t, value: [50, 150, 400, 1000, 2500][t], slot: 'armor', armor: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Equipment' });
+  defItem('sword' + t,  { name: METAL[t] + ' Sword', icon: '🗡️', tier: t, value: [12, 30, 60, 120, 240][t], slot: 'weapon', power: [3, 7, 12, 18, 26][t], req: GATHER_REQ[t], type: 'Equipment' });
+  defItem('armor' + t,  { name: METAL[t] + ' Armour', icon: '🥋', tier: t, value: [20, 45, 90, 180, 360][t], slot: 'armor', armor: [2, 5, 9, 14, 20][t], req: GATHER_REQ[t], type: 'Equipment' });
 }
 // endgame set made from Dragon drops
-defItem('sword5', { name: 'Dragon Sword', icon: '🗡️', tier: 5, value: 5000, slot: 'weapon', power: 36, req: 80, type: 'Equipment' });
-defItem('armor5', { name: 'Dragon Armour', icon: '🥋', tier: 5, value: 8000, slot: 'armor', armor: 28, req: 80, type: 'Equipment' });
+defItem('sword5', { name: 'Dragon Sword', icon: '🗡️', tier: 5, value: 900, slot: 'weapon', power: 36, req: 80, type: 'Equipment' });
+defItem('armor5', { name: 'Dragon Armour', icon: '🥋', tier: 5, value: 1400, slot: 'armor', armor: 28, req: 80, type: 'Equipment' });
 defItem('bread', { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
 defItem('burnt', { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
 defItem('bones', { name: 'Bones', icon: '🦴', value: 3, type: 'Misc' });
@@ -266,7 +305,7 @@ const ENEMIES = {
   gobchief: { name: 'Goblin Chief',   hp: 450,  maxHit: 14, atk: 20, def: 18, speed: 2.4, gold: [150, 250], shape: 'humanoid', size: 1.15, color: '#5d9a34', body: '#8a2f2f', boss: true, drops: [['ore1', 1, 5, 10], ['gem', .2, 1, 1]] },
   bonelord: { name: 'Bone Lord',      hp: 1300, maxHit: 30, atk: 42, def: 40, speed: 2.6, gold: [400, 700], shape: 'humanoid', size: 1.4, color: '#efe9d6', body: '#6b5fa0', boss: true, drops: [['ore2', 1, 6, 12], ['gem', .4, 1, 2]] },
   frosttroll: { name: 'Frost Troll',  hp: 3200, maxHit: 50, atk: 62, def: 62, speed: 3.0, gold: [900, 1500], shape: 'humanoid', size: 1.85, color: '#a8d8f0', body: '#3a5470', boss: true, drops: [['ore3', 1, 6, 12], ['gem', .6, 1, 3]] },
-  dragon:   { name: 'Dragon',         hp: 6000, maxHit: 80, atk: 85, def: 85, speed: 3.2, gold: [2000, 3500], shape: 'dragon', size: 1,   color: '#9b2222', boss: true, drops: [['scale', 1, 1, 2], ['gem', 1, 1, 3]] },
+  dragon:   { name: 'Dragon',         hp: 15000, maxHit: 110, atk: 95, def: 95, speed: 3.2, gold: [2000, 3500], shape: 'dragon', size: 1,   color: '#9b2222', boss: true, drops: [['scale', 1, 1, 2], ['gem', 1, 1, 3]] },
 };
 
 const ZONES = [
@@ -278,7 +317,7 @@ const ZONES = [
     th: { sky: ['#140f1d', '#352841'], far: '#2a2134', mid: '#3a2e46', near: '#22192b', ground: '#4a3f4f', dirt: '#2a2230', sun: null, decor: 'stalag', cave: true } },
   { name: 'Ice Mountains',   req: 45, boss: 'frosttroll', enemies: ['orc', 'troll'],
     th: { sky: ['#8fa9cc', '#eef4fb'], far: '#d3deeb', mid: '#97aac0', near: '#5f7186', ground: '#e9eff6', dirt: '#a3b0be', sun: '#ffffff', decor: 'rock', snow: true } },
-  { name: 'Dragon\'s Lair',  req: 65, boss: 'dragon', enemies: ['lizard', 'lizard', 'imp'],
+  { name: 'Dragon\'s Lair',  req: 70, boss: 'dragon', enemies: ['lizard', 'lizard', 'imp'],
     th: { sky: ['#2a0808', '#c2481e'], far: '#5a1a14', mid: '#3a1410', near: '#1c0806', ground: '#2b1a17', dirt: '#140b09', sun: '#ffb347', decor: 'spike', lava: true } },
 ];
 
@@ -312,7 +351,7 @@ const ACH = [
   { id: 'journey1', name: 'New Beginnings', desc: 'Start a New Journey', bonus: ['xp', 5], test: () => S.journeys >= 1 },
 ];
 const RUP = {
-  wisdom:    { name: 'Wisdom', icon: '📜', desc: '+10% XP', max: 10, cost: 5 },
+  wisdom:    { name: 'Wisdom', icon: '📜', desc: '+15% XP', max: 10, cost: 5 },
   fortune:   { name: 'Fortune', icon: '💰', desc: '+10% gold from enemies and chests', max: 10, cost: 4 },
   boots:     { name: 'Swift Boots', icon: '🥾', desc: '+5% walking speed', max: 6, cost: 5 },
   patience:  { name: 'Patience', icon: '⏳', desc: '+2h offline progress (base 12h)', max: 6, cost: 6 },
@@ -324,7 +363,7 @@ let SIM = false;       // fast simulation (offline) - no visuals
 const R = {            // runtime state (not saved)
   worldX: 0, phase: 'walk', ent: null, atkT: 0, deadT: 0, doneT: 0,
   swing: 0, eatFlash: 0, pendingHit: 0, shake: 0, freeze: 0, heroHit: 0, ring: 0, banner: null,
-  events: [], buff: 0, deathStreak: 0,
+  events: [], buff: 0, deathStreak: 0, rested: 0,
 };
 let time = 0;
 let floaters = [], particles = [], logLines = [];
@@ -338,6 +377,7 @@ function newState() {
     zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], smithSel: 0, cookSel: -1, tipEvent: false,
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0 }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
+    gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', muted: false, tipA2HS: false,
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -349,6 +389,9 @@ function save() {
 function load() {
   let data = null;
   try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { data = null; }
+  applySave(data);
+}
+function applySave(data) {
   const base = newState();
   if (data && data.v === 1) {
     S = Object.assign(base, data);
@@ -357,6 +400,7 @@ function load() {
     S.equip = Object.assign({ weapon: null, armor: null }, data.equip);
     S.stats = Object.assign(base.stats, data.stats);
     S.rup = Object.assign(base.rup, data.rup);
+    S.gsel = Object.assign(base.gsel, data.gsel);
   } else S = base;
   recalcLevels(); recalcBonuses();
   if (S.activity === 'combat' && !zoneOpen(S.zone)) S.zone = bestZone();
@@ -372,6 +416,8 @@ const fmt = n => Math.floor(n).toLocaleString('en-US');
 function log(msg, cls = '') {
   if (SIM) return;
   logLines.unshift({ msg, cls });
+  const tk = document.getElementById('ticker');
+  if (tk) tk.innerHTML = `<span class="${cls}">${msg}</span>`;
   if (logLines.length > 60) logLines.pop();
   renderLog();
 }
@@ -384,7 +430,7 @@ function take(id, n = 1) {
 function has(id) { return S.inv[id] || 0; }
 
 function addXp(skill, amt) {
-  amt *= xpMult() * (R.buff > 0 ? 1.5 : 1);
+  amt *= xpMult() * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1);
   const before = LV[skill];
   S.skills[skill] += amt;
   LV[skill] = levelFromXp(S.skills[skill]);
@@ -393,6 +439,7 @@ function addXp(skill, amt) {
     log(`${SKILLS[skill].icon} ${SKILLS[skill].name} reached level ${LV[skill]}!`, 'lg-xp');
     showBanner(`${SKILLS[skill].icon} ${SKILLS[skill].name} level ${LV[skill]}!`);
     if (!SIM) R.ring = 1;
+    sfx('level');
   }
   uiDirty = true;
 }
@@ -407,14 +454,16 @@ function armorValue() { return S.equip.armor ? ITEMS[S.equip.armor].armor : 0; }
 function playerMaxHit() { return Math.floor(4 + LV.attack * 0.7 + weaponPower()); }
 const PLAYER_SPEED = 1.8;
 function playerHitChance(e) { return clamp(0.6 + (LV.attack + weaponPower() * 0.5 - e.def) * 0.03, 0.1, 0.95); }
-function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue()) * 0.03, 0.05, 0.95); }
-function damageReduction() { return Math.min(0.6, armorValue() * 0.02 + LV.defence * 0.003); }
+function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue()) * 0.02, 0.15, 0.95); }
+function damageReduction() { return Math.min(0.5, armorValue() * 0.012 + LV.defence * 0.002); }
 
 function gatherTier(skill) {
   let t = 0;
   for (let i = 0; i < 5; i++) if (LV[skill] >= GATHER_REQ[i]) t = i;
   return t;
 }
+// the tier the hero actually gathers: the player's pick, or the best unlocked one
+function chosenTier(skill) { const sel = S.gsel[skill]; return sel < 0 ? gatherTier(skill) : Math.min(sel, gatherTier(skill)); }
 function gatherTime(skill, tier) { return GATHER_TIME[tier] * (1 - 0.12 * S.tools[TOOL_OF[skill]]) / (1 + BON.gather / 100); }
 
 /* ===== Achievements, Renown and permanent bonuses ===== */
@@ -423,7 +472,7 @@ function recalcBonuses() {
   BON.xp = BON.gold = BON.gather = 0;
   for (const a of ACH) if (S.ach[a.id]) BON[a.bonus[0]] += a.bonus[1];
 }
-function xpMult() { return 1 + BON.xp / 100 + 0.1 * S.rup.wisdom; }
+function xpMult() { return 1 + BON.xp / 100 + 0.15 * S.rup.wisdom; }
 function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune; }
 function walkSpeed() { return WALK * (1 + 0.05 * S.rup.boots); }
 function offlineCap() { return (12 + 2 * S.rup.patience) * 3600; }
@@ -436,11 +485,12 @@ function checkAch() {
     S.ach[a.id] = true;
     recalcBonuses();
     log(`🏆 Achievement: ${a.name} (${bonusText(a.bonus)})`, 'lg-xp');
-    showBanner(`🏆 ${a.name}`);
+    showBanner(`🏆 ${a.name}`); sfx('level');
     uiDirty = true;
   }
 }
-function renownGain() { return 10 + Math.floor(totalLevel() / 20); }
+// grows faster than linearly so pushing a journey further pays off
+function renownGain() { return 10 + Math.floor((totalLevel() / 40) ** 1.5) + 5 * S.bosses.filter(Boolean).length; }
 function rupCost(k) { return RUP[k].cost * (S.rup[k] + 1); }
 function buyRup(k) {
   if (S.rup[k] >= RUP[k].max || S.renown < rupCost(k)) return;
@@ -482,7 +532,7 @@ function spawnEntity() {
   } else if (act === 'smithing' || act === 'cooking') {
     R.ent = { kind: act === 'smithing' ? 'anvil' : 'fire', skill: act, crafts: STATION_CRAFTS, t: 0, x, stop: 62, hit: 0, swung: false, blocked: false };
   } else {
-    const tier = gatherTier(act);
+    const tier = chosenTier(act);
     const yields = randi(3, 6);
     const kind = act === 'woodcutting' ? 'tree' : act === 'mining' ? 'rock' : 'pond';
     const stop = kind === 'pond' ? 135 : kind === 'tree' ? 58 : 62;
@@ -504,18 +554,18 @@ function collectEvent(ev) {
   const { x, y } = evScreen(ev);
   S.tipEvent = true; S.stats.events++;
   if (ev.type === 'chest') {
-    const g = Math.round(rand(15, 30) * (1 + bestZone()) ** 2 * goldMult());
+    const g = Math.round(rand(15, 30) * (1 + S.zone) ** 2 * goldMult());
     S.gold += g;
     coinsFly(x, y, 8); burst(x, y, '#f2c94c', 14);
     floatText(x, y - 30, `+${g} 🪙`, '#f2c94c', 1.4, 1.2);
-    log(`🎁 Opened a chest: ${fmt(g)} gold`, 'lg-gold');
+    log(`🎁 Opened a chest: ${fmt(g)} gold`, 'lg-gold'); sfx('chest');
   } else if (ev.type === 'shrine') {
-    R.buff = 60;
+    R.buff = 60; sfx('magic');
     burst(x, y - 30, '#c9a0ff', 18);
     showBanner('✨ Blessing: +50% XP for 60s');
     log('✨ Shrine blessing: +50% XP for 60 seconds', 'lg-xp');
   } else {
-    burst(x, y, '#fff1a8', 16);
+    burst(x, y, '#fff1a8', 16); sfx('magic');
     if (Math.random() < 0.35) { give('gem'); showBanner('💎 Lucky find: a Gem!'); log('💎 Lucky find: a Gem!', 'lg-xp'); }
     else {
       const kind = ['log', 'ore', 'fish'][randi(0, 2)];
@@ -543,7 +593,7 @@ function tick(dt) {
     if (!R.ent) spawnEntity();
     if (R.ent.x - R.worldX <= R.ent.stop) {
       R.phase = 'act'; startAct();
-      if (R.ent.d && R.ent.d.boss) showBanner(`👑 BOSS: ${R.ent.d.name}`);
+      if (R.ent.d && R.ent.d.boss) { showBanner(`👑 BOSS: ${R.ent.d.name}`); sfx('boss'); }
     }
   } else if (R.phase === 'act') {
     const k = R.ent.kind;
@@ -563,6 +613,7 @@ function tick(dt) {
     if (R.doneT <= 0) { R.ent = null; R.phase = 'walk'; }
   }
   if (R.buff > 0) R.buff -= dt;
+  if (R.rested > 0) R.rested -= dt;
   for (const ev of R.events) ev.age += dt;
   R.events = R.events.filter(ev => ev.age < 25 && ev.x - R.worldX + HX > -60);
   if (!SIM) updateVisuals(dt);
@@ -582,10 +633,10 @@ function combatTick(dt) {
       const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
       const dmg = Math.max(1, Math.round(raw * (1 - damageReduction())));
       S.hp -= dmg;
-      addXp('defence', S.style === 'defence' ? 0 : dmg * 0.5);
+      addXp('defence', dmg * 0.5);
       floatText(HX - 18, GY - 108, '-' + dmg, '#ff6b6b', 1, 1, true);
       burst(HX + 4, GY - 40, '#c22', 5);
-      R.heroHit = 1;
+      R.heroHit = 1; sfx('hurt');
       R.shake = Math.max(R.shake, e.d.boss ? 8 : 3);
     } else floatText(HX - 18, GY - 108, 'Dodge', '#9ad', 1, 1, true);
   }
@@ -603,6 +654,7 @@ function playerHit(e) {
   e.hp -= dmg; e.hit = 1;
   addXp(S.style, dmg * 4);
   addXp('hitpoints', dmg * 1.33);
+  sfx(crit ? 'crit' : 'hit');
   floatText(ex, ey, crit ? dmg + '!' : '-' + dmg, crit ? '#ffe14a' : '#ffd166', 1, crit ? 1.6 : 1);
   burst(ex, GY - entHeight(e) * 0.55, crit ? '#ffe14a' : '#ff5a5a', crit ? 12 : 6);
   if (crit && !SIM) { R.shake = Math.max(R.shake, 5); R.freeze = 0.06; }
@@ -629,6 +681,11 @@ function die() {
   const lost = Math.floor(S.gold * 0.1);
   S.gold -= lost; S.deaths++; R.deathStreak++;
   S.hp = 0; R.phase = 'dead'; R.deadT = 20;
+  if (R.ent.d.boss) {
+    // let the player farm the zone again before the boss comes back
+    S.zk[S.zone] = Math.floor(BOSS_EVERY / 2);
+    log(`👑 ${R.ent.d.name} will return after ${BOSS_EVERY - S.zk[S.zone]} more kills.`, 'lg-bad');
+  }
   log(`💀 You were defeated by ${R.ent.d.name} and dropped ${fmt(lost)} gold. Recovering...`, 'lg-bad');
   uiDirty = true;
 }
@@ -648,6 +705,7 @@ function killEnemy(e) {
   floatText(ex, GY - entHeight(e) - 30, '+' + g + ' 🪙', '#f2c94c', 1.4);
   burst(ex, ey, e.d.color, 18);
   coinsFly(ex, ey, Math.min(12, 3 + Math.floor(g / 10)));
+  sfx('coin');
   if (!SIM) { R.shake = Math.max(R.shake, e.d.boss ? 12 : 4); R.freeze = e.d.boss ? 0.2 : 0.08; }
   const z = S.zone;
   if (e.d.boss) {
@@ -675,6 +733,7 @@ function gatherTick(dt) {
     give(item);
     addXp(e.skill, GATHER_XP[e.tier]);
     floatText(entScreenX(e), GY - 120, `+1 ${ITEMS[item].icon}`, '#ffffff');
+    sfx('gather');
     e.yields--;
     if (e.yields <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
   }
@@ -682,6 +741,7 @@ function gatherTick(dt) {
 
 function setActivity(a) {
   if (S.activity === a) return;
+  if ((a === 'smithing' || a === 'cooking') && S.activity !== 'smithing' && S.activity !== 'cooking') S.prevAct = S.activity;
   S.activity = a;
   if (a === 'combat' && !zoneOpen(S.zone)) S.zone = bestZone();
   resetEncounter();
@@ -730,7 +790,16 @@ function craftTick(dt) {
   e.reason = smithing && LV.smithing < req ? `Needs Smithing ${req}` : 'No materials';
   if (!can && !e.blocked) log(smithing ? '⚠️ Out of materials for smithing.' : '⚠️ No fish left to cook.', 'lg-bad');
   e.blocked = !can;
-  if (!can) return;
+  if (!can) {
+    // don't idle at an empty anvil all night: go back to what the hero was doing before
+    e.blockT = (e.blockT || 0) + dt;
+    if (e.blockT > 3) {
+      const back = S.prevAct || 'combat';
+      log(`↩️ Nothing left to ${smithing ? 'smith' : 'cook'} – back to ${back}.`);
+      setActivity(back);
+    }
+    return;
+  }
   const need = smithing ? SMITH_TIME : COOK_TIME, ex = entScreenX(e);
   e.t += dt;
   if (smithing && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; burst(ex - 6, GY - 46, '#ffb347', 4); }
@@ -739,7 +808,7 @@ function craftTick(dt) {
     if (smithing) {
       R.swing = 1;
       const out = smithOnce(S.smithSel);
-      burst(ex - 6, GY - 46, '#ffd27a', 8);
+      burst(ex - 6, GY - 46, '#ffd27a', 8); sfx('clink');
       floatText(ex, GY - 100, `+1 ${ITEMS[out].icon}`, '#ffffff');
     } else {
       const res = cookOnce(cookTarget());
@@ -838,11 +907,50 @@ function showOfflineSummary(sec, before) {
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
   openModal(`<h2>Welcome back!</h2>
     <p class="muted">While you were away (${h ? h + 'h ' : ''}${m}m), your hero kept travelling:</p>
+    ${R.rested > 0 ? `<p>😴 Well rested: <b>+50% XP</b> for the next ${Math.ceil(R.rested / 60)} minutes.</p>` : ''}
     <ul>${lines.map(l => `<li>${l}</li>`).join('') || '<li>Nothing much happened.</li>'}</ul>
     <button data-a="close">Continue</button>`);
 }
-function openModal(html) { document.getElementById('modal-body').innerHTML = html; document.getElementById('modal').hidden = false; }
-function closeModal() { document.getElementById('modal').hidden = true; }
+function openModal(html) {
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal').hidden = false;
+  document.body.classList.add('modal-open');
+}
+function closeModal() { document.getElementById('modal').hidden = true; document.body.classList.remove('modal-open'); }
+
+/* ================= SOUND (synthesized, no files) ================= */
+let actx = null;
+const sfxLast = {};
+function unlockAudio() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+}
+function tone(freq, dur, type = 'square', vol = 0.12, slide = 0, delay = 0) {
+  const t0 = actx.currentTime + delay;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * slide), t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function sfx(kind) {
+  if (SIM || S.muted || !actx || actx.state !== 'running') return;
+  const now = performance.now();
+  if (now - (sfxLast[kind] || 0) < 60) return;
+  sfxLast[kind] = now;
+  switch (kind) {
+    case 'hit': tone(190, 0.08, 'square', 0.07, 0.4); break;
+    case 'crit': tone(420, 0.12, 'sawtooth', 0.08, 0.3); tone(160, 0.12, 'square', 0.06, 0.5, 0.02); break;
+    case 'hurt': tone(130, 0.14, 'sawtooth', 0.07, 0.5); break;
+    case 'coin': tone(988, 0.07, 'square', 0.05); tone(1319, 0.1, 'square', 0.05, 0, 0.07); break;
+    case 'gather': tone(330, 0.05, 'triangle', 0.08, 0.6); break;
+    case 'clink': tone(1400, 0.08, 'triangle', 0.07); tone(2100, 0.06, 'triangle', 0.04, 0, 0.02); break;
+    case 'level': [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.14, 'triangle', 0.09, 0, i * 0.08)); break;
+    case 'chest': [784, 988, 1319].forEach((f, i) => tone(f, 0.1, 'square', 0.05, 0, i * 0.06)); break;
+    case 'magic': [660, 880, 1175, 1568].forEach((f, i) => tone(f, 0.2, 'sine', 0.07, 0, i * 0.05)); break;
+    case 'boss': tone(98, 0.6, 'sawtooth', 0.09, 0.7); tone(147, 0.6, 'sawtooth', 0.05, 0.7, 0.05); break;
+  }
+}
 
 /* ================= RENDERING ================= */
 
@@ -851,7 +959,7 @@ const ctx = canvas.getContext('2d');
 function resizeCanvas() {
   // phones get a narrower, zoomed-in view so the hero and text stay readable
   const narrow = window.innerWidth < 700;
-  W = narrow ? 560 : 960; HX = narrow ? 140 : 230; FS = narrow ? 1.35 : 1;
+  W = narrow ? 560 : 960; HX = narrow ? 140 : 230; FS = narrow ? 1.55 : 1;
   canvas.style.aspectRatio = `${W} / ${H}`;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = W * dpr; canvas.height = H * dpr;
@@ -1323,6 +1431,11 @@ function bar(x, y, w, h, frac, color) {
   rr(x, y, Math.max(0, w * clamp(frac, 0, 1)), h, 2, color);
 }
 
+const EMOJI = /\p{Extended_Pictographic}/u;
+function outlined(text, x, y, color) {
+  if (!EMOJI.test(text)) ctx.strokeText(text, x, y);
+  ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
 function font(weight, px) { ctx.font = `${weight} ${Math.round(px * FS)}px system-ui, sans-serif`; }
 
 function drawHud() {
@@ -1343,6 +1456,12 @@ function drawHud() {
     font(600, 12);
     rr(10, 16 + lh, ctx.measureText(t).width + 16, ph, 6, 'rgba(90,40,140,0.75)');
     ctx.fillStyle = '#f0e0ff'; ctx.fillText(t, 18, 16 + lh + ph / 2);
+  }
+  if (R.rested > 0) {
+    const t = `😴 Rested +50% XP · ${Math.ceil(R.rested / 60)}m`, ph = 22 * FS, py = 16 + lh + (R.buff > 0 ? ph + 6 : 0);
+    font(600, 12);
+    rr(10, py, ctx.measureText(t).width + 16, ph, 6, 'rgba(30,80,120,0.75)');
+    ctx.fillStyle = '#d8efff'; ctx.fillText(t, 18, py + ph / 2);
   }
   if (S.activity === 'combat') {
     const ready = S.zk[S.zone] >= BOSS_EVERY;
@@ -1368,8 +1487,7 @@ function drawHud() {
       const top = Math.max(GY - entHeight(e) - 24, 34 * FS + 26);
       const name = e.d.boss ? '👑 ' + e.d.name : e.d.name, bw = e.d.boss ? 130 : 70;
       font(e.d.boss ? 700 : 600, e.d.boss ? 14 : 12); ctx.textAlign = 'center'; ctx.fillStyle = e.d.boss ? '#ffe27a' : '#fff';
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.strokeText(name, ex, top - 10 * FS);
-      ctx.fillText(name, ex, top - 10 * FS);
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; outlined(name, ex, top - 10 * FS, ctx.fillStyle);
       bar(ex - bw / 2, top, bw, e.d.boss ? 8 : 6, e.hp / e.maxHp, '#e85a5a');
       ctx.textAlign = 'left';
       bar(HX - 25, GY - 82, 50, 3, 1 - R.atkT / PLAYER_SPEED, '#f2c94c');
@@ -1400,6 +1518,8 @@ function drawHud() {
     ctx.save(); ctx.globalAlpha = a; ctx.translate(W / 2, 62 * FS); ctx.scale(pop, pop);
     font(800, 20); ctx.textAlign = 'center';
     const bw = ctx.measureText(R.banner.text).width + 36;
+    const fit = Math.min(1, (W - 20) / bw);   // shrink long banners on narrow screens
+    ctx.scale(fit, fit);
     rr(-bw / 2, -18 * FS, bw, 36 * FS, 10, 'rgba(20,16,32,0.8)');
     ctx.fillStyle = '#f2c94c'; ctx.fillText(R.banner.text, 0, 1);
     ctx.restore(); ctx.textAlign = 'left';
@@ -1430,7 +1550,7 @@ function draw() {
     font(700, 15 * f.size * pop);
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     const x = f.screen ? f.sx : f.wx - R.worldX + HX;
-    ctx.strokeText(f.text, x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.text, x, f.y);
+    outlined(f.text, x, f.y, f.color);
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'left';
   ctx.restore();
@@ -1484,15 +1604,12 @@ function htmlActivity() {
       <p class="muted">${COOK_TIME}s per fish. Burnt fish gives no XP – higher Cooking burns less.</p>
       <button data-tab="cooking">Choose fish</button>`;
   } else {
-    const sk = S.activity, t = gatherTier(sk);
-    const node = sk === 'woodcutting' ? TREE_N[t] : sk === 'mining' ? METAL[t] + ' Rock' : 'Fishing Spot (' + FISH_N[t] + ')';
-    const nextT = t < 4 ? t + 1 : -1;
-    h += `<b>Target:</b> ${node}<br><span class="muted">${gatherTime(sk, t).toFixed(2)}s per item · ${GATHER_XP[t]} XP · tool level ${S.tools[TOOL_OF[sk]]}/4</span>`;
-    if (nextT > 0) {
-      const needLv = true, needZone = false;
-      h += `<p class="muted">Next tier (${sk === 'woodcutting' ? TREE_N[nextT] : sk === 'mining' ? METAL[nextT] + ' Ore' : FISH_N[nextT]}): ` +
-        [needLv ? `${SKILLS[sk].name} level ${GATHER_REQ[nextT]}` : '', needZone ? `zone "${ZONES[nextT].name}"` : ''].filter(Boolean).join(' and ') + '</p>';
-    }
+    const sk = S.activity, t = chosenTier(sk), best = gatherTier(sk);
+    const names = sk === 'woodcutting' ? TREE_N : sk === 'mining' ? METAL.map(m => m + ' Ore') : FISH_N;
+    h += `<b>Target:</b> ${names[t]}<br><span class="muted">${gatherTime(sk, t).toFixed(2)}s per item · ${GATHER_XP[t]} XP · tool level ${S.tools[TOOL_OF[sk]]}/4</span>
+      <div class="chips"><button class="${S.gsel[sk] < 0 ? 'sel' : ''}" data-a="gtier" data-id="-1">Best</button>` +
+      names.map((n, i) => `<button class="${S.gsel[sk] === i ? 'sel' : ''}" data-a="gtier" data-id="${i}" ${i > best ? 'disabled' : ''}>${i > best ? '🔒 ' : ''}${n}</button>`).join('') + '</div>';
+    if (best < 4) h += `<p class="muted">Next tier (${names[best + 1]}): ${SKILLS[sk].name} level ${GATHER_REQ[best + 1]}. Pick a lower tier if Smithing or Cooking can't use your current one yet.</p>`;
   }
   return h + '</div>';
 }
@@ -1586,7 +1703,7 @@ function htmlProgress() {
     <span>⏳ Offline <b>${offlineCap() / 3600}h</b></span></div>`;
   h += '<h3>🌟 New Journey</h3><div class="info">';
   h += S.bosses[4]
-    ? `<p>Start again from level 1 and earn <b>${renownGain()} Renown</b> (10 + 1 per 20 total levels). You keep achievements, Renown, upgrades and lifetime stats.</p>
+    ? `<p>Start again from level 1 and earn <b>${renownGain()} Renown</b> (more for higher levels and every boss beaten). You keep achievements, Renown, upgrades and lifetime stats.</p>
        <button data-a="journey">🌟 Start a New Journey</button>`
     : `<p class="muted">Defeat the Dragon to unlock. Each journey earns Renown to spend on permanent upgrades below${S.journeys ? ` · Journeys completed: ${S.journeys}` : ''}.</p>`;
   h += `</div><h3>Renown upgrades · 🌟 ${S.renown}</h3><div class="grid">` + Object.entries(RUP).map(([k, u]) => {
@@ -1594,6 +1711,12 @@ function htmlProgress() {
     return `<div class="item"><div class="top"><span class="ic">${u.icon}</span><span class="nm">${u.name}<br><small>${u.desc} · level ${l}/${u.max}</small></span></div>
       <div class="btns">${max ? '<button disabled>Maxed</button>' : `<button data-a="rup" data-id="${k}" ${S.renown < cost ? 'disabled' : ''}>Upgrade – ${cost} 🌟</button>`}</div></div>`;
   }).join('') + '</div>';
+  h += `<h3>Statistics</h3><div class="info stats">
+    <span>Distance walked <b>${fmt(S.dist)} m</b></span><span>Enemies defeated <b>${fmt(S.kills)}</b></span>
+    <span>Deaths <b>${fmt(S.deaths)}</b></span><span>Bosses beaten <b>${S.bosses.filter(Boolean).length} / 5</b></span>
+    <span>Road finds <b>${fmt(S.stats.events)}</b></span><span>Items smithed <b>${fmt(S.stats.smithed)}</b></span>
+    <span>Fish cooked <b>${fmt(S.stats.cooked)}</b></span><span>Total level <b>${totalLevel()}</b></span>
+    <span>Journeys <b>${S.journeys}</b></span></div>`;
   const done = ACH.filter(a => S.ach[a.id]).length;
   h += `<h3>Achievements · ${done} / ${ACH.length}</h3><div class="grid">` + ACH.map(a => `
     <div class="item ach ${S.ach[a.id] ? 'done' : ''}"><div class="top"><span class="ic">${S.ach[a.id] ? '🏆' : '🔒'}</span>
@@ -1670,10 +1793,15 @@ function renderGoal() {
   };
   document.querySelectorAll('nav.tabs [data-tab]').forEach(b => b.classList.toggle('alert', !!alerts[b.dataset.tab] && b.dataset.tab !== tab));
 }
-function openTab(name) {
+function openTab(name, scroll) {
   tab = name;
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('sel', b.dataset.tab === name));
   renderTab(true);
+  if (scroll && window.innerWidth < 700) {
+    // bring the tab's content up just under the sticky game view
+    const top = $('#tab-content').getBoundingClientRect().top + window.scrollY - $('#stage').offsetHeight - 6;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  }
 }
 
 function renderLog() {
@@ -1683,13 +1811,9 @@ function renderLog() {
 
 document.addEventListener('click', ev => {
   const tb = ev.target.closest('[data-tab]');
-  if (tb) { openTab(tb.dataset.tab); return; }
+  if (tb) { openTab(tb.dataset.tab, true); return; }
   const goal = ev.target.closest('#goal');
-  if (goal) {
-    openTab(goal.dataset.goto);
-    if (window.innerWidth < 700) document.querySelector('nav.tabs').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
+  if (goal) { openTab(goal.dataset.goto, true); return; }
   const b = ev.target.closest('[data-a]');
   if (!b || b.disabled) return;
   const id = b.dataset.id, n = +b.dataset.n || 1;
@@ -1705,6 +1829,35 @@ document.addEventListener('click', ev => {
     case 'tool': buyTool(id); break;
     case 'bread': buyBread(n); break;
     case 'rup': buyRup(id); break;
+    case 'gtier': S.gsel[S.activity] = +id; resetEncounter(); break;
+    case 'mute': S.muted = !S.muted; b.textContent = S.muted ? '🔇' : '🔊'; break;
+    case 'export': {
+      const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+      openModal(`<h2>📤 Export save</h2><p class="muted">Copy this code and keep it somewhere safe, or paste it into the game on another device.</p>
+        <textarea id="save-code" readonly>${code}</textarea>
+        <div class="row" style="margin-top:10px"><button data-a="copy">Copy code</button><button data-a="close">Close</button></div>`);
+      break;
+    }
+    case 'copy': {
+      const ta = document.getElementById('save-code');
+      const fallback = () => { ta.select(); b.textContent = 'Selected – copy it'; };
+      if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(() => { b.textContent = 'Copied ✓'; }, fallback); else fallback();
+      break;
+    }
+    case 'import':
+      openModal(`<h2>📥 Import save</h2><p class="muted">Paste a save code. This replaces your current progress.</p>
+        <textarea id="import-code" placeholder="Paste your code here"></textarea>
+        <p class="need" id="import-err" hidden>That code doesn't look like an Endless Road save. Check that you copied all of it.</p>
+        <div class="row" style="margin-top:10px"><button data-a="import-yes">Load save</button><button data-a="close">Cancel</button></div>`);
+      break;
+    case 'import-yes': {
+      let data = null;
+      try { data = JSON.parse(decodeURIComponent(escape(atob(document.getElementById('import-code').value.trim())))); } catch (e) { data = null; }
+      if (!data || data.v !== 1 || !data.skills) { document.getElementById('import-err').hidden = false; return; }
+      applySave(data); R.phase = 'walk'; R.ent = null; R.events = [];
+      save(); closeModal(); log('📥 Save imported.', 'lg-good'); openTab('activity');
+      break;
+    }
     case 'journey':
       openModal(`<h2>🌟 Start a New Journey?</h2>
         <p>Your skills, items, gold and zones reset to the start. You earn <b>${renownGain()} Renown</b> and keep achievements, Renown and upgrades.</p>
@@ -1718,7 +1871,7 @@ document.addEventListener('click', ev => {
         <div class="row"><button data-a="reset-yes">Yes, delete</button><button data-a="close">Cancel</button></div>`);
       break;
     case 'reset-yes':
-      S = newState(); recalcLevels(); recalcBonuses(); R.phase = 'walk'; R.ent = null; R.worldX = 0;
+      S = newState(); recalcLevels(); recalcBonuses(); R.phase = 'walk'; R.ent = null; R.worldX = 0; R.rested = 0;
       logLines = []; renderLog(); save(); closeModal(); log('A new journey begins!');
       break;
   }
@@ -1743,17 +1896,22 @@ canvas.addEventListener('pointermove', ev => {
 
 /* ================= LOOP ================= */
 
-let lastFrame = performance.now(), uiTimer = 0, saveTimer = 0;
+let lastFrame = performance.now(), lastWall = Date.now(), uiTimer = 0, saveTimer = 0;
+// fast-forward time the page was not running; the wall clock keeps counting while a phone sleeps
+function catchUp(sec) {
+  const before = snapshot();
+  const done = simulate(sec);
+  if (done > 600) R.rested = Math.min(1800, done * 0.1);
+  if (done > 60) showOfflineSummary(done, before);
+  uiDirty = true;
+}
 function frame(now) {
-  let dt = (now - lastFrame) / 1000;
+  let dt = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
   lastFrame = now;
-  if (dt > 1) {
-    // tab was hidden – fast-forward the elapsed time
-    const before = snapshot();
-    const sec = simulate(dt);
-    if (sec > 60) showOfflineSummary(sec, before);
-    uiDirty = true;
-  } else if (R.freeze > 0) R.freeze -= dt;   // hit-stop
+  const wall = Date.now(), gap = (wall - lastWall) / 1000;
+  lastWall = wall;
+  if (gap > 2) catchUp(gap);
+  else if (R.freeze > 0) R.freeze -= dt;   // hit-stop
   else tick(dt);
   draw();
   uiTimer += dt; saveTimer += dt;
@@ -1767,17 +1925,22 @@ function init() {
   window.addEventListener('resize', resizeCanvas);
   load();
   const away = (Date.now() - (S.last || Date.now())) / 1000;
-  if (away > 60) {
-    const before = snapshot();
-    const sec = simulate(away);
-    showOfflineSummary(sec, before);
-  }
+  if (away > 60) catchUp(away);
   log('Welcome! Your hero sets off on the endless road.');
+  $('#mute').textContent = S.muted ? '🔇' : '🔊';
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios && !navigator.standalone && !S.tipA2HS && location.protocol === 'https:' && !/claude/.test(location.hostname)) {
+    S.tipA2HS = true;
+    log('📱 Tip: tap Share → Add to Home Screen to play full screen and keep your save safe.', 'lg-xp');
+  }
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { /* not supported */ }
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  // browsers only allow sound after the first tap
+  window.addEventListener('pointerdown', unlockAudio, { passive: true });
   renderTab(true); renderHero(); renderGoal();
-  window.addEventListener('beforeunload', save);
   window.addEventListener('pagehide', save);   // iOS Safari does not fire beforeunload
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
-  requestAnimationFrame(t => { lastFrame = t; requestAnimationFrame(frame); });
+  requestAnimationFrame(t => { lastFrame = t; lastWall = Date.now(); requestAnimationFrame(frame); });
 }
 init();
 </script>
