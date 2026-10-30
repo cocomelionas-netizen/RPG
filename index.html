@@ -432,7 +432,7 @@ const SMITH_ITEMS = [
   { key: 'fullhelm',   name: 'Full Helm',  off: 7,  bars: 2, slot: 'helm',   arm: 0.25, icon: '⛑️' },
   { key: 'chainbody',  name: 'Chainbody',  off: 11, bars: 3, slot: 'body',   arm: 0.4,  icon: '🥋' },
   { key: 'kiteshield', name: 'Kiteshield', off: 12, bars: 3, slot: 'shield', arm: 0.3,  icon: '🛡️' },
-  { key: '2h',         name: '2h Sword',   off: 14, bars: 3, slot: 'weapon', pw: 1.5,  speed: 2.6, twoHanded: true, icon: '⚔️' },
+  { key: '2h',         name: '2h Sword',   off: 14, bars: 3, slot: 'weapon', pw: 1.8,  speed: 2.6, twoHanded: true, icon: '⚔️' },
   { key: 'platelegs',  name: 'Platelegs',  off: 16, bars: 3, slot: 'legs',   arm: 0.35, icon: '👖' },
   { key: 'platebody',  name: 'Platebody',  off: 18, bars: 5, slot: 'body',   arm: 0.6,  icon: '🥋' },
 ];
@@ -446,7 +446,7 @@ const STAFF_N = ['Apprentice Staff', 'Adept Staff', 'Mystic Staff', 'Master Staf
 const GATHER_REQ = [1, 15, 30, 50, 70];
 const GATHER_TIME = [3, 3.5, 4, 4.5, 5];
 const GATHER_XP = [10, 20, 35, 55, 80];
-const ESSENCE_TIME = 2.2, ESSENCE_XP = 5;
+const ESSENCE_TIME = 2.2, ESSENCE_XP = 9;
 const TOOL_COST = [300, 3000, 20000, 80000];
 const TOOL_NAMES = { axe: 'Axe', pick: 'Pickaxe', rod: 'Fishing Rod' };
 const TOOL_OF = { woodcutting: 'axe', mining: 'pick', fishing: 'rod' };
@@ -480,7 +480,9 @@ for (let m = 0; m < 6; m++) {
   RECIPES.push({ out: 'bar' + m, req: BARS[m].lvl, xp: BARS[m].xp, mats: BARS[m].mats, station: 'furnace', time: 2.0 });
   for (const k of SMITH_ITEMS) {
     const id = k.key === 'sword' ? 'sword' + m : k.key === 'platebody' ? 'armor' + m : k.key + m;   // keep old save ids where they exist
-    const it = { name: `${mn} ${k.name}`, icon: k.icon, color, tier: m, metal: m, kind: k.key, value: Math.round(BARS[m].xp * k.bars * 1.3 + 4), type: k.slot ? 'Equipment' : 'Resources' };
+    // worth a little more than the bars that went in; multi-item recipes (arrowtips) split that value
+    const barV = ITEMS['bar' + m].value, value = k.n ? Math.max(1, Math.round(barV * 1.2 * k.bars / k.n)) : Math.round(barV * k.bars * 1.1);
+    const it = { name: `${mn} ${k.name}`, icon: k.icon, color, tier: m, metal: m, kind: k.key, value, type: k.slot ? 'Equipment' : 'Resources' };
     if (k.slot) Object.assign(it, { slot: k.slot, req: METAL_EQUIP[m] });
     if (k.slot === 'weapon') Object.assign(it, { wtype: 'melee', power: Math.round(METAL_POWER[m] * k.pw), speed: k.speed, twoHanded: !!k.twoHanded });
     if (k.arm) it.armor = Math.max(1, Math.round(METAL_ARMOUR[m] * k.arm));
@@ -489,12 +491,12 @@ for (let m = 0; m < 6; m++) {
   }
 }
 // endgame set made from Dragon drops and rune bars
-defItem('sword6', { name: 'Dragon Scimitar', icon: '🗡️', color: METAL_COLORS[6], tier: 6, metal: 6, kind: 'scimitar', dragon: true, value: 900, slot: 'weapon', wtype: 'melee', power: 36, speed: 1.8, req: 60, type: 'Equipment' });
+defItem('sword6', { name: 'Dragon Scimitar', icon: '🗡️', color: METAL_COLORS[6], tier: 6, metal: 6, kind: 'scimitar', dragon: true, value: 900, slot: 'weapon', wtype: 'melee', power: 40, speed: 1.8, req: 60, type: 'Equipment' });
 defItem('armor6', { name: 'Dragon Platebody', icon: '🥋', color: METAL_COLORS[6], tier: 6, metal: 6, kind: 'platebody', dragon: true, value: 1400, slot: 'body', armor: 18, req: 60, type: 'Equipment' });
 RECIPES.push({ out: 'sword6', req: 90, xp: 400, mats: { bar5: 2, gem: 2, scale: 1 }, station: 'anvil', metal: 6 });
 RECIPES.push({ out: 'armor6', req: 92, xp: 600, mats: { bar5: 3, scale: 3 }, station: 'anvil', metal: 6 });
 const FLETCH = [];
-for (let m = 0; m < 6; m++) FLETCH.push({ out: 'arrow' + m, n: 15, req: [1, 15, 30, 45, 60, 75][m], xp: [8, 16, 28, 44, 64, 80][m], mats: { ['tips' + m]: 1, ['log' + Math.min(4, m)]: 1 } });
+for (let m = 0; m < 6; m++) FLETCH.push({ out: 'arrow' + m, n: 5, req: [1, 15, 30, 45, 60, 75][m], xp: [8, 16, 28, 44, 64, 80][m], mats: { ['tips' + m]: 1, ['log' + Math.min(4, m)]: 1 } });
 for (let t = 0; t < 5; t++) {
   FLETCH.push({ out: 'bow' + t, req: GATHER_REQ[t] + 2, xp: [14, 28, 50, 80, 120][t], mats: { ['log' + t]: 3 } });
   FLETCH.push({ out: 'staff' + t, req: GATHER_REQ[t] + 4, xp: [16, 32, 56, 88, 130][t], mats: t < 3 ? { ['log' + t]: 2, essence: 5 + t * 5 } : { ['log' + t]: 2, essence: 20, gem: 1 } });
@@ -502,15 +504,15 @@ for (let t = 0; t < 5; t++) {
 // elemental staffs give unlimited runes of their element, as in OSRS
 for (const el of Object.keys(ELEMENT)) {
   const E = ELEMENT[el];
-  defItem('bstaff_' + el, { name: `${E.name} Battlestaff`, icon: '🪄', color: E.color, value: 400, slot: 'weapon', wtype: 'magic', power: 9, req: 30, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
-  defItem('mstaff_' + el, { name: `Mystic ${E.name} Staff`, icon: '🪄', color: E.color, value: 1500, slot: 'weapon', wtype: 'magic', power: 15, req: 50, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
+  defItem('bstaff_' + el, { name: `${E.name} Battlestaff`, icon: '🪄', color: E.color, value: 200, slot: 'weapon', wtype: 'magic', power: 9, req: 30, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
+  defItem('mstaff_' + el, { name: `Mystic ${E.name} Staff`, icon: '🪄', color: E.color, value: 700, slot: 'weapon', wtype: 'magic', power: 15, req: 50, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
   FLETCH.push({ out: 'bstaff_' + el, req: 40, xp: 90, mats: { log2: 2, ['r_' + el]: 100, essence: 20 } });
   FLETCH.push({ out: 'mstaff_' + el, req: 65, xp: 160, mats: { log3: 2, ['r_' + el]: 300, gem: 1 } });
 }
 // shortbows are quick; longbows hit harder and more accurately but slower. A bow fires arrows up to one metal past its wood
 for (let t = 0; t < 5; t++) {
   Object.assign(ITEMS['bow' + t], { name: WOOD[t] + ' Shortbow', speed: 1.5, arrowMax: t + 1 });
-  defItem('lbow' + t, { name: WOOD[t] + ' Longbow', icon: '🏹', tier: t, value: [15, 35, 70, 140, 280][t], slot: 'weapon', wtype: 'ranged', power: Math.round([3, 7, 12, 18, 26][t] * 1.6), speed: 2.0, acc: 0.08, arrowMax: t + 1, req: GATHER_REQ[t], type: 'Equipment', note: '+8% accuracy' });
+  defItem('lbow' + t, { name: WOOD[t] + ' Longbow', icon: '🏹', tier: t, value: [15, 35, 70, 140, 280][t], slot: 'weapon', wtype: 'ranged', power: Math.round([3, 7, 12, 18, 26][t] * 1.75), speed: 2.0, acc: 0.12, arrowMax: t + 1, req: GATHER_REQ[t], type: 'Equipment', note: '+12% accuracy' });
   FLETCH.push({ out: 'lbow' + t, req: GATHER_REQ[t] + 6, xp: [20, 40, 70, 112, 168][t], mats: { ['log' + t]: 4 } });
 }
 // rare Slayer drops
@@ -548,9 +550,9 @@ defItem('viggora',   { name: "Viggora's Chainmace", icon: '🔨', color: '#6aff8
 defItem('thammaron', { name: "Thammaron's Sceptre", icon: '🪄', color: '#6aff8a', unique: true, value: 15000, slot: 'weapon', wtype: 'magic', power: 24, req: 60, ether: true, type: 'Equipment', note: 'in the Revenant Caves: +50% damage and accuracy (1 ether per attack)' });
 defItem('bread',   { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
 defItem('burnt',   { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
-defItem('bones',   { name: 'Bones', icon: '🦴', value: 3, bury: 5, pp: 1, type: 'Misc' });
-defItem('bigbones', { name: 'Big Bones', icon: '🦴', value: 10, bury: 15, pp: 3, type: 'Misc' });
-defItem('dragonbones', { name: 'Dragon Bones', icon: '🦴', value: 60, bury: 70, pp: 12, type: 'Misc' });
+defItem('bones',   { name: 'Bones', icon: '🦴', value: 3, bury: 15, pp: 1, type: 'Misc' });
+defItem('bigbones', { name: 'Big Bones', icon: '🦴', value: 10, bury: 45, pp: 3, type: 'Misc' });
+defItem('dragonbones', { name: 'Dragon Bones', icon: '🦴', value: 60, bury: 210, pp: 12, type: 'Misc' });
 defItem('essence', { name: 'Rune Essence', icon: '🔹', value: 2, type: 'Resources' });
 defItem('gem',     { name: 'Gem', icon: '💎', value: 150, type: 'Misc' });
 defItem('scale',   { name: 'Dragon Scale', icon: '🐉', value: 600, type: 'Misc' });
@@ -563,13 +565,13 @@ const RUNES = [
   { id: 'water', name: 'Water Rune', icon: '💧', lvl: 5,  xp: 6,   value: 3,  color: '#4fa3ff' },
   { id: 'earth', name: 'Earth Rune', icon: '🪨', lvl: 9,  xp: 6.5, value: 3,  color: '#8bd34a' },
   { id: 'fire',  name: 'Fire Rune',  icon: '🔥', lvl: 14, xp: 7,   value: 4,  color: '#ff7a2a' },
-  { id: 'chaos', name: 'Chaos Rune', icon: '⚡', lvl: 35, xp: 8.5, value: 8,  color: '#f2c94c', cat: true },
+  { id: 'chaos', name: 'Chaos Rune', icon: '⚡', lvl: 35, xp: 8.5, value: 6,  color: '#f2c94c', cat: true },
   { id: 'death', name: 'Death Rune', icon: '💀', lvl: 65, xp: 10,  value: 15, color: '#d8d8e0', cat: true },
   { id: 'blood', name: 'Blood Rune', icon: '🩸', lvl: 77, xp: 11,  value: 20, color: '#d8303a', cat: true },
 ];
 for (const r of RUNES) defItem('r_' + r.id, { name: r.name, icon: r.icon, color: r.color, value: r.value, type: 'Runes' });
 // more runes per essence as Runecrafting grows past the rune's level
-const RUNECRAFT = RUNES.map(r => ({ out: 'r_' + r.id, req: r.lvl, xp: r.xp, mats: { essence: 1 },
+const RUNECRAFT = RUNES.map(r => ({ out: 'r_' + r.id, req: r.lvl, xp: Math.round(r.xp * 1.8 * 10) / 10, mats: { essence: 1 },
   n: () => r.cat ? 1 + Math.floor((LV.runecrafting - r.lvl) / 15) : 2 + Math.floor((LV.runecrafting - r.lvl) / 10) }));
 const CRAFT = {
   smithing:     { recipes: RECIPES,   time: 2.4, verb: 'Smith',  stat: 'smithed',  spark: '#ffd27a', place: 'furnaces and anvils' },
@@ -624,8 +626,8 @@ const TYPE_ICON = { melee: '⚔️', ranged: '🏹', magic: '✨' };
 const TYPE_NAME = { melee: 'Melee', ranged: 'Ranged', magic: 'Magic' };
 const BEATS = { melee: 'ranged', ranged: 'magic', magic: 'melee' };   // Melvor's combat triangle
 const STYLES = {
-  melee:  [['attack', 'Accurate', 'Attack XP'], ['strength', 'Aggressive', 'Strength XP'], ['defence', 'Defensive', 'Defence XP']],
-  ranged: [['accurate', 'Accurate', 'Ranged XP'], ['rapid', 'Rapid', 'Ranged XP, faster'], ['longrange', 'Longrange', 'Ranged + Defence XP']],
+  melee:  [['attack', 'Accurate', 'Attack XP · +8 accuracy'], ['strength', 'Aggressive', 'Strength XP · +8 strength'], ['defence', 'Defensive', 'Defence XP']],
+  ranged: [['accurate', 'Accurate', 'Ranged XP · +8% hit, +8 strength'], ['rapid', 'Rapid', 'Ranged XP · faster, −8% hit chance'], ['longrange', 'Longrange', 'Ranged + Defence XP']],
   magic:  [['standard', 'Standard', 'Magic XP'], ['defensive', 'Defensive', 'Magic + Defence XP']],
 };
 // the OSRS standard spellbook: every element in five tiers
@@ -669,15 +671,16 @@ const ENEMIES = {
   orc:      { name: 'Orc',            type: 'melee',  hp: 520,  maxHit: 32, atk: 48, def: 47, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bigbones', 1, 1, 1], ['ore_coal', .4, 3, 6], ['gem', .03, 1, 1]] },
   icemage:  { name: 'Ice Mage',       type: 'magic',  hp: 600,  maxHit: 36, atk: 50, def: 44, speed: 2.6, gold: [20, 45],   shape: 'humanoid', size: 1,   color: '#e0eaff', body: '#4a6aa8', orb: '#9fe0ff', drops: [['bones', 1, 1, 1], ['r_water', .8, 10, 20], ['gem', .04, 1, 1]] },
   troll:    { name: 'Troll',          type: 'melee',  hp: 800,  maxHit: 40, atk: 54, def: 54, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bigbones', 1, 1, 2], ['ore_mithril', .2, 2, 4], ['gem', .05, 1, 1]] },
+  yeti:     { name: 'Yeti',           type: 'melee',  hp: 1000, maxHit: 44, atk: 60, def: 58, speed: 2.8, gold: [35, 70],   shape: 'quad',     size: 1.5, color: '#e8eef5', drops: [['bigbones', 1, 1, 2], ['ore_adamantite', .15, 1, 2], ['gem', .05, 1, 1]] },
   lizard:   { name: 'Fire Lizard',    type: 'magic',  hp: 1200, maxHit: 50, atk: 68, def: 68, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', breath: true, drops: [['bigbones', 1, 1, 1], ['ore_adamantite', .2, 1, 3], ['gem', .06, 1, 1]] },
   imp:      { name: 'Fire Imp',       type: 'magic',  hp: 1000, maxHit: 46, atk: 64, def: 62, speed: 1.8, gold: [45, 80],   shape: 'flyer',    size: 1,   color: '#c43a2a', orb: '#ff7a2a', drops: [['ore_adamantite', .15, 1, 2], ['gem', .05, 1, 1]] },
   drakeknight: { name: 'Dragon Knight', type: 'melee', hp: 1300, maxHit: 52, atk: 70, def: 72, speed: 2.6, gold: [55, 95],  shape: 'humanoid', size: 1.2, color: '#c8a080', body: '#7a1e14', drops: [['bigbones', 1, 1, 2], ['ore_runite', .15, 1, 2], ['bar4', .2, 1, 2], ['gem', .05, 1, 1]] },
   // zone bosses
   kingslime: { name: 'King Slime',    type: 'melee',  hp: 150,  maxHit: 6,  atk: 6,  def: 5,  speed: 2.6, gold: [60, 100],  shape: 'blob',     size: 1.9, color: '#3fbf5a', boss: true, drops: [['bread', 1, 5, 10]] },
-  gobchief: { name: 'Goblin Chief',   type: 'melee',  hp: 450,  maxHit: 14, atk: 20, def: 18, speed: 2.4, gold: [150, 250], shape: 'humanoid', size: 1.15, color: '#5d9a34', body: '#8a2f2f', boss: true, drops: [['bigbones', 1, 1, 2], ['ore_iron', 1, 5, 10], ['gem', .2, 1, 1]] },
-  bonelord: { name: 'Bone Lord',      type: 'magic',  hp: 1300, maxHit: 30, atk: 42, def: 40, speed: 2.6, gold: [400, 700], shape: 'humanoid', size: 1.4, color: '#efe9d6', body: '#6b5fa0', orb: '#7dffb0', boss: true, drops: [['bigbones', 1, 3, 5], ['ore_coal', 1, 6, 12], ['gem', .4, 1, 2]] },
+  gobchief: { name: 'Goblin Chief',   type: 'melee',  hp: 600,  maxHit: 14, atk: 20, def: 18, speed: 2.4, gold: [150, 250], shape: 'humanoid', size: 1.15, color: '#5d9a34', body: '#8a2f2f', boss: true, drops: [['bigbones', 1, 1, 2], ['ore_iron', 1, 5, 10], ['gem', .2, 1, 1]] },
+  bonelord: { name: 'Bone Lord',      type: 'magic',  hp: 1300, maxHit: 34, atk: 42, def: 40, speed: 2.6, gold: [400, 700], shape: 'humanoid', size: 1.4, color: '#efe9d6', body: '#6b5fa0', orb: '#7dffb0', boss: true, drops: [['bigbones', 1, 3, 5], ['ore_coal', 1, 6, 12], ['gem', .4, 1, 2]] },
   frosttroll: { name: 'Frost Troll',  type: 'melee',  hp: 3200, maxHit: 50, atk: 62, def: 62, speed: 3.0, gold: [900, 1500], shape: 'humanoid', size: 1.85, color: '#a8d8f0', body: '#3a5470', boss: true, drops: [['bigbones', 1, 3, 6], ['ore_mithril', 1, 6, 12], ['gem', .6, 1, 3]] },
-  dragon:   { name: 'Dragon',         type: 'magic',  hp: 15000, maxHit: 110, atk: 95, def: 95, speed: 3.2, gold: [2000, 3500], shape: 'dragon', size: 1, color: '#9b2222', breath: true, boss: true, drops: [['dragonbones', 1, 1, 2], ['scale', 1, 1, 2], ['gem', 1, 1, 3]] },
+  dragon:   { name: 'Dragon',         type: 'magic',  hp: 10000, maxHit: 80, atk: 84, def: 84, speed: 3.2, gold: [2000, 3500], shape: 'dragon', size: 1, color: '#9b2222', breath: true, boss: true, drops: [['dragonbones', 1, 1, 2], ['scale', 1, 1, 2], ['gem', 1, 1, 3]] },
   bogmother: { name: 'Bog Mother',    type: 'melee',  hp: 1500, maxHit: 24, atk: 34, def: 32, speed: 2.6, gold: [250, 450], shape: 'blob',     size: 2.4, color: '#4f6f2f', boss: true, drops: [['bigbones', 1, 2, 3], ['essence', 1, 10, 20], ['gem', .25, 1, 1]] },
   warden:   { name: 'Crystal Warden',  type: 'ranged', hp: 5000, maxHit: 50, atk: 66, def: 68, speed: 2.6, gold: [900, 1600], shape: 'humanoid', size: 1.8, color: '#c8f6ff', body: '#2f7f99', orb: '#9fe8ff', boss: true, drops: [['ore_runite', .6, 2, 4], ['gem', .5, 1, 2]] },
   overlord: { name: 'Abyssal Overlord', type: 'melee', hp: 12000, maxHit: 72, atk: 88, def: 86, speed: 2.8, gold: [2500, 4000], shape: 'humanoid', size: 2.0, color: '#9a3a8a', body: '#1e0618', orb: '#c050ff', boss: true, drops: [['ore_runite', 1, 3, 6], ['gem', .8, 1, 2], ['bigbones', 1, 2, 4]] },
@@ -702,9 +705,9 @@ const ZONES = [
     th: { sky: ['#3f6b7d', '#a5c6b2'], far: '#4f7366', mid: '#2f5d3a', near: '#1b3b24', ground: '#365f2b', dirt: '#4a3826', sun: '#e8f0c0', decor: 'pine' } },
   { name: 'Shadow Caves',    req: 25, tier: 2, boss: 'bonelord', enemies: ['bat', 'skeleton', 'cultist'],
     th: { sky: ['#140f1d', '#352841'], far: '#2a2134', mid: '#3a2e46', near: '#22192b', ground: '#4a3f4f', dirt: '#2a2230', sun: null, decor: 'stalag', cave: true } },
-  { name: 'Ice Mountains',   req: 45, tier: 3, boss: 'frosttroll', enemies: ['orc', 'icemage', 'troll'],
+  { name: 'Ice Mountains',   req: 45, tier: 3, boss: 'frosttroll', enemies: ['orc', 'icemage', 'troll', 'yeti'],
     th: { sky: ['#8fa9cc', '#eef4fb'], far: '#d3deeb', mid: '#97aac0', near: '#5f7186', ground: '#e9eff6', dirt: '#a3b0be', sun: '#ffffff', decor: 'rock', snow: true } },
-  { name: 'Dragon\'s Lair',  req: 70, tier: 4, boss: 'dragon', enemies: ['lizard', 'imp', 'drakeknight'],
+  { name: 'Dragon\'s Lair',  req: 65, tier: 4, boss: 'dragon', enemies: ['lizard', 'imp', 'drakeknight'],
     th: { sky: ['#2a0808', '#c2481e'], far: '#5a1a14', mid: '#3a1410', near: '#1c0806', ground: '#2b1a17', dirt: '#140b09', sun: '#ffb347', decor: 'spike', lava: true } },
   // Slayer areas: opened by Slayer level instead of bosses
   { name: 'Haunted Swamp',   slayer: 10, tier: 1, boss: 'bogmother', enemies: ['bog', 'wisp'],
@@ -717,7 +720,7 @@ const ZONES = [
 
 // elemental weaknesses for the spellbook
 for (const [el, ids] of Object.entries({
-  fire: ['slime', 'kingslime', 'goblin', 'gobarcher', 'gobchief', 'icemage', 'troll', 'frosttroll', 'bog', 'bogmother', 'shade'],
+  fire: ['slime', 'kingslime', 'goblin', 'gobarcher', 'gobchief', 'icemage', 'troll', 'frosttroll', 'yeti', 'bog', 'bogmother', 'shade'],
   water: ['lizard', 'imp', 'drakeknight', 'dragon', 'abyssal'],
   earth: ['skeleton', 'bonelord', 'golem', 'warden', 'orc', 'wisp'],
   air: ['rat', 'wolf', 'bat', 'cultist', 'sentry', 'overlord'],
@@ -739,8 +742,10 @@ Object.assign(ENEMIES.revknight, { styles: ['melee', 'magic'] });
 Object.assign(ENEMIES.revdragon, { styles: ['magic', 'ranged'] });
 // revenant loot scales with the revenant: k = 1 (imp) to 6 (dragon)
 for (const [id, k] of Object.entries({ revimp: 1, revgob: 2, revknight: 4, revdragon: 6 }))
-  ENEMIES[id].drops.push(['ether', 1, k, k * 3], ['emblem', 0.01 * k, 1, 1], ['totem', 0.005 * k, 1, 1], ['statuette', 0.0015 * k, 1, 1],
+  ENEMIES[id].drops.push(['ether', 1, k, k * 3], ['emblem', 0.005 * k, 1, 1], ['totem', 0.0025 * k, 1, 1], ['statuette', 0.00075 * k, 1, 1],
     ['bracelet', 0.004 * k, 1, 1], ['craw', 0.0006 * k, 1, 1], ['viggora', 0.0006 * k, 1, 1], ['thammaron', 0.0006 * k, 1, 1]);
+// normal monsters pay three times their listed gold, so fighting keeps up with skilling
+for (const d of Object.values(ENEMIES)) if (!d.boss && !d.ghost) d.gold = d.gold.map(g => g * 3);
 // unique drops: [item, chance, min, max]
 const BOSS_UNIQUES = {
   kingslime: [['slimegloves', 1 / 8]], gobchief: [['gobboots', 1 / 10]], bonelord: [['bonering', 1 / 14]], frosttroll: [['frostcape', 1 / 14]],
@@ -787,10 +792,10 @@ const GATHERING = ['woodcutting', 'mining', 'fishing'];
 const SHOP = [
   { id: 'bread', n: 1, cost: 5 },
   { id: 'arrow0', n: 50, cost: 60 },
-  { id: 'r_air', n: 50, cost: 60 },
-  { id: 'r_mind', n: 50, cost: 80 },
-  { id: 'r_chaos', n: 25, cost: 250 },
-  { id: 'essence', n: 50, cost: 60 },
+  { id: 'r_air', n: 50, cost: 125 },
+  { id: 'r_mind', n: 50, cost: 175 },
+  { id: 'r_chaos', n: 25, cost: 175 },
+  { id: 'essence', n: 50, cost: 125 },
   { id: 'gloves0', n: 1, cost: 40 },
   { id: 'boots0', n: 1, cost: 40 },
   { id: 'cape0', n: 1, cost: 60 },
@@ -1081,26 +1086,28 @@ function weaponPower() { return S.equip.weapon && attackMode() !== 'unarmed' ? I
 function armorValue() { return ARMOUR_SLOTS.reduce((a, sl) => a + (S.equip[sl] ? ITEMS[S.equip[sl]].armor : 0), 0); }
 function playerMaxHit() {
   const m = attackMode(), p = weaponPower();
-  const base = m === 'ranged' ? 4 + LV.ranged * 0.7 + p * 0.8 + (noAmmo() ? 12 : ITEMS[bestArrow()].power)
+  const base = m === 'ranged' ? 4 + (LV.ranged + (S.styles.ranged === 'accurate' ? 8 : 0)) * 0.7 + p * 0.8 + (noAmmo() ? 12 : ITEMS[bestArrow()].power)
     : m === 'magic' ? curSpell().max + LV.magic * 0.35 + p
-    : 4 + LV.strength * 0.7 + p;
+    : 4 + (LV.strength + (S.styles.melee === 'strength' ? 8 : 0)) * 0.7 + p;
   return Math.floor(base * (1 + amu('dmg') + pray('dmg') + petB('dmg')));
 }
 function accuracyLevel() {
   const m = attackMode();
-  return (m === 'ranged' ? LV.ranged : m === 'magic' ? LV.magic : LV.attack) + weaponPower() * 0.5;
+  return (m === 'ranged' ? LV.ranged : m === 'magic' ? LV.magic : LV.attack + (S.styles.melee === 'attack' ? 8 : 0)) + weaponPower() * 0.5;
 }
 function playerSpeed() {
   const m = attackMode();
   const w = S.equip.weapon && ITEMS[S.equip.weapon];
-  return m === 'ranged' ? +((w && w.speed || 1.6) - (S.styles.ranged === 'rapid' ? 0.3 : 0)).toFixed(1) : m === 'magic' ? 2.2 : m === 'melee' && w && w.speed ? w.speed : 1.8;
+  return m === 'ranged' ? +((w && w.speed || 1.6) - (S.styles.ranged === 'rapid' ? 0.2 : 0)).toFixed(1) : m === 'magic' ? 2.2 : m === 'melee' && w && w.speed ? w.speed : 1.8;
 }
 // +1: the hero's style beats the enemy's, -1: the enemy's beats the hero's
 // bosses switch attack styles mid-fight, so use the style of the current attack
 function etype(e) { return e.style || e.d.type; }
 function triangle(e) { const p = combatType(), t = etype(e); return BEATS[p] === t ? 1 : BEATS[t] === p ? -1 : 0; }
 function onTask(e) { return !!(S.task && e.id === S.task.id); }
-function playerHitChance(e) { return clamp(0.6 + (accuracyLevel() - e.def) * 0.03 + amu('acc') + pray('acc') + petB('acc'), 0.1, 0.97); }
+// ranged styles: Accurate aims better and hits harder, Rapid trades some accuracy for speed
+function rangedStyleAcc() { return attackMode() === 'ranged' && S.styles.ranged === 'accurate' ? 0.08 : 0; }
+function playerHitChance(e) { return clamp(0.6 + (accuracyLevel() - e.def) * 0.03 + amu('acc') + pray('acc') + petB('acc') + rangedStyleAcc(), 0.1, 0.97) * (attackMode() === 'ranged' && S.styles.ranged === 'rapid' ? 0.92 : 1); }
 function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue()) * 0.02, 0.15, 0.95); }
 function damageReduction() { return Math.min(0.6, armorValue() * 0.012 + LV.defence * 0.002 + amu('dr') + pray('dr') + petB('dr')); }
 
@@ -1340,7 +1347,9 @@ function combatTick(dt) {
     if (mode !== 'unarmed') R.ammoWarn = false;
     const p = activePrayer();
     if (p) {
-      if (S.pp >= p.cost) S.pp -= p.cost;
+      // prayer points drain once every three attacks
+      R.prayN = (R.prayN || 0) + 1;
+      if (R.prayN % 3) { /* free swing */ } else if (S.pp >= p.cost) S.pp -= p.cost;
       else { S.prayer = null; log('🙏 Out of prayer points – prayer stopped. Bury bones to restore them.', 'lg-bad'); }
     }
     R.swing = 1;
@@ -1430,7 +1439,7 @@ function playerHit(e, shot) {
   const roll = 1 + Math.floor(Math.random() * shot.maxHit);
   const crit = roll >= Math.max(3, shot.maxHit * 0.9);
   const tri = triangle(e);
-  const mult = (tri > 0 ? 1.2 : tri < 0 ? 0.85 : 1) * (onTask(e) ? 1 + amu('slay') : 1) * (shot.weak ? WEAK_BONUS : 1);
+  const mult = (tri > 0 ? 1.2 : tri < 0 ? 0.85 : 1) * (onTask(e) ? 1 + amu('slay') : 1) * (shot.weak ? WEAK_BONUS : 1) * (1 - (e.d.dr || 0));
   const dmg = Math.min(e.hp, Math.max(1, Math.round(roll * mult)));
   e.hp -= dmg; e.hit = 1;
   combatXp(dmg);
@@ -1460,7 +1469,7 @@ function autoEat() {
 
 function die() {
   if (inWild()) wildDeath(R.ent);
-  const lost = Math.floor(S.gold * 0.1);
+  const lost = Math.floor(Math.min(S.gold * 0.1, 2000 * ((ZONES[S.zone].tier || 0) + 1)));
   S.gold -= lost; S.deaths++; R.deathStreak++;
   S.hp = 0; R.phase = 'dead'; R.deadT = 20;
   if (R.ent.d.boss) {
@@ -1481,7 +1490,7 @@ function killEnemy(e) {
   const ex = entScreenX(e), ey = GY - entHeight(e) * 0.5;
   for (const [id, ch, mn, mx] of e.d.drops) {
     // a skull brings better revenant loot
-    if (Math.random() >= ch * (inWild() && S.wild.skull && id !== 'ether' ? 1.5 : 1)) continue;
+    if (Math.random() >= ch * (inWild() && S.wild.skull && id !== 'ether' ? 1.25 : 1)) continue;
     const n = randi(mn, mx);
     if (ITEMS[id].bury && S.autoBury) bury(id, n, true); else if (inWild() && id !== 'ether') wildGive(id, n); else give(id, n);
     got.push(`${n}× ${ITEMS[id].name}`);
@@ -1495,7 +1504,7 @@ function killEnemy(e) {
   sfx('coin');
   if (!SIM) { R.shake = Math.max(R.shake, e.d.boss ? 12 : 4); R.freeze = e.d.boss ? 0.2 : 0.08; }
   if (onTask(e)) slayerKill(e);
-  if (e.d.pker && S.ctarget === 'pvp') S.wild.gold += e.d.lvl * 40;   // bounty for hunting
+  if (e.d.pker && S.ctarget === 'pvp') S.wild.gold += e.d.lvl * 8;   // bounty for hunting
   if (e.d.pker) { S.wild.pks++; log(`☠️ You defeated ${e.d.name}! Their gear is in your looting bag.`, 'lg-xp'); showBanner(`☠️ You PK'd ${e.d.name}!`); }
   const z = S.zone;
   if (BOSS_PETS[e.id]) rollPet(...BOSS_PETS[e.id]);
@@ -1563,7 +1572,7 @@ function setZone(i) {
 }
 /* ===== Revenant Caves: loot is at risk until you leave; player killers hunt you ===== */
 const PK_NAMES = ['Zezima', 'xX Pk3r Xx', 'Iron Mike', 'Lil Purple', 'Wildy Wanda', 'Dharok Dan', 'Rune Rick', 'Skull Kid', 'Mage Mikey', 'Tank Tim', 'Ranger Rose', 'Bonk Lord', 'G Maul Gary', 'Freeze Frank'];
-const PK_CHANCE = 0.12, PK_ESCAPE = 0.65;
+const PK_CHANCE = 0.18, PK_ESCAPE = 0.5;
 function inWild() { return S.zone === WILD; }
 function bagValue() { return S.wild.gold + Object.entries(S.wild.loot).reduce((a, [id, n]) => a + ITEMS[id].value * n, 0); }
 function wildGive(id, n) { S.wild.loot[id] = (S.wild.loot[id] || 0) + n; }
@@ -1613,8 +1622,8 @@ function makePker() {
   const styles = Math.random() < 0.5 ? [main] : [main, all.filter(x => x !== main)[randi(0, 1)]];
   const weapon = { melee: 'scimitar' + m, ranged: (m >= 3 ? 'lbow' : 'bow') + Math.min(4, m), magic: m >= 3 ? 'bstaff_' + ['air', 'water', 'earth', 'fire'][randi(0, 3)] : 'staff' + Math.min(4, m) }[main];
   return { name: PK_NAMES[randi(0, PK_NAMES.length - 1)], pker: true, lvl, type: styles[0], styles: styles.length > 1 ? styles : null,
-    hp: 250 + lvl * 14, maxHit: Math.round(5 + lvl * 0.5), atk: Math.round(lvl * 0.95), def: Math.round(lvl * 0.9), speed: 2.3,
-    gold: [lvl * 25, lvl * 60], shape: 'humanoid', size: 1, color: '#f1c27d', body: METAL_COLORS[m], orb: '#c58bff', food: randi(2, 4),
+    hp: 250 + lvl * 18, maxHit: Math.round(10 + lvl * 1.0), atk: Math.round(lvl * 1.1), def: Math.round(lvl * 0.9), speed: 2.3, dr: 0.3,
+    gold: [lvl * 25, lvl * 60], shape: 'humanoid', size: 1, color: '#f1c27d', body: METAL_COLORS[m], orb: '#c58bff', food: randi(4, 8),
     drops: [[weapon, .35, 1, 1], ['armor' + m, .25, 1, 1], ['platelegs' + m, .25, 1, 1], ['fullhelm' + m, .2, 1, 1], ['emblem', .12, 1, 1], ['ether', .6, 5, 25]] };
 }
 
@@ -1876,10 +1885,12 @@ function bury(id, n, quiet) {
   n = quiet ? n : Math.min(n, has(id));
   if (n <= 0) return;
   if (!quiet) take(id, n);
-  addXp('prayer', ITEMS[id].bury * n);
+  // offering bones by hand at the Riverbend altar is worth 3.5x the XP
+  const altar = !quiet && S.zone === TOWN;
+  addXp('prayer', ITEMS[id].bury * n * (altar ? 3.5 : 1));
   S.pp = Math.min(9999, S.pp + ITEMS[id].pp * n);
   S.stats.buried += n;
-  if (!quiet) log(`🙏 Buried ${n}× ${ITEMS[id].name}`, 'lg-good');
+  if (!quiet) log(`🙏 ${altar ? 'Offered' : 'Buried'} ${n}× ${ITEMS[id].name}${altar ? ' at the Riverbend altar (3.5× Prayer XP)' : ''}`, 'lg-good');
 }
 function togglePrayer(id) {
   const p = PRAYERS.find(x => x.id === id);
@@ -1903,7 +1914,7 @@ function newTask() {
 }
 function skipTask() { if (S.scoins < 25 || !S.task) return; S.scoins -= 25; newTask(); }
 function slayerKill(e) {
-  addXp('slayer', e.d.hp * 0.25 * (1 + amu('slay')));
+  addXp('slayer', e.d.hp * 0.4 * (1 + amu('slay')));
   S.scoins += Math.max(1, Math.round(e.d.hp / 60));
   if (--S.task.left > 0) return;
   const bonus = 10 + S.task.n * 2;
@@ -4303,7 +4314,7 @@ function zoneEnemies(z) {
 function htmlCombatPanel() {
   const wt = wtype(), mode = attackMode(), ct = combatType();
   let h = `<div class="row"><b>Weapon:</b> ${S.equip.weapon ? itemLabel(S.equip.weapon) : 'Fists'} <span class="tag">${TYPE_ICON[ct]} ${TYPE_NAME[ct]}</span></div>`;
-  if (mode === 'unarmed' && wt !== 'melee') h += `<p class="need">${wt === 'ranged' ? `No arrows this bow can fire (up to ${METALS[weaponItem().arrowMax ?? 5]})` : 'No runes for any spell you know'} – your hero is punching. Fletch or buy ${wt === 'ranged' ? 'arrows' : 'runes (Craft → Runecrafting, or the Shop)'}.</p>`;
+  if (mode === 'unarmed' && wt !== 'melee') h += `<p class="need">${wt === 'ranged' ? `No arrows this bow can fire (up to ${METALS[weaponItem().arrowMax ?? 5]})` : `No runes for any spell you know${staffRune() && staffRune() !== 'air' ? ' (your staff still needs Air runes for most spells)' : ''}`} – your hero is punching. Fletch or buy ${wt === 'ranged' ? 'arrows' : 'runes (Craft → Runecrafting, or the Shop)'}.</p>`;
   h += `<h3>Style</h3><div class="chips">` + STYLES[ct].map(([id, n, xp]) =>
     `<button class="${S.styles[ct] === id ? 'sel' : ''}" data-a="style" data-id="${id}">${n}<small>${xp}</small></button>`).join('') + '</div>';
   if (wt === 'magic') {
@@ -4330,8 +4341,9 @@ function htmlCombatPanel() {
       return `<span class="tag ${t > 0 ? 'good' : t < 0 ? 'bad' : ''}">${TYPE_ICON[d.type]} ${d.name}${t > 0 ? ' · strong' : t < 0 ? ' · weak' : ''}${d.weak ? ` · ${ELEMENT[d.weak].icon}` : ''}</span>`;
     }).join('') + '</div>';
   h += `<h3>🙏 Prayer · ${fmt(S.pp)} points</h3><div class="chips">` + PRAYERS.map(pr =>
-    `<button class="${S.prayer === pr.id ? 'sel' : ''}" data-a="prayer" data-id="${pr.id}" ${LV.prayer < pr.lvl ? 'disabled' : ''}>${LV.prayer < pr.lvl ? '🔒' : pr.icon} ${pr.name}<small>Lv ${pr.lvl} · ${pr.desc} · ${pr.cost} pt/attack</small></button>`).join('') + '</div>';
+    `<button class="${S.prayer === pr.id ? 'sel' : ''}" data-a="prayer" data-id="${pr.id}" ${LV.prayer < pr.lvl ? 'disabled' : ''}>${LV.prayer < pr.lvl ? '🔒' : pr.icon} ${pr.name}<small>Lv ${pr.lvl} · ${pr.desc} · ${pr.cost} pt / 3 attacks</small></button>`).join('') + '</div>';
   h += `<label class="check"><input type="checkbox" id="autobury" data-a="autobury" ${S.autoBury ? 'checked' : ''}> Bury bones automatically (Prayer XP + prayer points)</label>
+    <p class="muted">Tip: turn this off and bury your bones by hand (Bag) while in Riverbend – the altar there gives 3.5× Prayer XP.</p>
     <p class="muted">When HP drops below 40%, the hero eats the best food available.</p>`;
   return h;
 }
@@ -4376,7 +4388,7 @@ function wildPanel() {
     <p>🎒 Looting bag: <b class="lg-gold">${fmt(bagValue())} gold</b>${w.gold ? ` · 🪙 ${fmt(w.gold)}` : ''}${bag.map(([id, n]) => ` · ${ITEMS[id].icon} ${fmt(n)}`).join('')}</p>
     <div class="btns">
       <button data-a="wildleave" ${w.in ? '' : 'disabled'}>🏃 Teleport out and bank</button>
-      <button data-a="wildskull" class="${w.skull ? 'sel' : ''}" ${w.in ? '' : 'disabled'}>☠️ Skull ${w.skull ? 'ON' : 'off'}<small> +50% rare loot, keep 0 items</small></button>
+      <button data-a="wildskull" class="${w.skull ? 'sel' : ''}" ${w.in ? '' : 'disabled'}>☠️ Skull ${w.skull ? 'ON' : 'off'}<small> +25% rare loot, keep 0 items</small></button>
       ${S.ctarget === 'pvp' ? '' : `<button data-a="wildflee" class="${w.flee ? 'sel' : ''}">${w.flee ? '🏃 Run from PKers' : '⚔️ Fight PKers'}</button>`}
     </div>
     <small class="muted">PKers defeated ${fmt(w.pks)} · deaths here ${fmt(w.deaths)} · banked ${fmt(w.banked)} gold</small></div>`;

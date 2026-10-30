@@ -15,24 +15,24 @@ create table if not exists public.xp_table (lvl int primary key, xp bigint not n
 alter table public.item_values enable row level security;
 alter table public.xp_table enable row level security;
 insert into public.item_values (id, value) values
-  ('2h0', 27),
-  ('2h1', 51),
-  ('2h2', 70),
-  ('2h3', 121),
-  ('2h4', 148),
-  ('2h5', 199),
+  ('2h0', 26),
+  ('2h1', 40),
+  ('2h2', 99),
+  ('2h3', 198),
+  ('2h4', 396),
+  ('2h5', 858),
   ('abyssring', 8000),
   ('amu_acc', 200),
   ('amu_def', 300),
   ('amu_fury', 3000),
   ('amu_slayer', 300),
   ('amu_str', 400),
-  ('armor0', 43),
-  ('armor1', 82),
-  ('armor2', 115),
-  ('armor3', 199),
-  ('armor4', 245),
-  ('armor5', 329),
+  ('armor0', 44),
+  ('armor1', 66),
+  ('armor2', 165),
+  ('armor3', 330),
+  ('armor4', 660),
+  ('armor5', 1430),
   ('armor6', 1400),
   ('arrow0', 1),
   ('arrow1', 2),
@@ -58,19 +58,19 @@ insert into public.item_values (id, value) values
   ('bow4', 200),
   ('bracelet', 3000),
   ('bread', 2),
-  ('bstaff_air', 400),
-  ('bstaff_earth', 400),
-  ('bstaff_fire', 400),
-  ('bstaff_water', 400),
+  ('bstaff_air', 200),
+  ('bstaff_earth', 200),
+  ('bstaff_fire', 200),
+  ('bstaff_water', 200),
   ('burnt', 1),
   ('cape0', 40),
   ('cbow', 2500),
-  ('chainbody0', 27),
-  ('chainbody1', 51),
-  ('chainbody2', 70),
-  ('chainbody3', 121),
-  ('chainbody4', 148),
-  ('chainbody5', 199),
+  ('chainbody0', 26),
+  ('chainbody1', 40),
+  ('chainbody2', 99),
+  ('chainbody3', 198),
+  ('chainbody4', 396),
+  ('chainbody5', 858),
   ('cooked0', 5),
   ('cooked1', 12),
   ('cooked2', 25),
@@ -78,12 +78,12 @@ insert into public.item_values (id, value) values
   ('cooked4', 100),
   ('craw', 15000),
   ('crystalgloves', 3000),
-  ('dagger0', 12),
-  ('dagger1', 20),
-  ('dagger2', 26),
-  ('dagger3', 43),
-  ('dagger4', 52),
-  ('dagger5', 69),
+  ('dagger0', 9),
+  ('dagger1', 13),
+  ('dagger2', 33),
+  ('dagger3', 66),
+  ('dagger4', 132),
+  ('dagger5', 286),
   ('dboots', 4000),
   ('dragonbones', 60),
   ('emblem', 5000),
@@ -96,21 +96,21 @@ insert into public.item_values (id, value) values
   ('fish3', 20),
   ('fish4', 40),
   ('frostcape', 2000),
-  ('fullhelm0', 20),
-  ('fullhelm1', 35),
-  ('fullhelm2', 48),
-  ('fullhelm3', 82),
-  ('fullhelm4', 100),
-  ('fullhelm5', 134),
+  ('fullhelm0', 18),
+  ('fullhelm1', 26),
+  ('fullhelm2', 66),
+  ('fullhelm3', 132),
+  ('fullhelm4', 264),
+  ('fullhelm5', 572),
   ('gem', 150),
   ('gloves0', 30),
   ('gobboots', 600),
-  ('kiteshield0', 27),
-  ('kiteshield1', 51),
-  ('kiteshield2', 70),
-  ('kiteshield3', 121),
-  ('kiteshield4', 148),
-  ('kiteshield5', 199),
+  ('kiteshield0', 26),
+  ('kiteshield1', 40),
+  ('kiteshield2', 99),
+  ('kiteshield3', 198),
+  ('kiteshield4', 396),
+  ('kiteshield5', 858),
   ('lbow0', 15),
   ('lbow1', 35),
   ('lbow2', 70),
@@ -121,16 +121,16 @@ insert into public.item_values (id, value) values
   ('log2', 10),
   ('log3', 20),
   ('log4', 40),
-  ('medhelm0', 12),
-  ('medhelm1', 20),
-  ('medhelm2', 26),
-  ('medhelm3', 43),
-  ('medhelm4', 52),
-  ('medhelm5', 69),
-  ('mstaff_air', 1500),
-  ('mstaff_earth', 1500),
-  ('mstaff_fire', 1500),
-  ('mstaff_water', 1500),
+  ('medhelm0', 9),
+  ('medhelm1', 13),
+  ('medhelm2', 33),
+  ('medhelm3', 66),
+  ('medhelm4', 132),
+  ('medhelm5', 286),
+  ('mstaff_air', 700),
+  ('mstaff_earth', 700),
+  ('mstaff_fire', 700),
+  ('mstaff_water', 700),
   ('ore_adamantite', 55),
   ('ore_coal', 10),
   ('ore_copper', 3),
@@ -138,27 +138,27 @@ insert into public.item_values (id, value) values
   ('ore_mithril', 30),
   ('ore_runite', 110),
   ('ore_tin', 3),
-  ('platelegs0', 27),
-  ('platelegs1', 51),
-  ('platelegs2', 70),
-  ('platelegs3', 121),
-  ('platelegs4', 148),
-  ('platelegs5', 199),
+  ('platelegs0', 26),
+  ('platelegs1', 40),
+  ('platelegs2', 99),
+  ('platelegs3', 198),
+  ('platelegs4', 396),
+  ('platelegs5', 858),
   ('r_air', 2),
   ('r_blood', 20),
-  ('r_chaos', 8),
+  ('r_chaos', 6),
   ('r_death', 15),
   ('r_earth', 3),
   ('r_fire', 4),
   ('r_mind', 3),
   ('r_water', 3),
   ('scale', 600),
-  ('scimitar0', 20),
-  ('scimitar1', 35),
-  ('scimitar2', 48),
-  ('scimitar3', 82),
-  ('scimitar4', 100),
-  ('scimitar5', 134),
+  ('scimitar0', 18),
+  ('scimitar1', 26),
+  ('scimitar2', 66),
+  ('scimitar3', 132),
+  ('scimitar4', 264),
+  ('scimitar5', 572),
   ('slimegloves', 300),
   ('sstaff', 2500),
   ('staff0', 12),
@@ -167,20 +167,20 @@ insert into public.item_values (id, value) values
   ('staff3', 120),
   ('staff4', 240),
   ('statuette', 40000),
-  ('sword0', 12),
-  ('sword1', 20),
-  ('sword2', 26),
-  ('sword3', 43),
-  ('sword4', 52),
-  ('sword5', 69),
+  ('sword0', 9),
+  ('sword1', 13),
+  ('sword2', 33),
+  ('sword3', 66),
+  ('sword4', 132),
+  ('sword5', 286),
   ('sword6', 900),
   ('thammaron', 15000),
-  ('tips0', 12),
-  ('tips1', 20),
-  ('tips2', 26),
-  ('tips3', 43),
-  ('tips4', 52),
-  ('tips5', 69),
+  ('tips0', 1),
+  ('tips1', 1),
+  ('tips2', 2),
+  ('tips3', 5),
+  ('tips4', 10),
+  ('tips5', 21),
   ('totem', 12000),
   ('viggora', 15000),
   ('whip', 2500)
@@ -317,11 +317,11 @@ create table if not exists public.item_stats (
 alter table public.item_stats enable row level security;
 insert into public.item_stats (id, name, slot, wtype, power, armor, speed, acc, dmg, dr, heal) values
   ('2h0', 'Bronze 2h Sword', 'weapon', 'melee', 5, 0, '2.6', 0, 0, 0, 0),
-  ('2h1', 'Iron 2h Sword', 'weapon', 'melee', 9, 0, '2.6', 0, 0, 0, 0),
-  ('2h2', 'Steel 2h Sword', 'weapon', 'melee', 15, 0, '2.6', 0, 0, 0, 0),
-  ('2h3', 'Mithril 2h Sword', 'weapon', 'melee', 23, 0, '2.6', 0, 0, 0, 0),
-  ('2h4', 'Adamant 2h Sword', 'weapon', 'melee', 32, 0, '2.6', 0, 0, 0, 0),
-  ('2h5', 'Rune 2h Sword', 'weapon', 'melee', 42, 0, '2.6', 0, 0, 0, 0),
+  ('2h1', 'Iron 2h Sword', 'weapon', 'melee', 11, 0, '2.6', 0, 0, 0, 0),
+  ('2h2', 'Steel 2h Sword', 'weapon', 'melee', 18, 0, '2.6', 0, 0, 0, 0),
+  ('2h3', 'Mithril 2h Sword', 'weapon', 'melee', 27, 0, '2.6', 0, 0, 0, 0),
+  ('2h4', 'Adamant 2h Sword', 'weapon', 'melee', 38, 0, '2.6', 0, 0, 0, 0),
+  ('2h5', 'Rune 2h Sword', 'weapon', 'melee', 50, 0, '2.6', 0, 0, 0, 0),
   ('abyssring', 'Ring of the Abyss', 'ring', null, 0, 0, null, 0.03, 0.06, 0, 0),
   ('amu_acc', 'Amulet of Accuracy', 'amulet', null, 0, 0, null, 0.06, 0, 0, 0),
   ('amu_def', 'Amulet of Warding', 'amulet', null, 0, 0, null, 0, 0, 0.05, 0),
@@ -412,11 +412,11 @@ insert into public.item_stats (id, name, slot, wtype, power, armor, speed, acc, 
   ('kiteshield3', 'Mithril Kiteshield', 'shield', null, 0, 3, null, 0, 0, 0, 0),
   ('kiteshield4', 'Adamant Kiteshield', 'shield', null, 0, 4, null, 0, 0, 0, 0),
   ('kiteshield5', 'Rune Kiteshield', 'shield', null, 0, 6, null, 0, 0, 0, 0),
-  ('lbow0', 'Birch Longbow', 'weapon', 'ranged', 5, 0, '2', 0.08, 0, 0, 0),
-  ('lbow1', 'Oak Longbow', 'weapon', 'ranged', 11, 0, '2', 0.08, 0, 0, 0),
-  ('lbow2', 'Maple Longbow', 'weapon', 'ranged', 19, 0, '2', 0.08, 0, 0, 0),
-  ('lbow3', 'Yew Longbow', 'weapon', 'ranged', 29, 0, '2', 0.08, 0, 0, 0),
-  ('lbow4', 'Magic Longbow', 'weapon', 'ranged', 42, 0, '2', 0.08, 0, 0, 0),
+  ('lbow0', 'Birch Longbow', 'weapon', 'ranged', 5, 0, '2', 0.12, 0, 0, 0),
+  ('lbow1', 'Oak Longbow', 'weapon', 'ranged', 12, 0, '2', 0.12, 0, 0, 0),
+  ('lbow2', 'Maple Longbow', 'weapon', 'ranged', 21, 0, '2', 0.12, 0, 0, 0),
+  ('lbow3', 'Yew Longbow', 'weapon', 'ranged', 32, 0, '2', 0.12, 0, 0, 0),
+  ('lbow4', 'Magic Longbow', 'weapon', 'ranged', 46, 0, '2', 0.12, 0, 0, 0),
   ('log0', 'Birch Logs', null, null, 0, 0, null, 0, 0, 0, 0),
   ('log1', 'Oak Logs', null, null, 0, 0, null, 0, 0, 0, 0),
   ('log2', 'Maple Logs', null, null, 0, 0, null, 0, 0, 0, 0),
@@ -474,7 +474,7 @@ insert into public.item_stats (id, name, slot, wtype, power, armor, speed, acc, 
   ('sword3', 'Mithril Sword', 'weapon', 'melee', 15, 0, '1.8', 0, 0, 0, 0),
   ('sword4', 'Adamant Sword', 'weapon', 'melee', 21, 0, '1.8', 0, 0, 0, 0),
   ('sword5', 'Rune Sword', 'weapon', 'melee', 28, 0, '1.8', 0, 0, 0, 0),
-  ('sword6', 'Dragon Scimitar', 'weapon', 'melee', 36, 0, '1.8', 0, 0, 0, 0),
+  ('sword6', 'Dragon Scimitar', 'weapon', 'melee', 40, 0, '1.8', 0, 0, 0, 0),
   ('thammaron', 'Thammaron''s Sceptre', 'weapon', 'magic', 24, 0, null, 0, 0, 0, 0),
   ('tips0', 'Bronze Arrowtips', null, null, 0, 0, null, 0, 0, 0, 0),
   ('tips1', 'Iron Arrowtips', null, null, 0, 0, null, 0, 0, 0, 0),
@@ -648,20 +648,23 @@ create or replace function public.save_problems(prof profiles, old saves, p_data
 language plpgsql security definer set search_path = public as $$
 declare
   el numeric; journey boolean; k text; gain numeric; total numeric := 0;
-  reasons text[] := '{}'; q_gold numeric; q_xp numeric;
-  -- limits, well above anything the game can reach legitimately
-  xp_rate constant numeric := 600;      -- XP per second in one skill
-  xp_total_rate constant numeric := 1000; -- XP per second over all skills
-  xp_grace constant numeric := 10000;   -- small jumps such as a level-up landing between saves
-  gold_rate constant numeric := 300;    -- wealth per second (best legit money makers are near 150)
-  gold_grace constant numeric := 25000; -- one rare drop between saves
+  reasons text[] := '{}'; q_gold numeric; q_xp numeric; m numeric;
+  xp_rate numeric; xp_total_rate numeric; xp_grace numeric;
+  -- wealth limits, well above the best legitimate money makers (about 150 gold a second)
+  gold_rate constant numeric := 200;
+  gold_grace constant numeric := 60000; -- one rare drop (Ancient Statuette 40k) between two quick saves
 begin
   el := least(extract(epoch from now() - old.updated_at), 86400) + 30;
+  -- XP limits follow the hero's own XP multiplier: Renown Wisdom (+15% each) and achievements (up to +76%);
+  -- 3 covers rested x shrine x bonfire, mastery and pets, which can all be active at once
+  m := 1.76 + 0.15 * least(coalesce((p_data -> 'rup' ->> 'wisdom')::numeric, 0), 10);
+  xp_rate := 330 * m * 3; xp_total_rate := 500 * m * 3; xp_grace := 10000 * m;
   -- quests finished since the last save bring exactly their reward
   select coalesce(sum(r.gold + r.items), 0), coalesce(sum(r.xp), 0) into q_gold, q_xp
     from jsonb_each(case when jsonb_typeof(p_data -> 'quests') = 'object' then p_data -> 'quests' else '{}' end) e
     join quest_rewards r on r.id = e.key
     where e.value ->> 's' = 'done' and coalesce(old.data -> 'quests' -> e.key ->> 's', '') <> 'done';
+  q_xp := q_xp * m;   -- quest XP goes through the same multiplier
   journey := coalesce((p_data ->> 'journeys')::int, 0) = coalesce((old.data ->> 'journeys')::int, 0) + 1;
   -- another device (or an old tab) sending older progress: hand it the newer save
   if (not journey and coalesce((p_data ->> 'kills')::numeric, 0) < coalesce((old.data ->> 'kills')::numeric, 0))
@@ -680,7 +683,7 @@ begin
   if gain > el * gold_rate + gold_grace + q_gold + prof.credit then reasons := reasons || format('wealth +%s in %s s', round(gain), round(el)); end if;
   -- kills are lifetime and survive a New Journey
   gain := coalesce((p_data ->> 'kills')::numeric, 0) - coalesce((old.data ->> 'kills')::numeric, 0);
-  if gain > el / 0.8 + 10 then reasons := reasons || format('kills +%s in %s s', round(gain), round(el)); end if;
+  if gain > el / 3 + 10 then reasons := reasons || format('kills +%s in %s s', round(gain), round(el)); end if;
   if array_length(reasons, 1) > 0 then
     insert into cheat_flags (user_id, reason, detail) values (prof.id, array_to_string(reasons, '; '), jsonb_build_object('elapsed', round(el)));
     update profiles set flags = flags + 1 where id = prof.id;
@@ -733,7 +736,7 @@ language plpgsql stable security definer set search_path = public as $$
 declare
   lv jsonb := '{}'; k text; x numeric; w item_stats; t text; r record;
   armor numeric := 0; acc numeric := 0; dmg numeric := 0; dr numeric := 0;
-  atk int; str int; def int; hpl int; power numeric; maxhit int; spd numeric; food int; heal numeric; cmb int;
+  atk int; str int; def int; hpl int; power numeric; maxhit int; spd numeric; food int; heal numeric; cmb int; extra numeric := 0;
 begin
   for k, x in select key, value::numeric from jsonb_each_text(coalesce(d -> 'skills', '{}')) loop
     lv := lv || jsonb_build_object(k, level_from_xp(x));
@@ -748,7 +751,16 @@ begin
   str := coalesce((lv ->> (case t when 'melee' then 'strength' else t end))::int, 1);
   def := coalesce((lv ->> 'defence')::int, 1);
   hpl := coalesce((lv ->> 'hitpoints')::int, 1);
-  maxhit := floor((case t when 'magic' then 8 + str * 0.4 + power when 'ranged' then 10 + str * 0.7 + power * 0.8 else 4 + str * 0.7 + power end) * (1 + dmg));
+  if t = 'magic' then
+    -- the best spell this Magic level can cast (game spellbook: level, max hit)
+    select coalesce(max(v.mx), 8) into extra from (values (1, 8), (5, 10), (9, 12), (13, 14), (17, 16), (23, 18), (29, 20), (35, 22), (41, 26), (47, 28), (53, 30), (59, 32), (62, 36), (65, 38), (70, 40), (75, 42), (81, 48), (85, 50), (90, 53), (95, 56)) v(lv, mx) where v.lv <= str;
+  elsif t = 'ranged' then
+    -- the best arrows in the bag (the Crystal Bow needs none)
+    select coalesce(max(s.power), 0) into extra from jsonb_each_text(coalesce(d -> 'inv', '{}')) e join item_stats s on s.id = e.key
+      where e.key like 'arrow%' and e.value::numeric > 0;
+    if w.id = 'cbow' then extra := 12; end if;
+  end if;
+  maxhit := floor((case t when 'magic' then extra + str * 0.35 + power when 'ranged' then 4 + str * 0.7 + power * 0.8 + extra else 4 + str * 0.7 + power end) * (1 + dmg));
   spd := coalesce(w.speed, case t when 'ranged' then 1.6 when 'magic' then 2.2 else 1.8 end);
   cmb := floor((greatest((coalesce((lv ->> 'attack')::int, 1) + coalesce((lv ->> 'strength')::int, 1)) / 2.0,
                          coalesce((lv ->> 'ranged')::int, 1), coalesce((lv ->> 'magic')::int, 1)) + def + hpl) / 3);
@@ -756,8 +768,8 @@ begin
   select s.heal, least(e.value::numeric, 10)::int into heal, food
     from jsonb_each_text(coalesce(d -> 'inv', '{}')) e join item_stats s on s.id = e.key where s.heal > 0 and e.value::numeric > 0
     order by s.heal desc limit 1;
-  return jsonb_build_object('type', t, 'atk', atk + power * 0.5, 'def', def, 'armor', armor, 'hp', 40 + hpl * 10,
-    'maxhit', greatest(1, maxhit), 'speed', spd, 'acc', acc, 'dr', least(0.6, armor * 0.012 + def * 0.002 + dr),
+  return jsonb_build_object('type', t, 'atk', atk + (power + case when t = 'magic' then extra else 0 end) * 0.5, 'def', def, 'armor', armor, 'hp', 40 + hpl * 10,
+    'maxhit', greatest(1, maxhit), 'speed', spd, 'acc', acc, 'dr', least(0.4, armor * 0.012 + def * 0.002 + dr),
     'food', coalesce(food, 0), 'heal', coalesce(heal, 0), 'combat', cmb);
 end $$;
 
@@ -776,7 +788,7 @@ language plpgsql security definer set search_path = public as $$
 declare
   uid uuid := auth.uid(); me profiles; op profiles; ms saves; os saves; a jsonb; b jsonb;
   ahp numeric; bhp numeric; amax numeric; bmax numeric; at numeric; bt numeric; afood int; bfood int;
-  ev jsonb := '[]'; t numeric; dmg numeric; tri numeric; n int := 0;
+  ev jsonb := '[]'; t numeric; dmg numeric; tri numeric; n int := 0; adealt numeric := 0; bdealt numeric := 0;
   win boolean; expct numeric; chg int; gold int;
   beats constant jsonb := '{"melee":"ranged","ranged":"magic","magic":"melee"}';
 begin
@@ -801,17 +813,17 @@ begin
 
   a := fighter(ms.data); b := fighter(os.data);
   amax := (a ->> 'hp')::numeric; bmax := (b ->> 'hp')::numeric; ahp := amax; bhp := bmax;
-  afood := (a ->> 'food')::int; bfood := (b ->> 'food')::int;
+  afood := least(4, (a ->> 'food')::int); bfood := least(4, (b ->> 'food')::int);   -- short fights, not food races
   at := (a ->> 'speed')::numeric * 0.5; bt := (b ->> 'speed')::numeric * 0.8;
   while ahp > 0 and bhp > 0 and n < 400 loop
     n := n + 1;
     if at <= bt then
       t := at; at := at + (a ->> 'speed')::numeric;
       if random() < greatest(0.1, least(0.95, 0.6 + ((a ->> 'atk')::numeric - (b ->> 'def')::numeric - (b ->> 'armor')::numeric * 0.5) * 0.02 + (a ->> 'acc')::numeric)) then
-        tri := case when beats ->> (a ->> 'type') = b ->> 'type' then 1.2 when beats ->> (b ->> 'type') = a ->> 'type' then 0.85 else 1 end;
+        tri := case when beats ->> (a ->> 'type') = b ->> 'type' then 1.1 when beats ->> (b ->> 'type') = a ->> 'type' then 0.92 else 1 end;
         dmg := greatest(1, round((1 + floor(random() * (a ->> 'maxhit')::numeric)) * (1 - (b ->> 'dr')::numeric) * tri));
       else dmg := 0; end if;
-      bhp := greatest(0, bhp - dmg);
+      bhp := greatest(0, bhp - dmg); adealt := adealt + dmg;
       ev := ev || jsonb_build_object('t', round(t, 2), 's', 'a', 'd', dmg, 'hp', bhp);
       if bhp > 0 and bhp < bmax * 0.4 and bfood > 0 then
         bfood := bfood - 1; bhp := least(bmax, bhp + (b ->> 'heal')::numeric);
@@ -820,10 +832,10 @@ begin
     else
       t := bt; bt := bt + (b ->> 'speed')::numeric;
       if random() < greatest(0.1, least(0.95, 0.6 + ((b ->> 'atk')::numeric - (a ->> 'def')::numeric - (a ->> 'armor')::numeric * 0.5) * 0.02 + (b ->> 'acc')::numeric)) then
-        tri := case when beats ->> (b ->> 'type') = a ->> 'type' then 1.2 when beats ->> (a ->> 'type') = b ->> 'type' then 0.85 else 1 end;
+        tri := case when beats ->> (b ->> 'type') = a ->> 'type' then 1.1 when beats ->> (a ->> 'type') = b ->> 'type' then 0.92 else 1 end;
         dmg := greatest(1, round((1 + floor(random() * (b ->> 'maxhit')::numeric)) * (1 - (a ->> 'dr')::numeric) * tri));
       else dmg := 0; end if;
-      ahp := greatest(0, ahp - dmg);
+      ahp := greatest(0, ahp - dmg); bdealt := bdealt + dmg;
       ev := ev || jsonb_build_object('t', round(t, 2), 's', 'd', 'd', dmg, 'hp', ahp);
       if ahp > 0 and ahp < amax * 0.4 and afood > 0 then
         afood := afood - 1; ahp := least(amax, ahp + (a ->> 'heal')::numeric);
@@ -832,7 +844,7 @@ begin
     end if;
     exit when t > 240;
   end loop;
-  win := bhp <= 0 or (ahp > 0 and ahp / amax >= bhp / bmax);
+  win := bhp <= 0 or (ahp > 0 and adealt >= bdealt);   -- on a timeout the harder hitter wins
   expct := 1 / (1 + power(10, (op.rating - me.rating) / 400.0));
   chg := round(32 * ((case when win then 1 else 0 end) - expct));
   gold := case when win then 40 * (b ->> 'combat')::int else 0 end;
