@@ -172,6 +172,20 @@
   .uq { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #2f2a44; color: var(--muted); }
   .uq.got { background: #2e4a2a; color: #c8f0b8; }
   .item.boss { box-shadow: inset 0 0 0 1px #6b5a24; }
+  .tag.m { background: #3a3014; color: #f2c94c; }
+  .bar.pool > i { background: #c99a2e; }
+  .mpool { margin-top: 8px; display: grid; gap: 4px; }
+  .mpool button { justify-self: start; padding: 3px 10px; font-size: 12px; }
+  .steps { list-style: none; padding: 0; margin: 8px 0 12px; font-size: 13px; }
+  .mlist { display: grid; gap: 6px; }
+  .mrow { display: flex; align-items: center; gap: 8px; background: var(--panel2); border-radius: 8px; padding: 6px 8px; }
+  .mrow.lock { opacity: .5; }
+  .mrow .ic { font-size: 22px; } .mrow .nm { flex: 1; } .mrow .bar { margin-top: 4px; height: 6px; }
+  .mrow button { display: flex; flex-direction: column; align-items: center; padding: 3px 8px; font-size: 12px; min-height: 0; }
+  .spellbook { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 6px; margin-top: 8px; }
+  .spell { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 1px; padding: 6px 8px; border-left: 3px solid var(--c); }
+  .spell small { font-size: 11px; color: var(--muted); }
+  .spell.cur { box-shadow: 0 0 0 1px var(--c); }
   .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #2f2a44; color: var(--muted); }
   .tag.good { background: #1f3a24; color: var(--good); } .tag.bad { background: #3f2024; color: var(--bad); }
   .quest { border: 1px solid transparent; }
@@ -407,6 +421,15 @@ const TOOL_NAMES = { axe: 'Axe', pick: 'Pickaxe', rod: 'Fishing Rod' };
 const TOOL_OF = { woodcutting: 'axe', mining: 'pick', fishing: 'rod' };
 const COOK_TIME = 2.0, STATION_CRAFTS = 10;
 const MAIN_ZONES = 5;    // zones 0-4 form the story road; the rest are Slayer areas
+// spell elements; enemies weak to an element take +35% damage from its spells
+const ELEMENT = {
+  air:   { word: 'Wind',  name: 'Air',   icon: '🌀', color: '#d8f0ff' },
+  water: { word: 'Water', name: 'Water', icon: '💧', color: '#4fa3ff' },
+  earth: { word: 'Earth', name: 'Earth', icon: '🪨', color: '#8bd34a' },
+  fire:  { word: 'Fire',  name: 'Fire',  icon: '🔥', color: '#ff7a2a' },
+};
+const WEAK_BONUS = 1.35;
+
 
 const ITEMS = {};
 function defItem(id, o) { ITEMS[id] = Object.assign({ id }, o); }
@@ -445,9 +468,23 @@ for (let t = 0; t < 5; t++) {
   FLETCH.push({ out: 'bow' + t, req: GATHER_REQ[t] + 2, xp: [14, 28, 50, 80, 120][t], mats: { ['log' + t]: 3 } });
   FLETCH.push({ out: 'staff' + t, req: GATHER_REQ[t] + 4, xp: [16, 32, 56, 88, 130][t], mats: t < 3 ? { ['log' + t]: 2, essence: 5 + t * 5 } : { ['log' + t]: 2, essence: 20, gem: 1 } });
 }
+// elemental staffs give unlimited runes of their element, as in OSRS
+for (const el of Object.keys(ELEMENT)) {
+  const E = ELEMENT[el];
+  defItem('bstaff_' + el, { name: `${E.name} Battlestaff`, icon: '🪄', color: E.color, value: 400, slot: 'weapon', wtype: 'magic', power: 9, req: 30, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
+  defItem('mstaff_' + el, { name: `Mystic ${E.name} Staff`, icon: '🪄', color: E.color, value: 1500, slot: 'weapon', wtype: 'magic', power: 15, req: 50, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
+  FLETCH.push({ out: 'bstaff_' + el, req: 40, xp: 90, mats: { log2: 2, ['r_' + el]: 100, essence: 20 } });
+  FLETCH.push({ out: 'mstaff_' + el, req: 65, xp: 160, mats: { log3: 2, ['r_' + el]: 300, gem: 1 } });
+}
+// shortbows are quick; longbows hit harder and more accurately but slower. A bow fires arrows up to one metal past its wood
+for (let t = 0; t < 5; t++) {
+  Object.assign(ITEMS['bow' + t], { name: WOOD[t] + ' Shortbow', speed: 1.5, arrowMax: t + 1 });
+  defItem('lbow' + t, { name: WOOD[t] + ' Longbow', icon: '🏹', tier: t, value: [15, 35, 70, 140, 280][t], slot: 'weapon', wtype: 'ranged', power: Math.round([3, 7, 12, 18, 26][t] * 1.6), speed: 2.0, acc: 0.08, arrowMax: t + 1, req: GATHER_REQ[t], type: 'Equipment', note: '+8% accuracy' });
+  FLETCH.push({ out: 'lbow' + t, req: GATHER_REQ[t] + 6, xp: [20, 40, 70, 112, 168][t], mats: { ['log' + t]: 4 } });
+}
 // rare Slayer drops
 defItem('whip',   { name: 'Abyssal Whip', icon: '🪢', unique: true, color: '#b46bff', value: 2500, slot: 'weapon', wtype: 'melee', power: 38, speed: 1.6, req: 70, type: 'Equipment' });
-defItem('cbow',   { name: 'Crystal Bow', icon: '🏹', unique: true, color: '#b46bff', value: 2500, slot: 'weapon', wtype: 'ranged', power: 36, req: 75, type: 'Equipment' });
+defItem('cbow',   { name: 'Crystal Bow', icon: '🏹', unique: true, color: '#b46bff', value: 2500, slot: 'weapon', wtype: 'ranged', power: 36, speed: 1.5, req: 75, noAmmo: true, type: 'Equipment', note: 'needs no arrows' });
 defItem('sstaff', { name: 'Shadow Staff', icon: '🪄', unique: true, color: '#b46bff', value: 2500, slot: 'weapon', wtype: 'magic', power: 28, req: 75, type: 'Equipment' });
 // amulets: acc = +hit chance, dmg = +max hit %, dr = +damage reduction, slay = bonus on Slayer task
 defItem('amu_acc',    { name: 'Amulet of Accuracy', icon: '📿', value: 200, slot: 'amulet', acc: 0.06, type: 'Equipment', note: '+6% accuracy' });
@@ -475,13 +512,25 @@ defItem('bones',   { name: 'Bones', icon: '🦴', value: 3, bury: 5, pp: 1, type
 defItem('bigbones', { name: 'Big Bones', icon: '🦴', value: 10, bury: 15, pp: 3, type: 'Misc' });
 defItem('dragonbones', { name: 'Dragon Bones', icon: '🦴', value: 60, bury: 70, pp: 12, type: 'Misc' });
 defItem('essence', { name: 'Rune Essence', icon: '🔹', value: 2, type: 'Resources' });
-defItem('rune',    { name: 'Runes', icon: '🔮', value: 2, type: 'Ammo' });
 defItem('gem',     { name: 'Gem', icon: '💎', value: 150, type: 'Misc' });
 defItem('scale',   { name: 'Dragon Scale', icon: '🐉', value: 600, type: 'Misc' });
 const FOOD_ORDER = ['cooked4', 'cooked3', 'cooked2', 'cooked1', 'cooked0', 'bread'];
 
-// more runes per essence as Runecrafting grows
-const RUNECRAFT = [{ out: 'rune', n: () => 4 + Math.floor(LV.runecrafting / 10), req: 1, xp: 6, mats: { essence: 1 } }];
+// OSRS runes: four elements, plus the catalysts (mind, chaos, death, blood) that set a spell's tier
+const RUNES = [
+  { id: 'air',   name: 'Air Rune',   icon: '🌀', lvl: 1,  xp: 5,   value: 2,  color: '#cfe8ff' },
+  { id: 'mind',  name: 'Mind Rune',  icon: '🧠', lvl: 2,  xp: 5.5, value: 3,  color: '#e8a040' },
+  { id: 'water', name: 'Water Rune', icon: '💧', lvl: 5,  xp: 6,   value: 3,  color: '#4fa3ff' },
+  { id: 'earth', name: 'Earth Rune', icon: '🪨', lvl: 9,  xp: 6.5, value: 3,  color: '#8bd34a' },
+  { id: 'fire',  name: 'Fire Rune',  icon: '🔥', lvl: 14, xp: 7,   value: 4,  color: '#ff7a2a' },
+  { id: 'chaos', name: 'Chaos Rune', icon: '⚡', lvl: 35, xp: 8.5, value: 8,  color: '#f2c94c', cat: true },
+  { id: 'death', name: 'Death Rune', icon: '💀', lvl: 65, xp: 10,  value: 15, color: '#d8d8e0', cat: true },
+  { id: 'blood', name: 'Blood Rune', icon: '🩸', lvl: 77, xp: 11,  value: 20, color: '#d8303a', cat: true },
+];
+for (const r of RUNES) defItem('r_' + r.id, { name: r.name, icon: r.icon, color: r.color, value: r.value, type: 'Runes' });
+// more runes per essence as Runecrafting grows past the rune's level
+const RUNECRAFT = RUNES.map(r => ({ out: 'r_' + r.id, req: r.lvl, xp: r.xp, mats: { essence: 1 },
+  n: () => r.cat ? 1 + Math.floor((LV.runecrafting - r.lvl) / 15) : 2 + Math.floor((LV.runecrafting - r.lvl) / 10) }));
 const CRAFT = {
   smithing:     { recipes: RECIPES,   time: 2.4, verb: 'Smith',  stat: 'smithed',  spark: '#ffd27a', place: 'furnaces and anvils' },
   fletching:    { recipes: FLETCH,    time: 2.0, verb: 'Fletch', stat: 'fletched', spark: '#e8c890', place: 'workbenches' },
@@ -497,10 +546,11 @@ const NPCS = {
   miner:    { name: 'Miner',        lvl: 25, xp: 28,  perception: 160, gold: [8, 18],    maxHit: 7,  skin: '#d8a880', body: '#6a5a4a', drops: [['ore_iron', .25, 2, 4], ['ore_coal', .25, 2, 5], ['gem', .01, 1, 1]] },
   merchant: { name: 'Merchant',     lvl: 40, xp: 45,  perception: 220, gold: [20, 45],   maxHit: 9,  skin: '#f1c27d', body: '#8a3a6a', drops: [['gem', .02, 1, 1], ['bar2', .05, 1, 2]] },
   guard:    { name: 'Town Guard',   lvl: 55, xp: 65,  perception: 280, gold: [30, 65],   maxHit: 14, skin: '#e8b88a', body: '#5a6a8a', drops: [['bar3', .05, 1, 2], ['cooked2', .1, 1, 2]] },
-  wizard:   { name: 'Wandering Wizard', lvl: 65, xp: 80, perception: 330, gold: [40, 80], maxHit: 16, skin: '#f1d0a8', body: '#3a3a9a', drops: [['rune', .5, 10, 30], ['essence', .3, 5, 15]] },
+  wizard:   { name: 'Wandering Wizard', lvl: 65, xp: 80, perception: 330, gold: [40, 80], maxHit: 16, skin: '#f1d0a8', body: '#3a3a9a', drops: [['r_mind', .5, 10, 30], ['r_chaos', .3, 5, 15], ['essence', .3, 5, 15]] },
   lord:     { name: 'Lord',         lvl: 80, xp: 110, perception: 420, gold: [100, 220], maxHit: 20, skin: '#f1c27d', body: '#8a1a2a', drops: [['gem', .05, 1, 1], ['amu_acc', .005, 1, 1]] },
 };
 const PICKPOCKET_TIME = 2.0, STUN_TIME = 3;
+for (const id in NPCS) NPCS[id].id = id;
 
 /* ===== Firemaking: burn logs, light bonfires for a global XP bonus ===== */
 const FM_XP = [12, 20, 35, 55, 85];
@@ -538,13 +588,21 @@ const STYLES = {
   ranged: [['accurate', 'Accurate', 'Ranged XP'], ['rapid', 'Rapid', 'Ranged XP, faster'], ['longrange', 'Longrange', 'Ranged + Defence XP']],
   magic:  [['standard', 'Standard', 'Magic XP'], ['defensive', 'Defensive', 'Magic + Defence XP']],
 };
-const SPELLS = [
-  { name: 'Wind Strike', lvl: 1,  max: 8,  runes: 1, color: '#d8f0ff' },
-  { name: 'Water Bolt',  lvl: 15, max: 16, runes: 2, color: '#4fa3ff' },
-  { name: 'Earth Blast', lvl: 30, max: 26, runes: 3, color: '#8bd34a' },
-  { name: 'Fire Wave',   lvl: 50, max: 38, runes: 4, color: '#ff7a2a' },
-  { name: 'Storm Surge', lvl: 70, max: 52, runes: 5, color: '#c58bff' },
+// the OSRS standard spellbook: every element in five tiers
+const SPELL_TIERS = [
+  { name: 'Strike', lvl: [1, 5, 9, 13],   max: [8, 10, 12, 14],  el: 1, cat: ['mind', 1] },
+  { name: 'Bolt',   lvl: [17, 23, 29, 35], max: [16, 18, 20, 22], el: 2, cat: ['chaos', 1] },
+  { name: 'Blast',  lvl: [41, 47, 53, 59], max: [26, 28, 30, 32], el: 3, cat: ['death', 1] },
+  { name: 'Wave',   lvl: [62, 65, 70, 75], max: [36, 38, 40, 42], el: 5, cat: ['blood', 1] },
+  { name: 'Surge',  lvl: [81, 85, 90, 95], max: [48, 50, 53, 56], el: 7, cat: ['blood', 2] },
 ];
+const SPELLS = [];
+for (const tr of SPELL_TIERS) Object.keys(ELEMENT).forEach((el, k) => {
+  const runes = { ['r_' + el]: tr.el };
+  if (el !== 'air') runes.r_air = Math.ceil(tr.el / 2);
+  runes['r_' + tr.cat[0]] = tr.cat[1];
+  SPELLS.push({ id: el + '_' + tr.name.toLowerCase(), name: `${ELEMENT[el].word} ${tr.name}`, lvl: tr.lvl[k], max: tr.max[k], el, runes, color: ELEMENT[el].color });
+});
 // prayer effects: dr = damage reduction, dmg = max hit %, acc = hit chance, protect = halves that damage type, heal = HP per hit
 const PRAYERS = [
   { id: 'skin',    name: 'Thick Skin',            icon: '🪨', lvl: 1,  cost: 1, dr: 0.1, desc: '+10% damage reduction' },
@@ -566,9 +624,9 @@ const ENEMIES = {
   wolf:     { name: 'Wolf',           type: 'melee',  hp: 75,   maxHit: 9,  atk: 13, def: 12, speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
   bat:      { name: 'Bat',            type: 'melee',  hp: 180,  maxHit: 16, atk: 27, def: 25, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
   skeleton: { name: 'Skeleton Archer', type: 'ranged', hp: 260, maxHit: 20, atk: 31, def: 30, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['arrow1', .3, 5, 12]] },
-  cultist:  { name: 'Dark Cultist',   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 26, speed: 2.6, gold: [10, 20],   shape: 'humanoid', size: 1,   color: '#d8c0a0', body: '#3a2050', orb: '#b06bff', drops: [['bones', 1, 1, 1], ['rune', .6, 5, 12], ['essence', .5, 2, 5]] },
+  cultist:  { name: 'Dark Cultist',   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 26, speed: 2.6, gold: [10, 20],   shape: 'humanoid', size: 1,   color: '#d8c0a0', body: '#3a2050', orb: '#b06bff', drops: [['bones', 1, 1, 1], ['r_chaos', .6, 5, 12], ['essence', .5, 2, 5]] },
   orc:      { name: 'Orc',            type: 'melee',  hp: 520,  maxHit: 32, atk: 48, def: 47, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bigbones', 1, 1, 1], ['ore_coal', .4, 3, 6], ['gem', .03, 1, 1]] },
-  icemage:  { name: 'Ice Mage',       type: 'magic',  hp: 600,  maxHit: 36, atk: 50, def: 44, speed: 2.6, gold: [20, 45],   shape: 'humanoid', size: 1,   color: '#e0eaff', body: '#4a6aa8', orb: '#9fe0ff', drops: [['bones', 1, 1, 1], ['rune', .8, 10, 20], ['gem', .04, 1, 1]] },
+  icemage:  { name: 'Ice Mage',       type: 'magic',  hp: 600,  maxHit: 36, atk: 50, def: 44, speed: 2.6, gold: [20, 45],   shape: 'humanoid', size: 1,   color: '#e0eaff', body: '#4a6aa8', orb: '#9fe0ff', drops: [['bones', 1, 1, 1], ['r_water', .8, 10, 20], ['gem', .04, 1, 1]] },
   troll:    { name: 'Troll',          type: 'melee',  hp: 800,  maxHit: 40, atk: 54, def: 54, speed: 3.0, gold: [30, 60],   shape: 'humanoid', size: 1.45, color: '#8b9bb0', body: '#5c5248', drops: [['bigbones', 1, 1, 2], ['ore_mithril', .2, 2, 4], ['gem', .05, 1, 1]] },
   lizard:   { name: 'Fire Lizard',    type: 'magic',  hp: 1200, maxHit: 50, atk: 68, def: 68, speed: 2.2, gold: [50, 90],   shape: 'quad',     size: 1.2, color: '#d8562a', breath: true, drops: [['bigbones', 1, 1, 1], ['ore_adamantite', .2, 1, 3], ['gem', .06, 1, 1]] },
   imp:      { name: 'Fire Imp',       type: 'magic',  hp: 1000, maxHit: 46, atk: 64, def: 62, speed: 1.8, gold: [45, 80],   shape: 'flyer',    size: 1,   color: '#c43a2a', orb: '#ff7a2a', drops: [['ore_adamantite', .15, 1, 2], ['gem', .05, 1, 1]] },
@@ -584,11 +642,11 @@ const ENEMIES = {
   overlord: { name: 'Abyssal Overlord', type: 'melee', hp: 12000, maxHit: 72, atk: 88, def: 86, speed: 2.8, gold: [2500, 4000], shape: 'humanoid', size: 2.0, color: '#9a3a8a', body: '#1e0618', orb: '#c050ff', boss: true, drops: [['ore_runite', 1, 3, 6], ['gem', .8, 1, 2], ['bigbones', 1, 2, 4]] },
   // Slayer areas
   bog:      { name: 'Bog Horror',     type: 'melee',  hp: 300,  maxHit: 18, atk: 28, def: 26, speed: 2.4, gold: [15, 30],   shape: 'blob',     size: 1.4, color: '#5a7a3a', drops: [['bones', 1, 1, 2], ['essence', .5, 3, 6], ['gem', .03, 1, 1]] },
-  wisp:     { name: "Will-o'-Wisp",   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 22, speed: 2.0, gold: [12, 26],   shape: 'flyer',    size: 1,   color: '#a8f0ff', orb: '#c8ffff', drops: [['essence', 1, 4, 8], ['rune', .4, 5, 10], ['gem', .04, 1, 1]] },
+  wisp:     { name: "Will-o'-Wisp",   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 22, speed: 2.0, gold: [12, 26],   shape: 'flyer',    size: 1,   color: '#a8f0ff', orb: '#c8ffff', drops: [['essence', 1, 4, 8], ['r_air', .4, 5, 10], ['gem', .04, 1, 1]] },
   golem:    { name: 'Crystal Golem',  type: 'melee',  hp: 1400, maxHit: 42, atk: 56, def: 62, speed: 3.0, gold: [60, 110],  shape: 'humanoid', size: 1.6, color: '#9fe8f5', body: '#4aa0b8', drops: [['ore_mithril', .4, 3, 5], ['gem', .1, 1, 1], ['cbow', .003, 1, 1]] },
   sentry:   { name: 'Crystal Sentry', type: 'ranged', hp: 1000, maxHit: 46, atk: 60, def: 55, speed: 2.0, gold: [50, 95],   shape: 'humanoid', size: 1.1, color: '#c8f6ff', body: '#3d7f99', drops: [['arrow3', .5, 10, 25], ['gem', .08, 1, 1], ['cbow', .003, 1, 1]] },
   abyssal:  { name: 'Abyssal Demon',  type: 'melee',  hp: 2600, maxHit: 62, atk: 82, def: 80, speed: 2.4, gold: [120, 200], shape: 'humanoid', size: 1.5, color: '#9a3a8a', body: '#3a1030', drops: [['bigbones', 1, 1, 2], ['ore_runite', .3, 1, 3], ['gem', .12, 1, 1], ['whip', .004, 1, 1]] },
-  shade:    { name: 'Shade',          type: 'magic',  hp: 2000, maxHit: 66, atk: 84, def: 74, speed: 2.2, gold: [100, 180], shape: 'flyer',    size: 1,   color: '#3a2a5a', orb: '#b06bff', drops: [['rune', 1, 20, 40], ['gem', .1, 1, 1], ['sstaff', .004, 1, 1]] },
+  shade:    { name: 'Shade',          type: 'magic',  hp: 2000, maxHit: 66, atk: 84, def: 74, speed: 2.2, gold: [100, 180], shape: 'flyer',    size: 1,   color: '#3a2a5a', orb: '#b06bff', drops: [['r_death', 1, 20, 40], ['gem', .1, 1, 1], ['sstaff', .004, 1, 1]] },
 };
 
 const ZONES = [
@@ -610,6 +668,17 @@ const ZONES = [
   { name: 'Abyssal Rift',    slayer: 65, tier: 4, boss: 'overlord', enemies: ['abyssal', 'shade'],
     th: { sky: ['#0a0412', '#3a1050'], far: '#2a0c3a', mid: '#1e0a2c', near: '#12061c', ground: '#2a1638', dirt: '#140a1c', sun: '#c070ff', decor: 'spike' } },
 ];
+
+// elemental weaknesses for the spellbook
+for (const [el, ids] of Object.entries({
+  fire: ['slime', 'kingslime', 'goblin', 'gobarcher', 'gobchief', 'icemage', 'troll', 'frosttroll', 'bog', 'bogmother', 'shade'],
+  water: ['lizard', 'imp', 'drakeknight', 'dragon', 'abyssal'],
+  earth: ['skeleton', 'bonelord', 'golem', 'warden', 'orc', 'wisp'],
+  air: ['rat', 'wolf', 'bat', 'cultist', 'sentry', 'overlord'],
+})) for (const id of ids) ENEMIES[id].weak = el;
+ENEMIES.shade.drops.push(['r_blood', .3, 5, 15]);
+ENEMIES.overlord.drops.push(['r_blood', 1, 20, 50]);
+ENEMIES.bonelord.drops.push(['r_death', 1, 10, 25]);
 
 // boss mechanics: styles = attack styles it switches between, enrage = attacks faster below 30% HP
 Object.assign(ENEMIES.kingslime, { enrage: true });
@@ -661,7 +730,9 @@ const GATHERING = ['woodcutting', 'mining', 'fishing'];
 const SHOP = [
   { id: 'bread', n: 1, cost: 5 },
   { id: 'arrow0', n: 50, cost: 60 },
-  { id: 'rune', n: 50, cost: 75 },
+  { id: 'r_air', n: 50, cost: 60 },
+  { id: 'r_mind', n: 50, cost: 80 },
+  { id: 'r_chaos', n: 25, cost: 250 },
   { id: 'essence', n: 50, cost: 60 },
   { id: 'gloves0', n: 1, cost: 40 },
   { id: 'boots0', n: 1, cost: 40 },
@@ -682,12 +753,12 @@ const QUESTS = [
   { id: 'q3',  name: 'Rat Catcher', req: 'q1', desc: 'The farmers want their barns back.', obj: [{ t: 'kill', id: 'rat', n: 25 }], rew: { gold: 120, items: { cooked0: 10 } } },
   { id: 'q4',  name: "A Fisherman's Tale", desc: 'Catch and cook a proper meal.', obj: [{ t: 'gather', skill: 'fishing', n: 40 }, { t: 'cook', n: 20 }], rew: { xp: { fishing: 300 }, items: { cooked1: 15 } } },
   { id: 'q5',  name: "The Archer's Path", req: 'q2', desc: 'Fletch your first arrows and bow.', obj: [{ t: 'fletch', n: 5 }], rew: { xp: { ranged: 300 }, items: { arrow0: 150 } } },
-  { id: 'q6',  name: 'Runes of Power', req: 'q2', desc: 'Mine Rune Essence and bind it into runes.', obj: [{ t: 'gather', skill: 'essence', n: 20 }, { t: 'rc', n: 5 }], rew: { xp: { magic: 300 }, items: { rune: 150, staff0: 1 } } },
+  { id: 'q6',  name: 'Runes of Power', req: 'q2', desc: 'Mine Rune Essence and bind it into runes.', obj: [{ t: 'gather', skill: 'essence', n: 20 }, { t: 'rc', n: 5 }], rew: { xp: { magic: 300 }, items: { r_air: 200, r_mind: 200, staff0: 1 } } },
   { id: 'q7',  name: 'Slime Monarchy', req: 'q1', desc: 'A giant slime rules the meadow from a hidden hollow. Thin out its court, then lure it out with a peace offering.', obj: [{ t: 'kill', id: 'slime', n: 25 }, { t: 'kill', id: 'rat', n: 10 }, { t: 'bring', id: 'bread', n: 10 }], rew: { gold: 300, items: { amu_acc: 1 }, boss: 'kingslime' } },
   { id: 'q8',  name: 'Goblin Trouble', req: 'q7', desc: 'The goblins only let traders into the chief\'s camp. Scare off the archers and bring bronze to trade.', obj: [{ t: 'kill', id: 'gobarcher', n: 20 }, { t: 'bring', id: 'bar0', n: 5 }], rew: { gold: 800, items: { amu_def: 1 }, boss: 'gobchief' } },
   { id: 'q9',  name: 'Bones of the Earth', req: 'q8', desc: 'Lay the fallen to rest.', obj: [{ t: 'bury', n: 100 }], rew: { xp: { prayer: 1500 } } },
   { id: 'q10', name: 'The Hunter', req: 'q8', desc: 'Complete Slayer tasks for the Slayer master.', obj: [{ t: 'tasks', n: 3 }], rew: { scoins: 200, xp: { slayer: 1000 } } },
-  { id: 'q11', name: 'Into the Dark', req: 'q8', desc: 'The cultists guard the way to the Bone Lord\'s crypt. Break the cult and bring bones and runes for the seal.', obj: [{ t: 'kill', id: 'cultist', n: 25 }, { t: 'bring', id: 'bones', n: 20 }, { t: 'bring', id: 'rune', n: 50 }], rew: { gold: 3000, items: { gem: 3 }, boss: 'bonelord' } },
+  { id: 'q11', name: 'Into the Dark', req: 'q8', desc: 'The cultists guard the way to the Bone Lord\'s crypt. Break the cult and bring bones and runes for the seal.', obj: [{ t: 'kill', id: 'cultist', n: 25 }, { t: 'bring', id: 'bones', n: 20 }, { t: 'bring', id: 'r_mind', n: 50 }], rew: { gold: 3000, items: { gem: 3 }, boss: 'bonelord' } },
   { id: 'q12', name: 'Frozen Peaks', req: 'q11', desc: 'The Frost Troll lives on a peak only climbers reach. Defeat the ice mages and bring steel spikes and food for the climb.', obj: [{ t: 'kill', id: 'icemage', n: 30 }, { t: 'bring', id: 'bar2', n: 10 }, { t: 'bring', id: 'cooked2', n: 10 }], rew: { gold: 10000, items: { scale: 1 }, boss: 'frosttroll' } },
   { id: 'q13', name: 'Master of Arms', req: 'q11', desc: 'Train every combat style.', obj: [{ t: 'level', skill: 'strength', n: 50 }, { t: 'level', skill: 'ranged', n: 50 }, { t: 'level', skill: 'magic', n: 50 }], rew: { gold: 20000, xp: { hitpoints: 5000 } } },
   { id: 'q15', name: 'Light Fingers', req: 'q1', desc: 'The Riverbend fence wants proof you can lift a purse.', obj: [{ t: 'steal', n: 40 }], rew: { gold: 400, xp: { thieving: 400 } } },
@@ -695,7 +766,7 @@ const QUESTS = [
   { id: 'q14', name: 'Dragonslayer', req: 'q12', desc: 'The Dragon sleeps on an island past the lava. Beat its knights, then bring planks and adamant for a boat that can survive the crossing.', obj: [{ t: 'kill', id: 'drakeknight', n: 20 }, { t: 'bring', id: 'log3', n: 30 }, { t: 'bring', id: 'bar4', n: 10 }], rew: { gold: 50000, items: { dragonbones: 10 }, boss: 'dragon' } },
   { id: 'q17', name: 'Mother of the Bog', req: 'q10', desc: 'Something huge stirs under the Haunted Swamp. Hunt its brood and bring essence to draw it up.', obj: [{ t: 'kill', id: 'bog', n: 30 }, { t: 'bring', id: 'essence', n: 40 }], rew: { gold: 2000, scoins: 100, boss: 'bogmother' } },
   { id: 'q18', name: 'Heart of Crystal', req: 'q17', desc: 'The Crystal Warden guards the heart of the caverns. Shatter its servants and bring gems to open the vault.', obj: [{ t: 'kill', id: 'golem', n: 25 }, { t: 'kill', id: 'sentry', n: 25 }, { t: 'bring', id: 'gem', n: 3 }], rew: { gold: 15000, scoins: 300, boss: 'warden' } },
-  { id: 'q19', name: 'Into the Abyss', req: 'q18', desc: 'The Abyssal Overlord rules the rift. Cut a path through its demons and bring runes to hold the portal open.', obj: [{ t: 'kill', id: 'abyssal', n: 40 }, { t: 'kill', id: 'shade', n: 30 }, { t: 'bring', id: 'rune', n: 300 }], rew: { gold: 40000, scoins: 600, boss: 'overlord' } },
+  { id: 'q19', name: 'Into the Abyss', req: 'q18', desc: 'The Abyssal Overlord rules the rift. Cut a path through its demons and bring runes to hold the portal open.', obj: [{ t: 'kill', id: 'abyssal', n: 40 }, { t: 'kill', id: 'shade', n: 30 }, { t: 'bring', id: 'r_death', n: 100 }], rew: { gold: 40000, scoins: 600, boss: 'overlord' } },
 ];
 
 // every boss lives in its own lair, opened by a quest as in OSRS; fight it as often as you like
@@ -766,12 +837,12 @@ function newState() {
     v: 1, gold: 25, skills: Object.fromEntries(Object.keys(SKILLS).map(k => [k, 0])),
     inv: { bread: 5 }, equip: { weapon: null, shield: null, helm: null, body: null, legs: null, amulet: null, cape: null, hands: null, feet: null, ring: null }, tools: { axe: 0, pick: 0, rod: 0 },
     activity: 'combat', zone: 0, hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
-    styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: -1, prayer: null, pp: 0, autoBury: true,
+    styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: 'auto', prayer: null, pp: 0, autoBury: true,
     zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0 }, cookSel: -1, tipEvent: false,
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
-    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {},
+    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {},
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -828,6 +899,10 @@ function applySave(data) {
       S.qv = QUEST_V;
     }
     S.clog = Object.assign({}, data.clog);
+    S.mastery = Object.assign({}, data.mastery);
+    // one kind of rune became eight: old runes turn into air and mind runes plus some catalysts
+    if (S.inv.rune) { const n = S.inv.rune; delete S.inv.rune; give('r_air', n); give('r_mind', n); give('r_chaos', Math.floor(n / 3)); give('r_death', Math.floor(n / 6)); }
+    if (typeof S.spell !== 'string') S.spell = 'auto';
     if (!data.csel && data.smithSel !== undefined) S.csel.smithing = data.smithSel;
   } else S = base;
   recalcLevels(); recalcBonuses();
@@ -859,7 +934,7 @@ function take(id, n = 1) {
 function has(id) { return S.inv[id] || 0; }
 
 function addXp(skill, amt) {
-  amt *= xpMult() * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1);
+  amt *= (MASTERY_SKILLS.includes(skill) ? mXpMult(skill) : 1) * xpMult() * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1);
   const before = LV[skill];
   S.skills[skill] += amt;
   LV[skill] = levelFromXp(S.skills[skill]);
@@ -905,17 +980,31 @@ function bestZone() { let b = 0; for (let i = 1; i < MAIN_ZONES; i++) if (zoneOp
 function combatLevel() { return Math.floor((Math.max((LV.attack + LV.strength) / 2, LV.ranged, LV.magic) + LV.defence + LV.hitpoints) / 3); }
 function maxHp() { return 40 + LV.hitpoints * 10; }
 function wtype() { return S.equip.weapon ? ITEMS[S.equip.weapon].wtype : 'melee'; }
-function bestArrow() { for (let t = 5; t >= 0; t--) if (has('arrow' + t)) return 'arrow' + t; return null; }
-function curSpell() {
-  const ok = sp => LV.magic >= sp.lvl && has('rune') >= sp.runes;
-  if (S.spell >= 0) return ok(SPELLS[S.spell]) ? SPELLS[S.spell] : null;
-  for (let i = SPELLS.length - 1; i >= 0; i--) if (ok(SPELLS[i])) return SPELLS[i];
+function weaponItem() { return S.equip.weapon ? ITEMS[S.equip.weapon] : null; }
+function noAmmo() { const w = weaponItem(); return !!(w && w.noAmmo); }
+function bestArrow() {
+  const w = weaponItem(), top = w && w.arrowMax !== undefined ? w.arrowMax : 5;
+  for (let t = top; t >= 0; t--) if (has('arrow' + t)) return 'arrow' + t;
   return null;
 }
+function staffRune() { const w = weaponItem(); return (w && w.rune) || null; }
+function runeHave(id) { return id === 'r_' + staffRune() ? Infinity : has(id); }
+function canCast(sp) { return LV.magic >= sp.lvl && Object.entries(sp.runes).every(([id, n]) => runeHave(id) >= n); }
+function spellValue(sp, e) { return sp.max * (e && e.d && e.d.weak === sp.el ? WEAK_BONUS : 1); }
+// autocast: the chosen spell while there are runes for it, otherwise the strongest one, counting the target's weakness
+function curSpell() {
+  if (S.spell !== 'auto') { const sp = SPELLS.find(x => x.id === S.spell); if (sp && canCast(sp)) return sp; }
+  const e = R.ent && R.ent.kind === 'enemy' ? R.ent : null;
+  let best = null;
+  for (const sp of SPELLS) if (canCast(sp) && (!best || spellValue(sp, e) > spellValue(best, e))) best = sp;
+  return best;
+}
+function castRunes(sp) { for (const [id, n] of Object.entries(sp.runes)) if (runeHave(id) !== Infinity) take(id, n); }
+function runeText(sp) { return Object.entries(sp.runes).map(([id, n]) => `${runeHave(id) === Infinity ? '∞' : n}${ITEMS[id].icon}`).join(' '); }
 // a bow without arrows or a staff without runes leaves the hero punching
 function attackMode() {
   const t = wtype();
-  if (t === 'ranged' && !bestArrow()) return 'unarmed';
+  if (t === 'ranged' && !noAmmo() && !bestArrow()) return 'unarmed';
   if (t === 'magic' && !curSpell()) return 'unarmed';
   return t;
 }
@@ -930,7 +1019,7 @@ function weaponPower() { return S.equip.weapon && attackMode() !== 'unarmed' ? I
 function armorValue() { return ARMOUR_SLOTS.reduce((a, sl) => a + (S.equip[sl] ? ITEMS[S.equip[sl]].armor : 0), 0); }
 function playerMaxHit() {
   const m = attackMode(), p = weaponPower();
-  const base = m === 'ranged' ? 4 + LV.ranged * 0.7 + p * 0.8 + ITEMS[bestArrow()].power
+  const base = m === 'ranged' ? 4 + LV.ranged * 0.7 + p * 0.8 + (noAmmo() ? 12 : ITEMS[bestArrow()].power)
     : m === 'magic' ? curSpell().max + LV.magic * 0.35 + p
     : 4 + LV.strength * 0.7 + p;
   return Math.floor(base * (1 + amu('dmg') + pray('dmg') + petB('dmg')));
@@ -942,7 +1031,7 @@ function accuracyLevel() {
 function playerSpeed() {
   const m = attackMode();
   const w = S.equip.weapon && ITEMS[S.equip.weapon];
-  return m === 'ranged' ? (S.styles.ranged === 'rapid' ? 1.3 : 1.6) : m === 'magic' ? 2.2 : m === 'melee' && w && w.speed ? w.speed : 1.8;
+  return m === 'ranged' ? +((w && w.speed || 1.6) - (S.styles.ranged === 'rapid' ? 0.3 : 0)).toFixed(1) : m === 'magic' ? 2.2 : m === 'melee' && w && w.speed ? w.speed : 1.8;
 }
 // +1: the hero's style beats the enemy's, -1: the enemy's beats the hero's
 // bosses switch attack styles mid-fight, so use the style of the current attack
@@ -971,13 +1060,18 @@ function chosenTier(skill) {
   if (sel >= 0 && ok.includes(sel)) return sel;
   return ok.length ? ok[ok.length - 1] : -1;
 }
+function gatherKey(skill, tier) { return skill === 'mining' ? ORES[tier].id : 't' + tier; }
 function gatherTime(skill, tier) {
   const base = skill === 'mining' ? ORES[tier].time : GATHER_TIME[tier];
-  return base * (1 - 0.12 * S.tools[TOOL_OF[skill]]) / (1 + BON.gather / 100);
+  return base * (1 - 0.12 * S.tools[TOOL_OF[skill]]) / (1 + BON.gather / 100) * mSpeed(skill, gatherKey(skill, tier));
 }
-function nodeTime(e) { return e.ess ? gatherTime('mining', 0) * ESSENCE_TIME / ORES[0].time : gatherTime(e.skill, e.tier); }
+function nodeTime(e) { return e.ess ? ESSENCE_TIME * (1 - 0.12 * S.tools.pick) / (1 + BON.gather / 100) * mSpeed('mining', 'ess') : gatherTime(e.skill, e.tier); }
 function craftRecipe(skill) { return CRAFT[skill].recipes[S.csel[skill]]; }
-function stationTime(e) { return e.skill === 'firemaking' ? BURN_TIME : e.skill === 'cooking' ? COOK_TIME : craftRecipe(e.skill).time || CRAFT[e.skill].time; }
+function stationKey(skill) { return skill === 'firemaking' ? 'log' + fmTarget() : skill === 'cooking' ? 'fish' + cookTarget() : craftRecipe(skill).out; }
+function stationTime(e) {
+  const base = e.skill === 'firemaking' ? BURN_TIME : e.skill === 'cooking' ? COOK_TIME : craftRecipe(e.skill).time || CRAFT[e.skill].time;
+  return base * mSpeed(e.skill, stationKey(e.skill));
+}
 
 /* ===== Achievements, Renown and permanent bonuses ===== */
 const BON = { xp: 0, gold: 0, gather: 0 };
@@ -1167,9 +1261,9 @@ function combatTick(dt) {
     const mode = attackMode();
     // work the hit out before using up ammo, so the last arrow still counts
     const spell = mode === 'magic' ? curSpell() : null;
-    R.shot = { mode, maxHit: playerMaxHit(), chance: playerHitChance(e), color: spell ? spell.color : null };
-    if (mode === 'ranged') take(bestArrow());
-    if (mode === 'magic') take('rune', spell.runes);
+    R.shot = { mode, maxHit: playerMaxHit(), chance: playerHitChance(e), color: spell ? spell.color : null, weak: !!spell && spell.el === e.d.weak };
+    if (mode === 'ranged' && !noAmmo()) take(bestArrow());
+    if (mode === 'magic') castRunes(spell);
     if (mode === 'unarmed' && !R.ammoWarn) { R.ammoWarn = true; log(`⚠️ Out of ${wtype() === 'ranged' ? 'arrows' : 'runes'} – fighting with fists!`, 'lg-bad'); }
     if (mode !== 'unarmed') R.ammoWarn = false;
     const p = activePrayer();
@@ -1257,7 +1351,7 @@ function playerHit(e, shot) {
   const roll = 1 + Math.floor(Math.random() * shot.maxHit);
   const crit = roll >= Math.max(3, shot.maxHit * 0.9);
   const tri = triangle(e);
-  const mult = (tri > 0 ? 1.2 : tri < 0 ? 0.85 : 1) * (onTask(e) ? 1 + amu('slay') : 1);
+  const mult = (tri > 0 ? 1.2 : tri < 0 ? 0.85 : 1) * (onTask(e) ? 1 + amu('slay') : 1) * (shot.weak ? WEAK_BONUS : 1);
   const dmg = Math.min(e.hp, Math.max(1, Math.round(roll * mult)));
   e.hp -= dmg; e.hit = 1;
   combatXp(dmg);
@@ -1341,12 +1435,14 @@ function gatherTick(dt) {
   if (!e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; chips(e); }
   if (e.t >= need) {
     e.t -= need; e.swung = false; R.swing = 1; e.hit = 1; chips(e);
-    const item = e.ess ? 'essence' : tierItem(e.skill, e.tier);
-    give(item);
+    const item = e.ess ? 'essence' : tierItem(e.skill, e.tier), mk = e.ess ? 'ess' : gatherKey(e.skill, e.tier);
+    const got = Math.random() < mDouble(e.skill, mk) ? 2 : 1;
+    give(item, got);
+    addMastery(e.skill, mk, need);
     addXp(e.skill, e.ess ? ESSENCE_XP : tierXp(e.skill, e.tier));
     const key = e.ess ? 'essence' : e.skill;
     S.stats.g[key] = (S.stats.g[key] || 0) + 1;
-    floatText(entScreenX(e), GY - 120, `+1 ${ITEMS[item].icon}`, '#ffffff');
+    floatText(entScreenX(e), GY - 120, `+${got} ${ITEMS[item].icon}`, got > 1 ? '#ffe14a' : '#ffffff');
     sfx('gather');
     rollSkillPet(e.skill);
     e.yields--;
@@ -1393,15 +1489,18 @@ function recipeCount(r) { return typeof r.n === 'function' ? r.n() : (r.n || 1);
 function canCraft(skill, i) { const r = CRAFT[skill].recipes[i]; return !!r && LV[skill] >= r.req && maxCraft(r.mats) > 0; }
 function craftOnce(skill, i) {
   const r = CRAFT[skill].recipes[i], n = recipeCount(r);
-  for (const [id, c] of Object.entries(r.mats)) take(id, c);
+  const saved = Math.random() < mDouble(skill, r.out);   // Mastery can save the materials
+  if (!saved) for (const [id, c] of Object.entries(r.mats)) take(id, c);
   give(r.out, n);
+  addMastery(skill, r.out, r.time || CRAFT[skill].time);
+  if (saved && !SIM) floatText(HX + 40, GY - 130, '🎓 Materials saved', '#ffe14a', 1.2);
   addXp(skill, r.xp);
   S.stats[CRAFT[skill].stat]++;
   if (ITEMS[r.out].dragon) S.stats.dragonGear++;
   if (ITEMS[r.out].slot && isUpgrade(r.out)) { equip(r.out); showBanner(`⬆️ Equipped ${ITEMS[r.out].name}`); }
   return [r.out, n];
 }
-function burnChance(t) { return Math.max(0, 0.35 - (LV.cooking - GATHER_REQ[t]) * 0.02); }
+function burnChance(t) { return Math.max(0, 0.35 - (LV.cooking - GATHER_REQ[t]) * 0.02) * (1 - mLv('cooking', 'fish' + t) / 99); }
 function cookTarget() {
   const ok = t => has('fish' + t) && LV.cooking >= GATHER_REQ[t];
   if (S.cookSel >= 0) return ok(S.cookSel) ? S.cookSel : -1;
@@ -1410,21 +1509,81 @@ function cookTarget() {
 }
 function cookOnce(t) {
   take('fish' + t);
+  addMastery('cooking', 'fish' + t, COOK_TIME);
   if (Math.random() < burnChance(t)) { give('burnt'); return 'burnt'; }
-  give('cooked' + t); addXp('cooking', GATHER_XP[t]); S.stats.cooked++;
+  give('cooked' + t, Math.random() < mDouble('cooking', 'fish' + t) ? 2 : 1); addXp('cooking', GATHER_XP[t]); S.stats.cooked++;
   return 'cooked' + t;
 }
 
-function stealChance(n) { return clamp((100 + 40 + LV.thieving * 1.5) / (100 + n.perception), 0.1, 0.95); }
+function stealChance(n) { return clamp((100 + 40 + LV.thieving * 1.5) / (100 + n.perception) + mLv('thieving', n.id) * 0.001, 0.1, 0.97); }
+function pickTime(id) { return PICKPOCKET_TIME * mSpeed('thieving', id); }
+
+/* ===== Mastery (Melvor): every tree, ore, fish, recipe and target levels up on its own ===== */
+const MASTERY_SKILLS = ['woodcutting', 'mining', 'fishing', 'thieving', 'smithing', 'cooking', 'fletching', 'runecrafting', 'firemaking'];
+const POOL_STEPS = [[0.1, '+5% skill XP'], [0.25, '5% faster actions'], [0.5, '+5% chance to double (or save materials)'], [0.95, '+25% Mastery XP and another +5% skill XP']];
+function masteryItems(skill) {
+  const t5 = f => [0, 1, 2, 3, 4].map(f);
+  if (skill === 'woodcutting' || skill === 'fishing') return t5(t => ({ key: 't' + t, item: tierItem(skill, t), req: GATHER_REQ[t] }));
+  if (skill === 'mining') return ORES.map(o => ({ key: o.id, item: 'ore_' + o.id, req: o.lvl })).concat([{ key: 'ess', item: 'essence', req: 1 }]);
+  if (skill === 'cooking') return t5(t => ({ key: 'fish' + t, item: 'cooked' + t, req: GATHER_REQ[t] }));
+  if (skill === 'firemaking') return t5(t => ({ key: 'log' + t, item: 'log' + t, req: GATHER_REQ[t] }));
+  if (skill === 'thieving') return Object.values(NPCS).map(n => ({ key: n.id, name: n.name, icon: '🥷', req: n.lvl }));
+  return CRAFT[skill].recipes.map(r => ({ key: r.out, item: r.out, req: r.req }));
+}
+function mState(skill) { return S.mastery[skill] || (S.mastery[skill] = { xp: {}, pool: 0 }); }
+function mXp(skill, key) { return (S.mastery[skill] && S.mastery[skill].xp[key]) || 0; }
+// mastery uses the skill XP curve divided by 10
+function mLv(skill, key) { return levelFromXp(mXp(skill, key) * 10); }
+function mNext(skill, key) { const l = mLv(skill, key); return l < 99 ? XP_TABLE[l + 1] / 10 : 0; }
+function poolCap(skill) { return 150000 + 5000 * masteryItems(skill).length; }
+function poolPct(skill) { return S.mastery[skill] ? S.mastery[skill].pool / poolCap(skill) : 0; }
+function mXpMult(skill) { const p = poolPct(skill); return (p >= 0.1 ? 1.05 : 1) * (p >= 0.95 ? 1.05 : 1); }
+function mSpeed(skill, key) { return (1 - mLv(skill, key) * 0.001) * (poolPct(skill) >= 0.25 ? 0.95 : 1); }
+function mDouble(skill, key) { return mLv(skill, key) * 0.002 + (poolPct(skill) >= 0.5 ? 0.05 : 0); }
+function masteryName(skill, key) { const m = masteryItems(skill).find(x => x.key === key); return m ? m.name || ITEMS[m.item].name : key; }
+function addMastery(skill, key, time) {
+  const m = mState(skill), before = mLv(skill, key);
+  const gain = (2 + time * 2) * (poolPct(skill) >= 0.95 ? 1.25 : 1);
+  m.xp[key] = (m.xp[key] || 0) + gain;
+  m.pool = Math.min(poolCap(skill), m.pool + gain * 0.5);
+  const after = mLv(skill, key);
+  if (after > before && (after % 10 === 0 || after === 99)) {
+    log(`🎓 ${SKILLS[skill].name} Mastery ${after}: ${masteryName(skill, key)}`, 'lg-xp');
+    if (after === 99) showBanner(`🎓 Mastery 99: ${masteryName(skill, key)}!`);
+  }
+}
+function spendPool(skill, key) {
+  const m = mState(skill), cost = Math.ceil(mNext(skill, key) - mXp(skill, key));
+  if (!cost || cost <= 0 || m.pool < cost) return;
+  m.pool -= cost; m.xp[key] = mXp(skill, key) + cost;
+  log(`🎓 Spent ${fmt(cost)} pool XP: ${masteryName(skill, key)} is now Mastery ${mLv(skill, key)}`, 'lg-xp');
+}
+function mTag(skill, key) { const l = mLv(skill, key); return ` <span class="tag m" title="Mastery">🎓 ${l}</span>`; }
+function masteryModal(skill) {
+  const pct = poolPct(skill), pool = mState(skill).pool;
+  openModal(`<h2>🎓 ${SKILLS[skill].icon} ${SKILLS[skill].name} Mastery</h2>
+    <p class="muted">Each item gains Mastery as you work on it: up to 10% faster and 20% more chance to double (crafting skills save materials instead; Cooking burns less, Thieving succeeds more). Half of all Mastery XP also fills the skill's pool.</p>
+    <div class="row" style="justify-content:space-between"><b>Mastery pool</b><span>${fmt(Math.floor(pool))} / ${fmt(poolCap(skill))} (${(pct * 100).toFixed(1)}%)</span></div>
+    <div class="bar pool"><i style="width:${(pct * 100).toFixed(1)}%"></i></div>
+    <ul class="steps">${POOL_STEPS.map(([v, t]) => `<li class="${pct >= v ? 'have' : 'muted'}">${pct >= v ? '✅' : '⬜'} ${v * 100}%: ${t}</li>`).join('')}</ul>
+    <div class="mlist">` + masteryItems(skill).map(m => {
+      const l = mLv(skill, m.key), xp = mXp(skill, m.key), cur = XP_TABLE[l] / 10, nxt = mNext(skill, m.key);
+      const cost = l < 99 ? Math.ceil(nxt - xp) : 0, locked = LV[skill] < m.req;
+      return `<div class="mrow ${locked ? 'lock' : ''}"><span class="ic">${m.icon || ITEMS[m.item].icon}</span>
+        <span class="nm"><b>${m.name || ITEMS[m.item].name}</b> <span class="tag m">🎓 ${l}</span><div class="bar"><i style="width:${l < 99 ? ((xp - cur) / (nxt - cur) * 100).toFixed(1) : 100}%"></i></div></span>
+        ${l < 99 ? `<button data-a="mspend" data-skill="${skill}" data-id="${m.key}" ${pool >= cost ? '' : 'disabled'}>+1 lv<small>${fmt(cost)}</small></button>` : '<b class="lg-gold">★ 99</b>'}</div>`;
+    }).join('') + `</div><div class="row" style="margin-top:10px"><button data-a="close">Close</button></div>`);
+}
 function thieveTick(dt) {
   const e = R.ent, n = e.d, ex = entScreenX(e);
   if (e.stun > 0) { e.stun -= dt; return; }
   e.t += dt;
-  if (e.t < PICKPOCKET_TIME) return;
+  if (e.t < pickTime(e.id)) return;
   e.t = 0; R.swing = 1;
   if (Math.random() < stealChance(n)) {
-    const g = Math.round(randi(n.gold[0], n.gold[1]) * goldMult());
+    const g = Math.round(randi(n.gold[0], n.gold[1]) * goldMult() * (Math.random() < mDouble('thieving', n.id) ? 2 : 1));
     S.gold += g; S.stats.stolen++;
+    addMastery('thieving', n.id, PICKPOCKET_TIME);
     addXp('thieving', n.xp);
     for (const [id, ch, mn, mx] of n.drops) if (Math.random() < ch) { const k = randi(mn, mx); give(id, k); floatText(ex, GY - 125, `+${k} ${ITEMS[id].icon}`, '#ffffff'); }
     floatText(ex, GY - 105, `+${g} 🪙`, '#f2c94c'); coinsFly(ex, GY - 50, 3); sfx('coin');
@@ -1444,7 +1603,8 @@ function fmTarget() {
   return -1;
 }
 function burnOnce(t) {
-  take('log' + t);
+  if (Math.random() >= mDouble('firemaking', 'log' + t)) take('log' + t);   // Mastery: sometimes the log isn't used up
+  addMastery('firemaking', 'log' + t, BURN_TIME);
   addXp('firemaking', FM_XP[t]); S.stats.burned++;
   if (Math.random() < 0.1) give('ore_coal');   // like Melvor, burning now and then leaves coal
   rollSkillPet('firemaking');
@@ -2566,7 +2726,7 @@ function drawHud() {
       const top = GY - 100;
       font(600, 12); ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
       outlined(`${e.d.name} · ${Math.round(stealChance(e.d) * 100)}%`, ex, top - 10 * FS, '#fff');
-      bar(ex - 30, top, 60, 6, e.stun > 0 ? e.stun / STUN_TIME : e.t / PICKPOCKET_TIME, e.stun > 0 ? '#e85a5a' : '#c58bff');
+      bar(ex - 30, top, 60, 6, e.stun > 0 ? e.stun / STUN_TIME : e.t / pickTime(e.id), e.stun > 0 ? '#e85a5a' : '#c58bff');
       ctx.textAlign = 'left';
     } else {
       const craft = CRAFTING.has(e.skill);
@@ -3494,20 +3654,31 @@ function zoneEnemies(z) {
 function htmlCombatPanel() {
   const wt = wtype(), mode = attackMode(), ct = combatType();
   let h = `<div class="row"><b>Weapon:</b> ${S.equip.weapon ? itemLabel(S.equip.weapon) : 'Fists'} <span class="tag">${TYPE_ICON[ct]} ${TYPE_NAME[ct]}</span></div>`;
-  if (mode === 'unarmed' && wt !== 'melee') h += `<p class="need">${wt === 'ranged' ? 'No arrows' : 'No runes'} – your hero is punching. Fletch or buy ${wt === 'ranged' ? 'arrows' : 'runes (Craft → Runecrafting, or the Shop)'}.</p>`;
+  if (mode === 'unarmed' && wt !== 'melee') h += `<p class="need">${wt === 'ranged' ? `No arrows this bow can fire (up to ${METALS[weaponItem().arrowMax ?? 5]})` : 'No runes for any spell you know'} – your hero is punching. Fletch or buy ${wt === 'ranged' ? 'arrows' : 'runes (Craft → Runecrafting, or the Shop)'}.</p>`;
   h += `<h3>Style</h3><div class="chips">` + STYLES[ct].map(([id, n, xp]) =>
     `<button class="${S.styles[ct] === id ? 'sel' : ''}" data-a="style" data-id="${id}">${n}<small>${xp}</small></button>`).join('') + '</div>';
   if (wt === 'magic') {
-    h += `<h3>Spell · 🔮 ${fmt(has('rune'))} runes</h3><div class="chips"><button class="${S.spell < 0 ? 'sel' : ''}" data-a="spell" data-id="-1">Best<small>auto</small></button>` +
-      SPELLS.map((sp, i) => `<button class="${S.spell === i ? 'sel' : ''}" data-a="spell" data-id="${i}" ${LV.magic < sp.lvl ? 'disabled' : ''}>${LV.magic < sp.lvl ? '🔒 ' : ''}${sp.name}<small>Lv ${sp.lvl} · ${sp.runes} rune${sp.runes > 1 ? 's' : ''} · hit ${sp.max}</small></button>`).join('') + '</div>';
+    const sr = staffRune(), cur = curSpell(), tgt = R.ent && R.ent.kind === 'enemy' ? R.ent.d : null;
+    h += `<h3>📖 Spellbook</h3><div class="chips">` + RUNES.map(r => `<span class="tag">${r.icon} ${r.name.replace(' Rune', '')} <b>${sr === r.id ? '∞' : fmt(has('r_' + r.id))}</b></span>`).join('') + '</div>'
+      + `<p class="muted">${sr ? `Your staff gives unlimited ${ELEMENT[sr].name.toLowerCase()} runes. ` : ''}Spells hit +${Math.round((WEAK_BONUS - 1) * 100)}% harder on enemies weak to their element${tgt && tgt.weak ? ` – ${tgt.name} is weak to ${ELEMENT[tgt.weak].icon} ${ELEMENT[tgt.weak].name}` : ''}.${cur ? ` Casting <b>${cur.name}</b>.` : ''}</p>`
+      + `<div class="chips"><button class="${S.spell === 'auto' ? 'sel' : ''}" data-a="spell" data-id="auto">✨ Autocast best<small>strongest spell you have runes for, using weaknesses</small></button></div>
+      <div class="spellbook">` + SPELLS.map(sp => {
+        const lock = LV.magic < sp.lvl;
+        return `<button class="spell ${S.spell === sp.id ? 'sel' : ''} ${cur === sp ? 'cur' : ''}" style="--c:${sp.color}" data-a="spell" data-id="${sp.id}" ${lock ? 'disabled' : ''}>
+          <b>${lock ? '🔒' : ELEMENT[sp.el].icon} ${sp.name}</b><small>Lv ${sp.lvl} · max hit ${sp.max}</small><small class="${canCast(sp) ? '' : 'need'}">${runeText(sp)}</small></button>`;
+      }).join('') + '</div>';
   }
-  if (wt === 'ranged') { const a = bestArrow(); h += `<p class="muted">Ammo: ${a ? `${itemLabel(a)} ×${fmt(has(a))}` : '<span class="need">no arrows</span>'} – the best arrows are used first.</p>`; }
+  if (wt === 'ranged') {
+    const a = bestArrow(), w = weaponItem();
+    h += noAmmo() ? '<p class="muted">Your bow needs no arrows.</p>'
+      : `<p class="muted">Ammo: ${a ? `${itemLabel(a)} ×${fmt(has(a))}` : '<span class="need">no arrows</span>'} – the best arrows this bow can fire (up to ${METALS[w.arrowMax ?? 5]}) are used first.</p>`;
+  }
   h += `<div class="row muted" style="margin-top:10px">Max hit <b>${playerMaxHit()}</b> · Accuracy <b>${Math.round(accuracyLevel())}</b> · Speed <b>${playerSpeed()}s</b> · Armour <b>${armorValue()}</b> · Damage reduction <b>${Math.round(damageReduction() * 100)}%</b></div>`;
   const z = ZONES[S.zone];
   h += `<h3>Combat triangle</h3><p class="muted">⚔️ Melee beats 🏹 Ranged · 🏹 Ranged beats ✨ Magic · ✨ Magic beats ⚔️ Melee. Against an enemy you beat you deal +20% damage and take 15% less.</p>
     <div class="chips">` + [...new Set(z.enemies.concat(z.boss ? [z.boss] : []))].map(id => {
       const d = ENEMIES[id], t = BEATS[ct] === d.type ? 1 : BEATS[d.type] === ct ? -1 : 0;
-      return `<span class="tag ${t > 0 ? 'good' : t < 0 ? 'bad' : ''}">${TYPE_ICON[d.type]} ${d.name}${t > 0 ? ' · strong' : t < 0 ? ' · weak' : ''}</span>`;
+      return `<span class="tag ${t > 0 ? 'good' : t < 0 ? 'bad' : ''}">${TYPE_ICON[d.type]} ${d.name}${t > 0 ? ' · strong' : t < 0 ? ' · weak' : ''}${d.weak ? ` · ${ELEMENT[d.weak].icon}` : ''}</span>`;
     }).join('') + '</div>';
   h += `<h3>🙏 Prayer · ${fmt(S.pp)} points</h3><div class="chips">` + PRAYERS.map(pr =>
     `<button class="${S.prayer === pr.id ? 'sel' : ''}" data-a="prayer" data-id="${pr.id}" ${LV.prayer < pr.lvl ? 'disabled' : ''}>${LV.prayer < pr.lvl ? '🔒' : pr.icon} ${pr.name}<small>Lv ${pr.lvl} · ${pr.desc} · ${pr.cost} pt/attack</small></button>`).join('') + '</div>';
@@ -3564,7 +3735,7 @@ function bossCard(b, fromMap) {
   else btn = on ? '<button class="sel" disabled>👑 Fighting…</button>' : `<button data-a="fight" data-z="${b.zone}" data-id="${b.id}">👑 Enter lair</button>`;
   const mech = bossMechText(d);
   return `<div class="item boss ${on ? 'on' : ''}"><div class="top"><span class="ic">👑</span>
-    <span class="nm"><b>${d.name}</b> <span class="tag">Lv ${enemyLevel(d)}</span> ${(d.styles || [d.type]).map(t => `<span class="tag">${TYPE_ICON[t]} ${TYPE_NAME[t]}</span>`).join(' ')}${fromMap ? '' : ` <span class="tag">📍 ${ZONES[b.zone].name}</span>`}<br>
+    <span class="nm"><b>${d.name}</b> <span class="tag">Lv ${enemyLevel(d)}</span> ${(d.styles || [d.type]).map(t => `<span class="tag">${TYPE_ICON[t]} ${TYPE_NAME[t]}</span>`).join(' ')}${d.weak ? ` <span class="tag">weak to ${ELEMENT[d.weak].icon}</span>` : ''}${fromMap ? '' : ` <span class="tag">📍 ${ZONES[b.zone].name}</span>`}<br>
     <small>❤️ ${fmt(d.hp)} · 💥 ${d.maxHit} max hit · 🛡️ ${d.def} defence · kill count <b>${fmt(S.kc[b.id] || 0)}</b></small><br>
     ${mech ? `<small>⚠️ ${mech}</small><br>` : ''}<span class="uqs">${uniq}<span class="uq ${S.pets[petId] ? 'got' : ''}">${S.pets[petId] ? pet.icon : '🐾'} Pet ${S.pets[petId] ? pet.name : '???'} · 1/${Math.round(1 / petCh)}</span></span></span></div>
     <div class="btns">${btn}</div></div>`;
@@ -3582,7 +3753,7 @@ function htmlLocAct(i, a) {
       const d = ENEMIES[id], t = BEATS[ct] === d.type ? 1 : BEATS[d.type] === ct ? -1 : 0;
       const on = here && S.ctarget === id;
       return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">${TYPE_ICON[d.type]}</span>
-        <span class="nm"><b>${d.name}</b> <span class="tag">Lv ${enemyLevel(d)}</span> <span class="tag ${t > 0 ? 'good' : t < 0 ? 'bad' : ''}">${TYPE_ICON[d.type]} ${TYPE_NAME[d.type]}${t > 0 ? ' · strong' : t < 0 ? ' · weak' : ''}</span>${onTask({ id }) ? ' <span class="tag good">💀 task</span>' : ''}<br>
+        <span class="nm"><b>${d.name}</b> <span class="tag">Lv ${enemyLevel(d)}</span> <span class="tag ${t > 0 ? 'good' : t < 0 ? 'bad' : ''}">${TYPE_ICON[d.type]} ${TYPE_NAME[d.type]}${t > 0 ? ' · strong' : t < 0 ? ' · weak' : ''}</span>${d.weak ? ` <span class="tag">weak to ${ELEMENT[d.weak].icon}</span>` : ''}${onTask({ id }) ? ' <span class="tag good">💀 task</span>' : ''}<br>
         <small>❤️ ${fmt(d.hp)} · 💥 ${d.maxHit} max hit · 🛡️ ${d.def} defence · ${d.speed}s</small><br>
         <small>Drops: <span class="drops">🪙${dropIcons(d)}</span> · defeated ${fmt(S.kc[id] || 0)}</small></span></div>
         <div class="btns">${on ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="${id}">⚔️ Fight</button>`}</div></div>`;
@@ -3601,13 +3772,13 @@ function htmlLocAct(i, a) {
     let h = '<div class="grid">' + locTiers(a, i).map(t => {
       const locked = LV[a] < tierReq(a, t), on = cur === t;
       return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">${node}</span>
-        <span class="nm"><b><span class="tier" style="background:${tierColor(a, t)}"></span>${names[t]}</b><br>
+        <span class="nm"><b><span class="tier" style="background:${tierColor(a, t)}"></span>${names[t]}</b>${mTag(a, gatherKey(a, t))}<br>
         <small>${locked ? '🔒 ' : ''}${SKILLS[a].name} ${tierReq(a, t)} · ${gatherTime(a, t).toFixed(1)}s · ${tierXp(a, t)} XP · you have ${fmt(has(item(t)))}</small></span></div>
         <div class="btns">${on ? `<button class="sel" disabled>${SKILLS[a].icon} Working…</button>` : `<button data-a="gather" data-z="${i}" data-skill="${a}" data-id="${t}" ${locked ? 'disabled' : ''}>${SKILLS[a].icon} ${a === 'fishing' ? 'Fish' : a === 'mining' ? 'Mine' : 'Chop'}</button>`}</div></div>`;
     }).join('');
     if (a === 'mining' && z.ess) {
       const on = cur === 'ess';
-      h += `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">🔹</span><span class="nm"><b>Rune Essence</b><br>
+      h += `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">🔹</span><span class="nm"><b>Rune Essence</b>${mTag('mining', 'ess')}<br>
         <small>Mining 1 · ${(gatherTime('mining', 0) * ESSENCE_TIME / ORES[0].time).toFixed(1)}s · ${ESSENCE_XP} XP · for Runecrafting · you have ${fmt(has('essence'))}</small></span></div>
         <div class="btns">${on ? '<button class="sel" disabled>⛏️ Working…</button>' : `<button data-a="gather" data-z="${i}" data-skill="mining" data-id="-2">⛏️ Mine</button>`}</div></div>`;
     }
@@ -3618,7 +3789,7 @@ function htmlLocAct(i, a) {
     return '<div class="grid">' + z.npcs.map(id => {
       const n = NPCS[id], locked = LV.thieving < n.lvl, on = here && (S.tsel === id || (!S.tsel && cur === id));
       return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">🥷</span>
-        <span class="nm"><b>${n.name}</b> <span class="tag">Thieving ${n.lvl}</span><br>
+        <span class="nm"><b>${n.name}</b> <span class="tag">Thieving ${n.lvl}</span>${mTag('thieving', id)}<br>
         <small>${locked ? '🔒 ' : ''}${Math.round(stealChance(n) * 100)}% success · ${n.xp} XP · ${n.gold[0]}–${n.gold[1]} 🪙 · drops <span class="drops">${[...new Set(n.drops.map(d => ITEMS[d[0]].icon))].join('')}</span></small><br>
         <small>Getting caught stuns you for ${STUN_TIME}s and hits up to ${n.maxHit}</small></span></div>
         <div class="btns">${on ? '<button class="sel" disabled>🥷 Pickpocketing…</button>' : `<button data-a="thieve" data-z="${i}" data-id="${id}" ${locked ? 'disabled' : ''}>🥷 Pickpocket</button>`}</div></div>`;
@@ -3647,7 +3818,9 @@ function htmlSkills() {
     const frac = l < 99 ? (xp - cur) / (nxt - cur) : 1;
     return `<div class="skill"><div class="top"><span>${sk.icon} ${sk.name}</span><span class="lv">${l} / 99</span></div>
       <div class="bar"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
-      <small>${fmt(xp)} / ${fmt(nxt)} XP</small></div>`;
+      <small>${fmt(xp)} / ${fmt(nxt)} XP</small>${MASTERY_SKILLS.includes(k) ? `
+      <div class="mpool"><small>🎓 Mastery pool ${(poolPct(k) * 100).toFixed(1)}%</small><div class="bar pool"><i style="width:${(poolPct(k) * 100).toFixed(1)}%"></i></div>
+      <button data-a="mastery" data-id="${k}">🎓 Mastery</button></div>` : ''}</div>`;
   }).join('') + '</div>';
 }
 
@@ -3669,14 +3842,18 @@ const SLOT_HINT = { helm: 'Smith helms at the anvil.', body: 'Smith platebodies 
 function stackText(n) { return n < 100000 ? [fmt(n), ''] : n < 1e7 ? [Math.floor(n / 1000) + 'K', 'w'] : [Math.floor(n / 1e6) + 'M', 'g']; }
 function slotHtml(id, n, attrs, ph, extra = '') {
   const it = id && ITEMS[id];
-  const st = it && (n > 1 || it.type === 'Ammo') ? stackText(n) : null;
+  const st = it && (n > 1 || it.type === 'Ammo' || it.type === 'Runes') ? stackText(n) : null;
   const bg = it && it.color ? ` style="background:radial-gradient(circle at 50% 55%, ${it.color}66 0%, ${it.color}00 68%), #2b2520"` : '';
   return `<button class="slot ${extra}" ${attrs}${bg} aria-label="${it ? it.name : 'Empty'}">${it ? `<span class="si">${it.icon}</span>` : `<span class="si ph">${ph}</span>`}${st ? `<span class="sn ${st[1]}">${st[0]}</span>` : ''}</button>`;
 }
 function dollHtml(small) {
   return `<div class="doll ${small ? 'sm' : ''}">` + DOLL.map(sl => {
     if (!sl) return '<span></span>';
-    if (sl === 'ammo') { const a = wtype() === 'magic' ? (has('rune') ? 'rune' : null) : bestArrow(); return slotHtml(a, a ? has(a) : 0, 'data-a="eslot" data-id="ammo"', SLOT_ICON.ammo); }
+    if (sl === 'ammo') {
+      const sp = wtype() === 'magic' ? curSpell() : null;
+      const a = sp ? Object.keys(sp.runes).reverse().find(id => runeHave(id) !== Infinity) : wtype() === 'ranged' ? bestArrow() : null;
+      return slotHtml(a, a ? has(a) : 0, 'data-a="eslot" data-id="ammo"', SLOT_ICON.ammo);
+    }
     return slotHtml(S.equip[sl], 1, `data-a="eslot" data-id="${sl}"`, SLOT_ICON[sl]);
   }).join('') + '</div>';
 }
@@ -3688,10 +3865,10 @@ function eqStatsHtml() {
   if (bon.length) rows.push(['Item bonuses', bon.join(', ')]);
   return '<div class="eqstats">' + rows.map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join('') + '</div>';
 }
-const INV_ORDER = ['Equipment', 'Ammo', 'Food', 'Bars', 'Ores', 'Resources', 'Misc'];
+const INV_ORDER = ['Equipment', 'Ammo', 'Runes', 'Food', 'Bars', 'Ores', 'Resources', 'Misc'];
 function invIds() {
   const ord = id => { const k = INV_ORDER.indexOf(ITEMS[id].type); return k < 0 ? 99 : k; };
-  return Object.keys(S.inv).filter(id => S.inv[id] > 0).sort((a, b) => ord(a) - ord(b) || (ITEMS[a].tier || 0) - (ITEMS[b].tier || 0) || a.localeCompare(b));
+  return Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0).sort((a, b) => ord(a) - ord(b) || (ITEMS[a].tier || 0) - (ITEMS[b].tier || 0) || a.localeCompare(b));
 }
 function itemMenu(id) {
   const it = ITEMS[id], n = has(id);
@@ -3712,7 +3889,7 @@ function itemMenu(id) {
 function slotMenu(sl) {
   if (sl === 'ammo') {
     const a = bestArrow();
-    openModal(`<h2>➶ Ammo</h2><p class="muted">${wtype() === 'magic' ? `Spells use runes – you have ${fmt(has('rune'))}.` : `Your hero always fires the best arrows in the bag${a ? ` – now ${ITEMS[a].name} ×${fmt(has(a))}` : ' – you have none'}.`}</p><button data-a="close">Close</button>`);
+    openModal(`<h2>➶ Ammo</h2><p class="muted">${wtype() === 'magic' ? `Spells use runes: ${RUNES.map(r => `${r.icon} ${runeHave('r_' + r.id) === Infinity ? '∞' : fmt(has('r_' + r.id))}`).join(' · ')}. Pick spells in Map → ⚔️ Combat.` : noAmmo() ? 'Your bow needs no arrows.' : `Your hero always fires the best arrows in the bag${a ? ` – now ${ITEMS[a].name} ×${fmt(has(a))}` : ' – you have none'}.`}</p><button data-a="close">Close</button>`);
     return;
   }
   const id = S.equip[sl];
@@ -3760,7 +3937,7 @@ function htmlCraft() {
   return h + list.map(([r, i]) => {
     const it = ITEMS[r.out], locked = LV[sk] < r.req, mx = maxCraft(r.mats), n = recipeCount(r);
     const active = S.activity === sk && S.csel[sk] === i;
-    return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${n > 1 ? n + '× ' : ''}${itemLabel(r.out)}<br>
+    return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${n > 1 ? n + '× ' : ''}${itemLabel(r.out)}${mTag(sk, r.out)}<br>
       <small>${itemStats(it) ? itemStats(it) + ' · ' : ''}${r.xp} XP · ${locked ? '🔒 ' : ''}${SKILLS[sk].name} ${r.req}${r.station ? ' · ' + (r.station === 'furnace' ? '🔥 furnace' : '🔨 anvil') : ''}</small></span></div>
       <small>${matsHtml(r.mats)}</small>
       <div class="btns">${active ? `<button class="sel" disabled>${SKILLS[sk].icon} Working…</button>`
@@ -3775,7 +3952,7 @@ function htmlFiremaking() {
     <div class="btns">${auto ? '<button class="sel" disabled>🔥 Burning…</button>' : '<button data-a="burn" data-id="-1">Burn</button>'}</div></div>`;
   for (let t = 0; t < 5; t++) {
     const locked = LV.firemaking < GATHER_REQ[t], n = has('log' + t), active = S.activity === 'firemaking' && S.fmSel === t;
-    h += `<div class="item"><div class="top"><span class="ic">🪵</span><span class="nm">${itemLabel('log' + t)}<br>
+    h += `<div class="item"><div class="top"><span class="ic">🪵</span><span class="nm">${itemLabel('log' + t)}${mTag('firemaking', 'log' + t)}<br>
       <small>${FM_XP[t]} XP · ${locked ? '🔒 ' : ''}Firemaking ${GATHER_REQ[t]} · bonfire +${BONFIRE_PCT[t]}% XP · you have ${fmt(n)}</small></span></div>
       <div class="btns">${active ? '<button class="sel" disabled>🔥 Burning…</button>' : `<button data-a="burn" data-id="${t}" ${locked ? 'disabled' : ''}>Burn</button>`}
       <button data-a="bonfire" data-id="${t}" ${locked || n < BONFIRE_LOGS || S.bonfire ? 'disabled' : ''}>🔥 Bonfire (${BONFIRE_LOGS})</button></div></div>`;
@@ -3791,7 +3968,7 @@ function htmlCooking() {
   for (let t = 0; t < 5; t++) {
     const locked = LV.cooking < GATHER_REQ[t], n = has('fish' + t);
     const burn = burnChance(t), active = S.activity === 'cooking' && S.cookSel === t;
-    h += `<div class="item"><div class="top"><span class="ic">🍽️</span><span class="nm">${itemLabel('cooked' + t)}<br>
+    h += `<div class="item"><div class="top"><span class="ic">🍽️</span><span class="nm">${itemLabel('cooked' + t)}${mTag('cooking', 'fish' + t)}<br>
       <small>Heals ${ITEMS['cooked' + t].heal} · ${GATHER_XP[t]} XP · ${locked ? '🔒 ' : ''}Cooking ${GATHER_REQ[t]}${locked ? '' : ' · burn chance ' + Math.round(burn * 100) + '%'}</small></span></div>
       <small><span class="${n ? 'have' : 'need'}">Raw ${FISH_N[t]}: ${n}</span></small>
       <div class="btns">${active ? '<button class="sel" disabled>🍳 Cooking…</button>' : `<button data-a="cook" data-id="${t}" ${locked ? 'disabled' : ''}>Cook</button>`}</div></div>`;
@@ -3919,7 +4096,7 @@ function renderTab(force) {
 function renderHero() {
   const mh = maxHp();
   const ammo = wtype() === 'ranged' ? (bestArrow() ? `${ITEMS[bestArrow()].name} ×${fmt(has(bestArrow()))}` : '<span class="need">none</span>')
-    : wtype() === 'magic' ? `🔮 ${fmt(has('rune'))} runes` : null;
+    : wtype() === 'magic' ? (curSpell() ? `${ELEMENT[curSpell().el].icon} ${curSpell().name} · ${runeText(curSpell())}` : '<span class="need">no runes</span>') : null;
   const pr = activePrayer();
   const html = `<h3>Hero</h3>
     <div class="row" style="justify-content:space-between"><span>❤️ ${Math.ceil(Math.max(0, S.hp))} / ${mh}</span><span class="muted">Combat level ${combatLevel()}</span></div>
@@ -4029,12 +4206,14 @@ document.addEventListener('click', ev => {
   if (b.dataset.close) closeModal();
   switch (b.dataset.a) {
     case 'islot': itemMenu(id); break;
+    case 'mastery': masteryModal(id); break;
+    case 'mspend': spendPool(b.dataset.skill, id); masteryModal(b.dataset.skill); break;
     case 'eslot': slotMenu(id); break;
     case 'questsub': questSub = id; break;
     case 'activity': setActivity(id); break;
     case 'zone': setZone(+id); break;
     case 'style': S.styles[combatType()] = id; break;
-    case 'spell': S.spell = +id; break;
+    case 'spell': S.spell = id; break;
     case 'prayer': togglePrayer(id); break;
     case 'autobury': S.autoBury = b.checked; break;
     case 'bury': bury(id, has(id)); break;
