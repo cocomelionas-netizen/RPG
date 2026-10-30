@@ -43,6 +43,7 @@
   header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; display: flex; align-items: center; gap: 10px; }
   #mute, #gfx { padding: 2px 8px; min-height: 0; font-size: 16px; line-height: 1.2; }
   #gfx { font-size: 12px; font-weight: 700; margin-left: 6px; }
+  #acct { padding: 2px 10px; min-height: 0; font-size: 13px; line-height: 1.4; margin-right: 6px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   header .stat { color: var(--muted); display: inline-block; }
   header .stat b { color: var(--text); }
   #gold b { color: var(--accent); }
@@ -173,6 +174,12 @@
   .uq.got { background: #2e4a2a; color: #c8f0b8; }
   .item.boss { box-shadow: inset 0 0 0 1px #6b5a24; }
   .tag.m { background: #3a3014; color: #f2c94c; }
+  .fld { display: grid; gap: 4px; margin: 8px 0; font-size: 13px; color: var(--muted); }
+  .fld input { font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  table.hs { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  table.hs th { text-align: left; color: #ff981f; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  table.hs td { padding: 5px 6px; border-bottom: 1px solid #26223a; }
+  table.hs tr.me td { background: #2e2a1c; }
   .info.wild { background: #2a1414; border: 1px solid #6a2a2a; margin-bottom: 10px; }
   .info.wild p { margin: 6px 0; }
   .info.wild .btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
@@ -250,7 +257,7 @@
     .loc .nm { font-size: 10.5px; }
     header { padding-block: max(8px, env(safe-area-inset-top)) 8px; gap: 4px 12px; font-size: 13px; }
     header h1 { font-size: 16px; width: 100%; }
-    #mute { margin-left: auto; }
+    #acct { margin-left: auto; }
     .wrap { padding: 0 0 calc(76px + env(safe-area-inset-bottom)); }
     #stage {
       position: sticky; top: 0; z-index: 5; background: var(--bg);
@@ -292,7 +299,7 @@
 </head>
 <body>
 <header>
-  <h1>🗺️ Endless Road <button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button></h1>
+  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button></h1>
   <span class="stat" id="gold">Gold: <b>0</b></span>
   <span class="stat" id="cmb">Combat level: <b>1</b></span>
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
@@ -337,6 +344,7 @@
 <div id="rotate" aria-live="polite"><span class="big">📱</span><b>Turn your phone upright</b><span class="muted">Endless Road is played in portrait.</span></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 'use strict';
 
@@ -2906,6 +2914,141 @@ function draw() {
   drawXpDrops();
 }
 
+/* ================= ONLINE: accounts, cloud saves, hiscores (Supabase) ================= */
+// The publishable key is meant for browsers; every table is protected by Row Level Security and the
+// server functions in supabase/schema.sql check each upload before accepting it.
+const NET = { url: 'https://ntvuqakhgcogxxhzkvex.supabase.co', key: 'sb_publishable_e2MqXNFj8OwpDhQrVYPlWw_sPFFHI4u', status: '', busy: false, timer: 0 };
+let sb = null, me = null;
+const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 _-]{1,10}[A-Za-z0-9]$/;
+// accounts use a hero name and a password; the name is turned into an internal login address
+const nameEmail = n => `${n.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.')}@players.endlessroad.game`;
+function netInit() {
+  try {
+    if (!window.supabase || !window.supabase.createClient) return;
+    sb = window.supabase.createClient(NET.url, NET.key, { auth: { persistSession: true, storageKey: 'endless-road-auth' } });
+  } catch (e) { sb = null; return; }
+  sb.auth.getSession().then(({ data }) => { if (data && data.session) onSignedIn(data.session.user); });
+  renderAccount();
+}
+function renderAccount() {
+  const b = document.getElementById('acct');
+  if (b) { b.hidden = !sb; b.textContent = me ? `👤 ${me.name}` : '👤 Log in'; }
+}
+function accErr(msg) { const e = document.getElementById('acc-err'); if (e) { e.textContent = msg; e.hidden = false; } accBusy(false); }
+function accBusy(on) { document.querySelectorAll('#modal [data-a="login"], #modal [data-a="signup"]').forEach(b => { b.disabled = on; }); }
+function accountModal() {
+  if (!sb) { openModal('<h2>👤 Online</h2><p class="muted">Online play could not load. Check your connection and reload the page.</p><button data-a="close">Close</button>'); return; }
+  if (me) {
+    openModal(`<h2>👤 ${me.name}</h2><p class="muted">Your hero is saved to the cloud every minute. The server checks every upload, so progress that is impossible in the game is refused.</p>
+      <p>${NET.status || '☁️ Connected'}</p>
+      <div class="row"><button data-a="syncnow">☁️ Save now</button><button data-a="logout">Sign out</button><button data-a="close">Close</button></div>`);
+    return;
+  }
+  openModal(`<h2>👤 Play online</h2><p class="muted">Make an account to keep your hero in the cloud, play on any device and appear on the hiscores. A new account starts from the progress on this device.</p>
+    <label class="fld">Hero name<input id="acc-name" maxlength="12" autocomplete="username" placeholder="3–12 letters or numbers"></label>
+    <label class="fld">Password<input id="acc-pass" type="password" autocomplete="current-password" placeholder="at least 8 characters"></label>
+    <p class="need" id="acc-err" hidden></p>
+    <div class="row"><button data-a="login">Log in</button><button data-a="signup">Create account</button><button data-a="close">Cancel</button></div>
+    <p class="muted"><small>There is no password reset yet – keep your password safe.</small></p>`);
+}
+async function netLogin(signup) {
+  const name = (document.getElementById('acc-name').value || '').trim(), pass = document.getElementById('acc-pass').value || '';
+  if (!NAME_RE.test(name)) return accErr('Names are 3–12 letters, numbers, spaces, - or _');
+  if (pass.length < 8) return accErr('Use a password of at least 8 characters');
+  accBusy(true);
+  try {
+    const res = signup ? await sb.auth.signUp({ email: nameEmail(name), password: pass }) : await sb.auth.signInWithPassword({ email: nameEmail(name), password: pass });
+    if (res.error) return accErr(/registered/i.test(res.error.message) ? 'That name is taken' : /invalid login/i.test(res.error.message) ? 'Wrong name or password' : res.error.message);
+    if (!res.data.session) return accErr('The account needs email confirmation, which this game does not use. (Supabase → Authentication → turn off "Confirm email".)');
+    if (signup) {
+      const r = await sb.rpc('claim_name', { p_name: name });
+      if (r.error || !r.data.ok) { await sb.auth.signOut(); return accErr((r.data && r.data.reason) || r.error.message); }
+    }
+    await onSignedIn(res.data.session.user, name);
+    closeModal();
+  } catch (e) { accErr('Could not reach the server. Try again.'); }
+}
+async function onSignedIn(user, typed) {
+  let { data: prof } = await sb.from('profiles').select('name').eq('id', user.id).maybeSingle();
+  if (!prof) {
+    // signed up but the name was never claimed (closed tab): claim it now
+    const r = await sb.rpc('claim_name', { p_name: typed || (user.email || '').split('@')[0].replace(/\./g, ' ').slice(0, 12) });
+    if (r.error || !r.data.ok) { NET.status = '⚠️ ' + ((r.data && r.data.reason) || 'No hero name'); return; }
+    prof = { name: r.data.name };
+  }
+  me = { id: user.id, name: prof.name };
+  const { data: row } = await sb.from('saves').select('data').eq('user_id', user.id).maybeSingle();
+  if (row && row.data) useCloud(row.data, `☁️ Welcome back, ${me.name}! Loaded your hero from the cloud.`);
+  else log(`☁️ Welcome, ${me.name}! Uploading this device's hero to your account.`, 'lg-xp');
+  renderAccount();
+  await netSync();
+}
+function useCloud(data, msg) {
+  applySave(data);
+  R.phase = 'walk'; R.ent = null; R.events = [];
+  const away = (Date.now() - (S.last || Date.now())) / 1000;
+  if (away > 60) catchUp(away);
+  save(); uiDirty = true; lastHero = '';
+  log(msg, 'lg-xp');
+}
+async function netSync() {
+  if (!sb || !me || NET.busy) return;
+  NET.busy = true;
+  try {
+    S.last = Date.now();
+    const { data, error } = await sb.rpc('sync_save', { p_data: S });
+    if (error) NET.status = '⚠️ Offline – will try again';
+    else if (data.ok) NET.status = `☁️ Saved at ${new Date().toLocaleTimeString()}`;
+    else if (data.reason === 'stale') useCloud(data.data, '☁️ This device was behind – loaded the newer save from the cloud.');
+    else if (data.reason === 'rejected') {
+      useCloud(data.data, '⛔ The server refused progress that is impossible in the game and restored your last good save.');
+      openModal(`<h2>⛔ Save refused</h2><p>The server found progress that the game cannot produce (${data.detail}) and restored your last good cloud save.</p><button data-a="close">OK</button>`);
+    } else if (data.reason === 'banned') { NET.status = '⛔ This account is banned'; await netLogout(); }
+    else if (data.reason !== 'too_fast') NET.status = '⚠️ ' + data.reason;
+  } catch (e) { NET.status = '⚠️ Offline – will try again'; }
+  NET.busy = false;
+  renderAccount();
+}
+async function netLogout() {
+  if (sb) await sb.auth.signOut();
+  me = null; renderAccount(); closeModal();
+  log('👤 Signed out. Your hero keeps playing on this device.');
+}
+
+/* --- hiscores --- */
+let progSub = 'progress', hsSkill = 'overall', hsRows = null, hsAt = 0, hsKey = '', hsLoading = false;
+async function loadHiscores() {
+  hsLoading = true;
+  try {
+    let q = sb.from('hiscores').select('name,total_level,total_xp,combat,skills,kills,bosses,pks,imported');
+    q = hsSkill === 'overall' ? q.order('total_level', { ascending: false }).order('total_xp', { ascending: false })
+      : hsSkill === 'pks' ? q.order('pks', { ascending: false }) : hsSkill === 'bosses' ? q.order('bosses', { ascending: false })
+      : q.order(`skills->${hsSkill}`, { ascending: false, nullsFirst: false });
+    const { data, error } = await q.limit(50);
+    hsRows = error ? { error: error.message } : data;
+  } catch (e) { hsRows = { error: 'Could not reach the server' }; }
+  hsAt = Date.now(); hsKey = hsSkill; hsLoading = false; uiDirty = true;
+}
+function htmlHiscores() {
+  if (!sb) return '<p class="muted">The hiscores need a connection to the server.</p>';
+  if (!hsLoading && (!hsRows || hsKey !== hsSkill || Date.now() - hsAt > 60000)) loadHiscores();
+  const opts = [['overall', '🏆 Overall'], ['pks', '☠️ PKs'], ['bosses', '👑 Bosses'], ...Object.entries(SKILLS).map(([k, sk]) => [k, sk.icon + ' ' + sk.name])];
+  let h = `<p class="muted">${me ? `Signed in as <b>${me.name}</b>.` : '<button data-a="acct">👤 Log in</button> to appear on the hiscores.'} Only progress the server accepted counts; ⓘ marks heroes that brought progress from before their account.</p>
+    <div class="chips">` + opts.map(([k, n]) => `<button class="${hsSkill === k ? 'sel' : ''}" data-a="hsk" data-id="${k}">${n}</button>`).join('') + '</div>';
+  if (!hsRows || hsKey !== hsSkill) return h + '<p class="muted">Loading…</p>';
+  if (hsRows.error) return h + `<p class="need">${hsRows.error}</p>`;
+  if (!hsRows.length) return h + '<p class="muted">Nobody here yet – be the first!</p>';
+  const val = r => {
+    if (hsSkill === 'overall') return [`${fmt(r.total_level)}`, `${fmt(r.total_xp)} XP`];
+    if (hsSkill === 'pks') return [`${fmt(r.pks)}`, 'players killed'];
+    if (hsSkill === 'bosses') return [`${fmt(r.bosses)} / ${BOSSES.length}`, 'bosses beaten'];
+    const x = (r.skills && r.skills[hsSkill]) || 0; return [`${levelFromXp(x)}`, `${fmt(x)} XP`];
+  };
+  return h + '<table class="hs"><thead><tr><th>#</th><th>Name</th><th>Combat</th><th>' + (hsSkill === 'overall' ? 'Total level' : hsSkill === 'pks' ? 'PKs' : hsSkill === 'bosses' ? 'Bosses' : 'Level') + '</th><th></th></tr></thead><tbody>'
+    + hsRows.map((r, i) => { const [a, b] = val(r); return `<tr class="${me && r.name === me.name ? 'me' : ''}"><td>${i + 1}</td><td>${r.name}${r.imported ? ' <span class="muted" title="progress from before the account">ⓘ</span>' : ''}</td><td>${r.combat}</td><td><b>${a}</b></td><td class="muted">${b}</td></tr>`; }).join('')
+    + '</tbody></table>';
+}
+
 function applyGfx() {
   if (S.gfx !== '2d' && G3.ok === undefined) G3.ok = G3.init(document.getElementById('scene3d'));
   G3.on = !!G3.ok && S.gfx !== '2d';
@@ -4198,8 +4341,10 @@ function htmlQuests() {
 }
 
 function htmlProgress() {
+  const nav = subNav('progsub', progSub, [['progress', '🏆 Progress'], ['hiscores', '📊 Hiscores']]);
+  if (progSub === 'hiscores') return nav + htmlHiscores();
   const pct = m => Math.round((m - 1) * 100);
-  let h = `<h3>Permanent bonuses</h3><div class="info bonuses">
+  let h = nav + `<h3>Permanent bonuses</h3><div class="info bonuses">
     <span>✨ XP <b>+${pct(xpMult())}%</b></span><span>🪙 Gold <b>+${pct(goldMult())}%</b></span>
     <span>⏱️ Gathering <b>+${BON.gather}%</b></span><span>🥾 Walking <b>+${S.rup.boots * 5}%</b></span>
     <span>⏳ Offline <b>${offlineCap() / 3600}h</b></span></div>`;
@@ -4355,6 +4500,13 @@ document.addEventListener('click', ev => {
   if (b.dataset.close) closeModal();
   switch (b.dataset.a) {
     case 'islot': itemMenu(id); break;
+    case 'acct': accountModal(); break;
+    case 'login': netLogin(false); break;
+    case 'signup': netLogin(true); break;
+    case 'logout': netLogout(); break;
+    case 'syncnow': netSync().then(accountModal); break;
+    case 'progsub': progSub = id; break;
+    case 'hsk': hsSkill = id; break;
     case 'wildleave': leaveWild('Teleported out'); break;
     case 'wildskull': if (S.wild.in) { S.wild.skull = !S.wild.skull; log(S.wild.skull ? '☠️ You are skulled: better revenant loot, but you keep nothing if you die.' : 'Skull removed.', 'lg-bad'); } break;
     case 'wildflee': S.wild.flee = !S.wild.flee; break;
@@ -4486,6 +4638,7 @@ function frame(now) {
   uiTimer += dt; saveTimer += dt;
   if (uiTimer > 0.25) { uiTimer = 0; renderHero(); renderGoal(); if (uiDirty) { uiDirty = false; renderTab(); } }
   if (saveTimer > 10) { saveTimer = 0; save(); }
+  if (me && (NET.timer += dt) > 60) { NET.timer = 0; netSync(); }
   requestAnimationFrame(frame);
 }
 
@@ -4511,7 +4664,8 @@ function init() {
   window.addEventListener('pointerdown', unlockAudio, { passive: true });
   renderTab(true); renderHero(); renderGoal();
   window.addEventListener('pagehide', save);   // iOS Safari does not fire beforeunload
-  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { save(); netSync(); } });
+  netInit();
   requestAnimationFrame(t => { lastFrame = t; lastWall = Date.now(); requestAnimationFrame(frame); });
 }
 init();
