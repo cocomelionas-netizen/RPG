@@ -124,6 +124,14 @@
   aside .card { padding: 12px; margin-bottom: 12px; }
   .eq { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
   .eq button { padding: 2px 8px; font-size: 12px; }
+  .logtabs { display: flex; gap: 6px; margin-bottom: 8px; }
+  .logtabs button { padding: 3px 10px; min-height: 0; font-size: 13px; }
+  #chat-new { background: var(--accent); color: #000; border-radius: 8px; padding: 0 5px; font-size: 11px; margin-left: 2px; }
+  #chatlist { max-height: 260px; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; font-size: 13px; display: flex; flex-direction: column; gap: 3px; word-break: break-word; }
+  .chatbar { display: flex; gap: 6px; margin-top: 8px; }
+  .chatbar input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  .fld select { font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  .item.faded { opacity: .6; }
   #log { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
   #log div { padding: 2px 0; border-bottom: 1px dashed #2c283b; }
   .lg-good { color: var(--good); }
@@ -328,8 +336,10 @@
     <aside>
       <div class="card" id="hero"></div>
       <div class="card">
-        <h3>Log</h3>
+        <div class="logtabs"><button class="sel" data-a="logtab" data-id="log">📜 Log</button><button data-a="logtab" data-id="chat">💬 Chat <span id="chat-new" hidden></span></button></div>
         <div id="log"></div>
+        <div id="chat" hidden><div id="chatlist"></div>
+          <div class="chatbar"><input id="chat-input" maxlength="200" placeholder="Say something…" autocomplete="off"><button data-a="chatsend">Send</button></div></div>
       </div>
       <div class="card row">
         <button data-a="save">💾 Save</button>
@@ -882,7 +892,7 @@ function newState() {
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
-    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
+    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, geSeq: 0, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -2928,7 +2938,7 @@ function netInit() {
     sb = window.supabase.createClient(NET.url, NET.key, { auth: { persistSession: true, storageKey: 'endless-road-auth' } });
   } catch (e) { sb = null; return; }
   sb.auth.getSession().then(({ data }) => { if (data && data.session) onSignedIn(data.session.user); });
-  renderAccount();
+  renderAccount();  renderChat();
 }
 function renderAccount() {
   const b = document.getElementById('acct');
@@ -2980,7 +2990,7 @@ async function onSignedIn(user, typed) {
   const { data: row } = await sb.from('saves').select('data').eq('user_id', user.id).maybeSingle();
   if (row && row.data) useCloud(row.data, `☁️ Welcome back, ${me.name}! Loaded your hero from the cloud.`);
   else log(`☁️ Welcome, ${me.name}! Uploading this device's hero to your account.`, 'lg-xp');
-  renderAccount();
+  renderAccount(); renderChat(); GE.offers = null;
   await netSync();
 }
 function useCloud(data, msg) {
@@ -2998,7 +3008,12 @@ async function netSync() {
     S.last = Date.now();
     const { data, error } = await sb.rpc('sync_save', { p_data: S });
     if (error) NET.status = '⚠️ Offline – will try again';
-    else if (data.ok) NET.status = `☁️ Saved at ${new Date().toLocaleTimeString()}`;
+    else if (data.ok) {
+      NET.status = `☁️ Saved at ${new Date().toLocaleTimeString()}`;
+      const { count } = await sb.from('ge_collect').select('id', { count: 'exact', head: true }).eq('user_id', me.id);
+      if (count && !GE.told) { GE.told = true; log('📈 Grand Exchange: you have trades to collect (Bag → Grand Exchange).', 'lg-gold'); }
+      if (!count) GE.told = false;
+    }
     else if (data.reason === 'stale') useCloud(data.data, '☁️ This device was behind – loaded the newer save from the cloud.');
     else if (data.reason === 'rejected') {
       useCloud(data.data, '⛔ The server refused progress that is impossible in the game and restored your last good save.');
@@ -3011,7 +3026,7 @@ async function netSync() {
 }
 async function netLogout() {
   if (sb) await sb.auth.signOut();
-  me = null; renderAccount(); closeModal();
+  me = null; renderAccount(); renderChat(); closeModal();
   log('👤 Signed out. Your hero keeps playing on this device.');
 }
 
@@ -3116,6 +3131,155 @@ function htmlRealPvp() {
     }).join('') + '</div>';
   }
   return h;
+}
+
+/* --- Grand Exchange: the server holds offers in escrow and matches them --- */
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const GE = { offers: null, collect: null, trades: null, busy: false, msg: '', at: 0, told: false };
+function geItemName(id) { return id === '__gold' ? '🪙 Gold' : ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : esc(id); }
+async function geLoad() {
+  if (!me) return;
+  try {
+    const [o, c, t] = await Promise.all([
+      sb.from('ge_offers').select('id,kind,item,price,qty,left_qty,status,created_at').eq('user_id', me.id).order('created_at', { ascending: false }).limit(16),
+      sb.from('ge_collect').select('item,qty').eq('user_id', me.id),
+      sb.from('ge_trades').select('item,qty,price,created_at').order('created_at', { ascending: false }).limit(12),
+    ]);
+    GE.offers = o.data || []; GE.trades = t.data || [];
+    GE.collect = {}; for (const r of c.data || []) GE.collect[r.item] = (GE.collect[r.item] || 0) + Number(r.qty);
+    if (o.error) GE.msg = o.error.message;
+  } catch (e) { GE.msg = 'Could not reach the server'; }
+  GE.at = Date.now(); uiDirty = true;
+}
+// the browser sends the hero; the server checks it, changes it (escrow, collecting) and sends it back
+async function geCall(fn, args, done) {
+  if (GE.busy || !me) return;
+  GE.busy = true; GE.msg = ''; uiDirty = true;
+  try {
+    S.last = Date.now();
+    const { data, error } = await sb.rpc(fn, Object.assign({ p_data: S }, args));
+    if (error) GE.msg = error.message;
+    else if (!data.ok) {
+      if (data.data) useCloud(data.data, data.reason === 'stale' ? '☁️ This device was behind – loaded your newer hero.' : '⛔ The server refused this device\'s progress and restored your last good save.');
+      GE.msg = data.reason === 'stale' ? 'This device was behind – your newer hero is loaded, try again' : data.reason === 'rejected' ? 'The server refused this device\'s progress' : data.reason;
+    } else {
+      applySave(data.data); lastHero = ''; save();
+      if (done) done(data);
+    }
+  } catch (e) { GE.msg = 'Could not reach the server'; }
+  GE.busy = false;
+  await geLoad();
+}
+function geOfferModal(kind) {
+  const ids = kind === 'sell' ? invIds() : Object.keys(ITEMS).sort((a, b) => ITEMS[a].name.localeCompare(ITEMS[b].name));
+  if (!ids.length) { GE.msg = 'Your bag is empty'; uiDirty = true; return; }
+  openModal(`<h2>${kind === 'sell' ? '🪙 Sell' : '🛒 Buy'} on the Grand Exchange</h2>
+    <label class="fld">Item<select id="ge-item">${ids.map(id => `<option value="${id}">${ITEMS[id].icon} ${ITEMS[id].name}${kind === 'sell' ? ` (×${fmt(has(id))})` : ''}</option>`).join('')}</select></label>
+    <label class="fld">Amount<input id="ge-qty" type="number" min="1" step="1" value="1"></label>
+    <label class="fld">Price each (gold)<input id="ge-price" type="number" min="1" step="1"></label>
+    <p class="muted" id="ge-hint">Checking prices…</p>
+    <div class="row"><button data-a="geplace" data-id="${kind}">Place offer</button><button data-a="close">Cancel</button></div>`);
+  geHint(kind);
+}
+async function geHint(kind) {
+  const sel = document.getElementById('ge-item');
+  if (!sel) return;
+  const id = sel.value, it = ITEMS[id], price = document.getElementById('ge-price'), qty = document.getElementById('ge-qty');
+  price.value = it.value; if (kind === 'sell') qty.value = has(id);
+  try {
+    const [sl, bu, tr] = await Promise.all([
+      sb.from('ge_offers').select('price').eq('item', id).eq('kind', 'sell').eq('status', 'open').order('price').limit(1),
+      sb.from('ge_offers').select('price').eq('item', id).eq('kind', 'buy').eq('status', 'open').order('price', { ascending: false }).limit(1),
+      sb.from('ge_trades').select('price').eq('item', id).order('created_at', { ascending: false }).limit(1),
+    ]);
+    const low = sl.data && sl.data[0], high = bu.data && bu.data[0], last = tr.data && tr.data[0];
+    if (document.getElementById('ge-item') !== sel || sel.value !== id) return;
+    if (last) price.value = last.price;
+    document.getElementById('ge-hint').innerHTML = `Shop value ${fmt(it.value)} · last trade ${last ? fmt(last.price) : '—'} · cheapest seller ${low ? fmt(low.price) : '—'} · best buyer ${high ? fmt(high.price) : '—'}<br>Sellers pay a 1% tax. ${kind === 'sell' ? `You have ${fmt(has(id))}.` : `You have ${fmt(S.gold)} gold.`}`;
+  } catch (e) { /* hint is optional */ }
+}
+function gePlace(kind) {
+  const item = document.getElementById('ge-item').value, qty = Math.floor(+document.getElementById('ge-qty').value), price = Math.floor(+document.getElementById('ge-price').value);
+  if (!(qty >= 1) || !(price >= 1)) { document.getElementById('ge-hint').textContent = 'Enter an amount and a price'; return; }
+  closeModal();
+  geCall('ge_place', { p_kind: kind, p_item: item, p_qty: qty, p_price: price }, d =>
+    log(`📈 ${kind === 'sell' ? 'Selling' : 'Buying'} ${fmt(qty)}× ${ITEMS[item].name} at ${fmt(price)} each${d.filled ? ` – ${fmt(d.filled)} traded right away` : ''}.`, 'lg-gold'));
+}
+async function geCancel(id) {
+  if (GE.busy) return;
+  GE.busy = true; uiDirty = true;
+  try { const { data, error } = await sb.rpc('ge_cancel', { p_id: +id }); GE.msg = error ? error.message : data.ok ? 'Offer cancelled – collect what was left' : data.reason; }
+  catch (e) { GE.msg = 'Could not reach the server'; }
+  GE.busy = false; await geLoad();
+}
+function htmlGE() {
+  if (!sb) return '<p class="muted">The Grand Exchange needs a connection to the server.</p>';
+  if (!me) return '<p class="muted">Log in to trade with other players. <button data-a="acct">👤 Log in</button></p>';
+  if (!GE.busy && (!GE.offers || Date.now() - GE.at > 30000)) geLoad();
+  const open = (GE.offers || []).filter(o => o.status === 'open').length, box = Object.entries(GE.collect || {});
+  let h = `<p class="muted">Buy and sell with other players. An offer holds your items or gold until it trades; the server matches offers, the older offer sets the price and sellers pay a 1% tax.</p>
+    ${GE.msg ? `<p class="need">${esc(GE.msg)}</p>` : ''}
+    <div class="btns"><button data-a="geoffer" data-id="sell" ${GE.busy ? 'disabled' : ''}>🪙 Sell</button><button data-a="geoffer" data-id="buy" ${GE.busy ? 'disabled' : ''}>🛒 Buy</button><button data-a="georefresh">🔄 Refresh</button></div>`;
+  if (box.length) h += `<div class="info"><b>📦 Collection box</b><div class="chips">${box.map(([id, n]) => `<span class="tag">${geItemName(id)} ×${fmt(n)}</span>`).join('')}</div>
+    <div class="btns" style="margin-top:6px"><button data-a="gecollect" ${GE.busy ? 'disabled' : ''}>📦 Collect all</button></div></div>`;
+  h += `<h3>Your offers · ${open} / 8</h3>`;
+  if (!GE.offers) h += '<p class="muted">Loading…</p>';
+  else if (!GE.offers.length) h += '<p class="muted">No offers yet.</p>';
+  else h += '<div class="grid">' + GE.offers.map(o => {
+    const done = o.qty - o.left_qty;
+    return `<div class="item ${o.status === 'open' ? '' : 'faded'}"><div class="top"><span class="ic">${o.kind === 'sell' ? '🪙' : '🛒'}</span>
+      <span class="nm"><b>${o.kind === 'sell' ? 'Sell' : 'Buy'} ${geItemName(o.item)}</b><br><small>${fmt(done)} / ${fmt(o.qty)} traded · ${fmt(o.price)} each · ${o.status}</small>
+      <div class="bar"><i style="width:${(done / o.qty * 100).toFixed(1)}%"></i></div></span></div>
+      ${o.status === 'open' ? `<div class="btns"><button data-a="gecancel" data-id="${o.id}" ${GE.busy ? 'disabled' : ''}>Cancel</button></div>` : ''}</div>`;
+  }).join('') + '</div>';
+  if (GE.trades && GE.trades.length) h += '<h3>Latest trades</h3><div class="info">' + GE.trades.map(t => `<div>${geItemName(t.item)} ×${fmt(t.qty)} <span class="muted">at</span> <b>${fmt(t.price)}</b></div>`).join('') + '</div>';
+  return h;
+}
+
+/* --- chat: live through Supabase Realtime --- */
+const CHAT = { open: false, loaded: false, msgs: [], unread: 0, chan: null };
+async function chatStart() {
+  if (!sb || CHAT.loaded) return;
+  CHAT.loaded = true;
+  try {
+    const { data } = await sb.from('chat_messages').select('id,name,body,created_at').order('created_at', { ascending: false }).limit(40);
+    CHAT.msgs = (data || []).reverse();
+    CHAT.chan = sb.channel('chat-global').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, pl => {
+      if (CHAT.msgs.some(m => m.id === pl.new.id)) return;
+      CHAT.msgs.push(pl.new); if (CHAT.msgs.length > 80) CHAT.msgs.shift();
+      if (!CHAT.open) CHAT.unread++;
+      renderChat();
+    }).subscribe();
+  } catch (e) { CHAT.loaded = false; }
+  renderChat();
+}
+function renderChat() {
+  const el = document.getElementById('chatlist'), badge = document.getElementById('chat-new');
+  if (badge) { badge.hidden = !CHAT.unread; badge.textContent = CHAT.unread; }
+  if (!el) return;
+  if (!sb) { el.innerHTML = '<div class="muted">Chat needs a connection to the server.</div>'; return; }
+  el.innerHTML = CHAT.msgs.map(m => `<div><span class="muted">${new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> <b class="${me && m.name === me.name ? 'lg-gold' : ''}">${esc(m.name)}:</b> ${esc(m.body)}</div>`).join('')
+    || '<div class="muted">No messages yet – say hello!</div>';
+  el.scrollTop = el.scrollHeight;
+  const inp = document.getElementById('chat-input');
+  if (inp) { inp.disabled = !me; inp.placeholder = me ? 'Say something…' : 'Log in to chat'; }
+}
+async function chatSend() {
+  const inp = document.getElementById('chat-input'), body = inp.value.trim();
+  if (!body || !me) return;
+  inp.value = '';
+  try {
+    const { data, error } = await sb.rpc('chat_send', { p_body: body });
+    if (error || !data.ok) { inp.value = body; log(`💬 ${error ? 'Could not send' : data.reason}`, 'lg-bad'); }
+  } catch (e) { inp.value = body; }
+}
+function logTab(which) {
+  CHAT.open = which === 'chat';
+  document.getElementById('log').hidden = CHAT.open;
+  document.getElementById('chat').hidden = !CHAT.open;
+  document.querySelectorAll('.logtabs button').forEach(b => b.classList.toggle('sel', b.dataset.id === which));
+  if (CHAT.open) { CHAT.unread = 0; chatStart(); }
+  renderChat();
 }
 
 /* --- hiscores --- */
@@ -4301,8 +4465,9 @@ function slotMenu(sl) {
     <button data-a="close">Close</button></div></div>`);
 }
 function htmlBag() {
-  const nav = subNav('bagsub', bagSub, [['items', '🎒 Items'], ['shop', '🏪 Shop']]);
+  const nav = subNav('bagsub', bagSub, [['items', '🎒 Items'], ['shop', '🏪 Shop'], ['ge', '📈 Grand Exchange']]);
   if (bagSub === 'shop') return nav + htmlShop();
+  if (bagSub === 'ge') return nav + htmlGE();
   const ids = invIds();
   const total = ids.reduce((a, id) => a + ITEMS[id].value * S.inv[id], 0);
   return nav + `<div class="osrs">
@@ -4604,6 +4769,13 @@ document.addEventListener('click', ev => {
   if (b.dataset.close) closeModal();
   switch (b.dataset.a) {
     case 'islot': itemMenu(id); break;
+    case 'geoffer': geOfferModal(id); break;
+    case 'geplace': gePlace(id); break;
+    case 'gecancel': geCancel(id); break;
+    case 'gecollect': geCall('ge_collect_all', {}, d => log(`📦 Collected from the Grand Exchange: ${Object.entries(d.got || {}).map(([k, n]) => `${geItemName(k)} ×${fmt(n)}`).join(', ') || 'nothing'}.`, 'lg-gold')); break;
+    case 'georefresh': GE.msg = ''; geLoad(); break;
+    case 'logtab': logTab(id); break;
+    case 'chatsend': chatSend(); break;
     case 'acct': accountModal(); break;
     case 'login': netLogin(false); break;
     case 'signup': netLogin(true); break;
@@ -4772,6 +4944,8 @@ function init() {
   window.addEventListener('pagehide', save);   // iOS Safari does not fire beforeunload
   document.addEventListener('visibilitychange', () => { if (document.hidden) { save(); netSync(); } });
   netInit();
+  document.addEventListener('change', ev => { if (ev.target.id === 'ge-item') geHint(document.querySelector('#modal [data-a="geplace"]').dataset.id); });
+  document.addEventListener('keydown', ev => { if (ev.target.id === 'chat-input' && ev.key === 'Enter') { ev.preventDefault(); chatSend(); } });
   requestAnimationFrame(t => { lastFrame = t; lastWall = Date.now(); requestAnimationFrame(frame); });
 }
 init();
