@@ -173,6 +173,10 @@
   .uq.got { background: #2e4a2a; color: #c8f0b8; }
   .item.boss { box-shadow: inset 0 0 0 1px #6b5a24; }
   .tag.m { background: #3a3014; color: #f2c94c; }
+  .info.wild { background: #2a1414; border: 1px solid #6a2a2a; margin-bottom: 10px; }
+  .info.wild p { margin: 6px 0; }
+  .info.wild .btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+  .info.wild button small { display: block; font-size: 11px; color: var(--muted); }
   .bar.pool > i { background: #c99a2e; }
   .mpool { margin-top: 8px; display: grid; gap: 4px; }
   .mpool button { justify-self: start; padding: 3px 10px; font-size: 12px; }
@@ -506,6 +510,15 @@ defItem('dboots',        { name: 'Dragon Boots', icon: '🥾', color: '#c0302a',
 defItem('bogring',       { name: 'Ring of the Bog', icon: '💍', color: '#6a8a3a', unique: true, value: 1200, slot: 'ring', slay: 0.1, type: 'Equipment', note: '+10% damage and Slayer XP on task' });
 defItem('crystalgloves', { name: 'Crystal Gauntlets', icon: '🧤', color: '#9fe8f5', unique: true, value: 3000, slot: 'hands', armor: 6, acc: 0.03, req: 50, type: 'Equipment', note: '+3% accuracy' });
 defItem('abyssring',     { name: 'Ring of the Abyss', icon: '💍', color: '#b46bff', unique: true, value: 8000, slot: 'ring', dmg: 0.06, acc: 0.03, type: 'Equipment', note: '+6% max hit, +3% accuracy' });
+// Revenant Caves loot: ether charges the revenant weapons, ancient artefacts sell for a lot
+defItem('ether',     { name: 'Revenant Ether', icon: '💚', color: '#6aff8a', value: 10, type: 'Misc', note: 'charges revenant weapons and the Bracelet of Ethereum' });
+defItem('emblem',    { name: 'Ancient Emblem', icon: '🏅', color: '#c9a43a', value: 5000, type: 'Misc', note: 'sell it for gold' });
+defItem('totem',     { name: 'Ancient Totem', icon: '🗿', color: '#c9a43a', value: 12000, type: 'Misc', note: 'sell it for gold' });
+defItem('statuette', { name: 'Ancient Statuette', icon: '🏺', color: '#f2c94c', value: 40000, type: 'Misc', note: 'sell it for gold' });
+defItem('bracelet',  { name: 'Bracelet of Ethereum', icon: '⛓️', color: '#6aff8a', unique: true, value: 3000, slot: 'hands', armor: 2, req: 1, type: 'Equipment', note: 'in the Revenant Caves revenants deal 50% less damage (1 ether per hit)' });
+defItem('craw',      { name: "Craw's Bow", icon: '🏹', color: '#6aff8a', unique: true, value: 15000, slot: 'weapon', wtype: 'ranged', power: 30, speed: 1.5, arrowMax: 5, req: 60, ether: true, type: 'Equipment', note: 'in the Revenant Caves: +50% damage and accuracy (1 ether per attack)' });
+defItem('viggora',   { name: "Viggora's Chainmace", icon: '🔨', color: '#6aff8a', unique: true, value: 15000, slot: 'weapon', wtype: 'melee', power: 32, speed: 1.8, req: 60, ether: true, type: 'Equipment', note: 'in the Revenant Caves: +50% damage and accuracy (1 ether per attack)' });
+defItem('thammaron', { name: "Thammaron's Sceptre", icon: '🪄', color: '#6aff8a', unique: true, value: 15000, slot: 'weapon', wtype: 'magic', power: 24, req: 60, ether: true, type: 'Equipment', note: 'in the Revenant Caves: +50% damage and accuracy (1 ether per attack)' });
 defItem('bread',   { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
 defItem('burnt',   { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
 defItem('bones',   { name: 'Bones', icon: '🦴', value: 3, bury: 5, pp: 1, type: 'Misc' });
@@ -609,6 +622,7 @@ const PRAYERS = [
   { id: 'str',     name: 'Burst of Strength',     icon: '💪', lvl: 5,  cost: 1, dmg: 0.1, desc: '+10% max hit' },
   { id: 'eye',     name: 'Sharp Eye',             icon: '👁️', lvl: 10, cost: 1, acc: 0.1, desc: '+10% accuracy' },
   { id: 'heal',    name: 'Rapid Heal',            icon: '💗', lvl: 20, cost: 1, heal: 0.02, desc: 'Heal 2% HP each hit you land' },
+  { id: 'pitem',   name: 'Protect Item',          icon: '🔒', lvl: 25, cost: 1, desc: 'Keep 1 more item if you die in the Wilderness' },
   { id: 'pmelee',  name: 'Protect from Melee',    icon: '⚔️', lvl: 30, cost: 2, protect: 'melee', desc: 'Halve melee damage taken' },
   { id: 'pranged', name: 'Protect from Missiles', icon: '🏹', lvl: 40, cost: 2, protect: 'ranged', desc: 'Halve ranged damage taken' },
   { id: 'pmagic',  name: 'Protect from Magic',    icon: '✨', lvl: 50, cost: 2, protect: 'magic', desc: 'Halve magic damage taken' },
@@ -640,6 +654,11 @@ const ENEMIES = {
   bogmother: { name: 'Bog Mother',    type: 'melee',  hp: 1500, maxHit: 24, atk: 34, def: 32, speed: 2.6, gold: [250, 450], shape: 'blob',     size: 2.4, color: '#4f6f2f', boss: true, drops: [['bigbones', 1, 2, 3], ['essence', 1, 10, 20], ['gem', .25, 1, 1]] },
   warden:   { name: 'Crystal Warden',  type: 'ranged', hp: 5000, maxHit: 50, atk: 66, def: 68, speed: 2.6, gold: [900, 1600], shape: 'humanoid', size: 1.8, color: '#c8f6ff', body: '#2f7f99', orb: '#9fe8ff', boss: true, drops: [['ore_runite', .6, 2, 4], ['gem', .5, 1, 2]] },
   overlord: { name: 'Abyssal Overlord', type: 'melee', hp: 12000, maxHit: 72, atk: 88, def: 86, speed: 2.8, gold: [2500, 4000], shape: 'humanoid', size: 2.0, color: '#9a3a8a', body: '#1e0618', orb: '#c050ff', boss: true, drops: [['ore_runite', 1, 3, 6], ['gem', .8, 1, 2], ['bigbones', 1, 2, 4]] },
+  // Revenant Caves: ghosts of the Wilderness
+  revimp:    { name: 'Revenant Imp',     type: 'magic',  hp: 160,  maxHit: 14, atk: 40, def: 30, speed: 2.2, gold: [20, 45],   shape: 'flyer',    size: .9,  color: '#8aa07a', orb: '#9fff9f', ghost: true, drops: [] },
+  revgob:    { name: 'Revenant Goblin',  type: 'ranged', hp: 420,  maxHit: 24, atk: 52, def: 46, speed: 2.4, gold: [40, 90],   shape: 'humanoid', size: .9,  color: '#a8d098', body: '#3a4a3a', ghost: true, drops: [] },
+  revknight: { name: 'Revenant Knight',  type: 'melee',  hp: 1600, maxHit: 46, atk: 74, def: 76, speed: 2.6, gold: [120, 240], shape: 'humanoid', size: 1.3, color: '#c8e8c0', body: '#2a3a2a', orb: '#9fff9f', ghost: true, drops: [] },
+  revdragon: { name: 'Revenant Dragon',  type: 'magic',  hp: 3600, maxHit: 60, atk: 86, def: 84, speed: 3.0, gold: [260, 480], shape: 'dragon',   size: 1,   color: '#6a8a5a', breath: true, ghost: true, drops: [] },
   // Slayer areas
   bog:      { name: 'Bog Horror',     type: 'melee',  hp: 300,  maxHit: 18, atk: 28, def: 26, speed: 2.4, gold: [15, 30],   shape: 'blob',     size: 1.4, color: '#5a7a3a', drops: [['bones', 1, 1, 2], ['essence', .5, 3, 6], ['gem', .03, 1, 1]] },
   wisp:     { name: "Will-o'-Wisp",   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 22, speed: 2.0, gold: [12, 26],   shape: 'flyer',    size: 1,   color: '#a8f0ff', orb: '#c8ffff', drops: [['essence', 1, 4, 8], ['r_air', .4, 5, 10], ['gem', .04, 1, 1]] },
@@ -689,6 +708,12 @@ Object.assign(ENEMIES.dragon, { styles: ['magic', 'melee'], enrage: true });
 Object.assign(ENEMIES.bogmother, { styles: ['melee', 'magic'] });
 Object.assign(ENEMIES.warden, { styles: ['ranged', 'magic'], enrage: true });
 Object.assign(ENEMIES.overlord, { styles: ['melee', 'magic', 'ranged'], enrage: true });
+Object.assign(ENEMIES.revknight, { styles: ['melee', 'magic'] });
+Object.assign(ENEMIES.revdragon, { styles: ['magic', 'ranged'] });
+// revenant loot scales with the revenant: k = 1 (imp) to 6 (dragon)
+for (const [id, k] of Object.entries({ revimp: 1, revgob: 2, revknight: 4, revdragon: 6 }))
+  ENEMIES[id].drops.push(['ether', 1, k, k * 3], ['emblem', 0.01 * k, 1, 1], ['totem', 0.005 * k, 1, 1], ['statuette', 0.0015 * k, 1, 1],
+    ['bracelet', 0.004 * k, 1, 1], ['craw', 0.0006 * k, 1, 1], ['viggora', 0.0006 * k, 1, 1], ['thammaron', 0.0006 * k, 1, 1]);
 // unique drops: [item, chance, min, max]
 const BOSS_UNIQUES = {
   kingslime: [['slimegloves', 1 / 8]], gobchief: [['gobboots', 1 / 10]], bonelord: [['bonering', 1 / 14]], frosttroll: [['frostcape', 1 / 14]],
@@ -701,6 +726,10 @@ for (const [id, list] of Object.entries(BOSS_UNIQUES)) for (const [it, ch] of li
 ZONES.push({ name: 'Riverbend', town: true, tier: 0, enemies: [],
   th: { sky: ['#86c9f5', '#e6f5ff'], far: '#b3d3e3', mid: '#86c46a', near: '#5a8f4a', ground: '#6aa646', dirt: '#8a6a44', sun: '#fff3a0', decor: 'house' } });
 const TOWN = ZONES.length - 1;
+// the Wilderness: deep caves full of revenants, roamed by player killers
+ZONES.push({ name: 'Revenant Caves', wild: true, req: 40, tier: 3, enemies: ['revimp', 'revgob', 'revknight', 'revdragon'],
+  th: { sky: ['#0a0806', '#2a1c12'], far: '#2a2018', mid: '#4a3a2a', near: '#1a120c', ground: '#3e3428', dirt: '#2a2018', sun: null, decor: 'wild', cave: true } });
+const WILD = ZONES.length - 1;
 // where each place sits on the world map and what can be done there (res lists the resource tiers on offer)
 const LOC = [
   { icon: '🌾', x: .40, y: .78, desc: 'Rolling fields where every adventurer starts out.',
@@ -721,6 +750,7 @@ const LOC = [
     res: { mining: [6], fishing: [4] }, ess: true, stations: ['runecrafting'] },
   { icon: '🏘️', x: .19, y: .70, desc: 'A quiet river town with a forge, a campfire, a fletcher\'s bench and a rune altar.',
     res: { fishing: [0, 1, 2] }, stations: ['smithing', 'cooking', 'fletching', 'runecrafting'] },
+  { icon: '☠️', x: .42, y: .16, desc: 'Deep in the Wilderness. Revenants guard ancient treasure – and other adventurers hunt anyone carrying it.' },
 ];
 LOC.forEach((l, i) => Object.assign(ZONES[i], l));
 [[0, ['man', 'farmer']], [1, ['golbin']], [2, ['miner']], [3, ['wizard']], [TOWN, ['man', 'merchant', 'guard', 'lord']]].forEach(([i, n]) => { ZONES[i].npcs = n; });
@@ -784,6 +814,8 @@ const SKILL_ACH = { attack: 'Duelist', strength: 'Brute', defence: 'Bulwark', hi
   smithing: 'Blacksmith', cooking: 'Chef', fletching: 'Fletcher', runecrafting: 'Runesmith', thieving: 'Pickpocket', firemaking: 'Pyromancer' };
 // bonus: [type, percent] – xp: all XP, gold: gold from enemies and chests, gather: gathering speed
 const ACH = [
+  { id: 'pk1', name: 'Wilderness Warrior', desc: 'Defeat a player killer', bonus: ['gold', 2], test: () => S.wild.pks >= 1 },
+  { id: 'rev100k', name: 'Revenant Hunter', desc: 'Bank 100,000 gold of loot from the Revenant Caves', bonus: ['gold', 3], test: () => S.wild.banked >= 100000 },
   { id: 'kill1', name: 'First Blood', desc: 'Defeat an enemy', bonus: ['gold', 1], test: () => S.kills >= 1 },
   { id: 'kill100', name: 'Monster Hunter', desc: 'Defeat 100 enemies', bonus: ['gold', 2], test: () => S.kills >= 100 },
   { id: 'kill1k', name: 'Monster Slayer', desc: 'Defeat 1,000 enemies', bonus: ['gold', 3], test: () => S.kills >= 1000 },
@@ -842,7 +874,7 @@ function newState() {
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
-    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {},
+    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -900,6 +932,7 @@ function applySave(data) {
     }
     S.clog = Object.assign({}, data.clog);
     S.mastery = Object.assign({}, data.mastery);
+    S.wild = Object.assign(def.wild, data.wild);
     // one kind of rune became eight: old runes turn into air and mind runes plus some catalysts
     if (S.inv.rune) { const n = S.inv.rune; delete S.inv.rune; give('r_air', n); give('r_mind', n); give('r_chaos', Math.floor(n / 3)); give('r_death', Math.floor(n / 6)); }
     if (typeof S.spell !== 'string') S.spell = 'auto';
@@ -953,6 +986,7 @@ function addXp(skill, amt) {
 function zoneOpen(i) {
   const z = ZONES[i];
   if (z.slayer) return LV.slayer >= z.slayer;
+  if (z.wild) return combatLevel() >= z.req;
   return i === 0 || (S.bosses[i - 1] && combatLevel() >= z.req);
 }
 // Slayer areas need Slayer level for everything; other places can always be visited to gather and craft
@@ -962,7 +996,7 @@ function locHas(i, act) {
   const z = ZONES[i];
   if (act === 'combat') return z.enemies.length > 0;
   if (act === 'thieving') return !!(z.npcs && z.npcs.length);
-  if (act === 'firemaking') return true;
+  if (act === 'firemaking') return !z.wild;
   if (CRAFTING.has(act)) return (z.stations || []).includes(act);
   return locTiers(act, i).length > 0 || (act === 'mining' && !!z.ess);
 }
@@ -1148,10 +1182,11 @@ function spawnEntity() {
     const z = ZONES[S.zone];
     const lair = S.ctarget && S.ctarget === z.boss && bossOpen(bossOf(z.boss));
     const id = auto ? S.task.id : lair || (S.ctarget && z.enemies.includes(S.ctarget)) ? S.ctarget : z.enemies[Math.floor(Math.random() * z.enemies.length)];
-    const d = ENEMIES[id];
+    const pk = z.wild && Math.random() < PK_CHANCE;
+    const d = pk ? makePker() : ENEMIES[id];
     // archers and mages keep their distance
     const stop = (d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0);
-    R.ent = { kind: 'enemy', id, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0, pend: 0, style: d.styles ? d.styles[0] : d.type, swap: randi(3, 5) };
+    R.ent = { kind: 'enemy', id: pk ? 'pker' : id, food: d.food || 0, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0, pend: 0, style: d.styles ? d.styles[0] : d.type, swap: randi(3, 5) };
   } else if (act === 'thieving') {
     const list = (ZONES[S.zone].npcs || []).filter(id => LV.thieving >= NPCS[id].lvl);
     const id = S.tsel && list.includes(S.tsel) ? S.tsel : list[Math.floor(Math.random() * list.length)] || 'man';
@@ -1217,6 +1252,8 @@ function startAct() {
 
 function tick(dt) {
   time += dt;
+  if (inWild() && !S.wild.in) { S.wild.in = true; log('☠️ You enter the Revenant Caves. Loot stays in your looting bag until you leave – die here and you lose it, and most of your gear.', 'lg-bad'); }
+  else if (!inWild() && S.wild.in) bankWild('You left the caves');
   if (R.phase === 'walk') {
     const w = walkSpeed();
     R.worldX += w * dt;
@@ -1226,8 +1263,13 @@ function tick(dt) {
     if (R.ent.x - R.worldX <= R.ent.stop) {
       R.phase = 'act'; startAct();
       if (R.ent.d && R.ent.d.boss) { showBanner(`👑 BOSS: ${R.ent.d.name}`); sfx('boss'); }
+      if (R.ent.d && R.ent.d.pker) {
+        log(`☠️ ${R.ent.d.name} (level ${R.ent.d.lvl}) attacks you!`, 'lg-bad'); showBanner(`☠️ PKer: ${R.ent.d.name} (level ${R.ent.d.lvl})`); sfx('boss');
+        if (S.wild.flee) tryEscape(`You ran from ${R.ent.d.name}`, R.ent);
+      }
     }
-  } else if (R.phase === 'act') {
+  } else if (R.phase === 'act' && !R.ent) R.phase = 'walk';
+  else if (R.phase === 'act') {
     const k = R.ent.kind;
     if (k === 'enemy') combatTick(dt); else if (k === 'npc') thieveTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
   } else if (R.phase === 'dead') {
@@ -1262,6 +1304,8 @@ function combatTick(dt) {
     // work the hit out before using up ammo, so the last arrow still counts
     const spell = mode === 'magic' ? curSpell() : null;
     R.shot = { mode, maxHit: playerMaxHit(), chance: playerHitChance(e), color: spell ? spell.color : null, weak: !!spell && spell.el === e.d.weak };
+    // revenant weapons burn ether for +50% damage and accuracy in the caves
+    if (inWild() && weaponItem() && weaponItem().ether && has('ether')) { take('ether'); R.shot.maxHit = Math.floor(R.shot.maxHit * 1.5); R.shot.chance = Math.min(0.97, R.shot.chance * 1.5); }
     if (mode === 'ranged' && !noAmmo()) take(bestArrow());
     if (mode === 'magic') castRunes(spell);
     if (mode === 'unarmed' && !R.ammoWarn) { R.ammoWarn = true; log(`⚠️ Out of ${wtype() === 'ranged' ? 'arrows' : 'runes'} – fighting with fists!`, 'lg-bad'); }
@@ -1294,6 +1338,12 @@ function combatTick(dt) {
   }
   if (e.pend > 0) { e.pend -= dt; if (e.pend <= 0) enemyHit(e); }
   autoEat();
+  if (e.d.pker && e.food > 0 && e.hp < e.maxHp * 0.35) {
+    e.food--; const h = Math.round(e.maxHp * 0.3); e.hp = Math.min(e.maxHp, e.hp + h);
+    floatText(entScreenX(e), GY - entHeight(e) - 40, `🍖 +${h}`, '#6fd27a', 1.2);
+  }
+  // out of food and nearly dead: try to teleport out before a death costs the gear
+  if (inWild() && S.hp > 0 && S.hp < maxHp() * 0.25 && foodCount() === 0 && !e.escapeTried && tryEscape('Low on health', e)) return;
   if (S.hp <= 0) die();
 }
 
@@ -1321,7 +1371,8 @@ function enemyHit(e) {
   if (Math.random() >= enemyHitChance(e)) { hitsplat(HX, GY - 42, 0, 'miss', true); return; }
   const tri = triangle(e);
   const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
-  const mult = (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === etype(e) ? 0.5 : 1);
+  let mult = (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === etype(e) ? 0.5 : 1);
+  if (inWild() && e.d.ghost && S.equip.hands === 'bracelet' && has('ether')) { take('ether'); mult *= 0.5; }
   const dmg = Math.max(1, Math.round(raw * mult));
   S.hp -= dmg;
   addXp('defence', dmg * 0.5);
@@ -1380,6 +1431,7 @@ function autoEat() {
 }
 
 function die() {
+  if (inWild()) wildDeath(R.ent);
   const lost = Math.floor(S.gold * 0.1);
   S.gold -= lost; S.deaths++; R.deathStreak++;
   S.hp = 0; R.phase = 'dead'; R.deadT = 20;
@@ -1394,14 +1446,16 @@ function die() {
 
 function killEnemy(e) {
   const g = Math.round(randi(e.d.gold[0], e.d.gold[1]) * goldMult());
-  S.gold += g; S.kills++; R.deathStreak = 0;
+  if (inWild()) S.wild.gold += g; else S.gold += g;
+  S.kills++; R.deathStreak = 0;
   S.kc[e.id] = (S.kc[e.id] || 0) + 1;
   const got = [`${g} gold`];
   const ex = entScreenX(e), ey = GY - entHeight(e) * 0.5;
   for (const [id, ch, mn, mx] of e.d.drops) {
-    if (Math.random() >= ch) continue;
+    // a skull brings better revenant loot
+    if (Math.random() >= ch * (inWild() && S.wild.skull && id !== 'ether' ? 1.5 : 1)) continue;
     const n = randi(mn, mx);
-    if (ITEMS[id].bury && S.autoBury) bury(id, n, true); else give(id, n);
+    if (ITEMS[id].bury && S.autoBury) bury(id, n, true); else if (inWild() && id !== 'ether') wildGive(id, n); else give(id, n);
     got.push(`${n}× ${ITEMS[id].name}`);
     if (ITEMS[id].unique) { S.stats.uniques++; S.clog[id] = (S.clog[id] || 0) + n; }
     if (ITEMS[id].value >= 150) { log(`✨ Rare drop: ${ITEMS[id].icon} ${ITEMS[id].name}!`, 'lg-xp'); showBanner(`✨ Rare drop: ${ITEMS[id].name}!`); }
@@ -1413,6 +1467,7 @@ function killEnemy(e) {
   sfx('coin');
   if (!SIM) { R.shake = Math.max(R.shake, e.d.boss ? 12 : 4); R.freeze = e.d.boss ? 0.2 : 0.08; }
   if (onTask(e)) slayerKill(e);
+  if (e.d.pker) { S.wild.pks++; log(`☠️ You defeated ${e.d.name}! Their gear is in your looting bag.`, 'lg-xp'); showBanner(`☠️ You PK'd ${e.d.name}!`); }
   const z = S.zone;
   if (BOSS_PETS[e.id]) rollPet(...BOSS_PETS[e.id]);
   if (e.d.boss) {
@@ -1477,6 +1532,62 @@ function setZone(i) {
   if (S.activity === 'combat' && S.autoSlayer && S.task && i !== S.task.zone) { S.autoSlayer = false; log('🧭 Auto Slayer paused while you pick your own area.'); }
   S.zone = i; resetEncounter();
 }
+/* ===== Revenant Caves: loot is at risk until you leave; player killers hunt you ===== */
+const PK_NAMES = ['Zezima', 'xX Pk3r Xx', 'Iron Mike', 'Lil Purple', 'Wildy Wanda', 'Dharok Dan', 'Rune Rick', 'Skull Kid', 'Mage Mikey', 'Tank Tim', 'Ranger Rose', 'Bonk Lord', 'G Maul Gary', 'Freeze Frank'];
+const PK_CHANCE = 0.12, PK_ESCAPE = 0.65;
+function inWild() { return S.zone === WILD; }
+function bagValue() { return S.wild.gold + Object.entries(S.wild.loot).reduce((a, [id, n]) => a + ITEMS[id].value * n, 0); }
+function wildGive(id, n) { S.wild.loot[id] = (S.wild.loot[id] || 0) + n; }
+function bankWild(why) {
+  const w = S.wild, val = bagValue();
+  if (val) {
+    S.gold += w.gold;
+    for (const [id, n] of Object.entries(w.loot)) give(id, n);
+    w.banked += val;
+    log(`🎒 ${why} – banked ${fmt(val)} gold worth of loot from the Revenant Caves.`, 'lg-gold');
+    showBanner(`🎒 Loot banked: ${fmt(val)} gold`);
+  }
+  w.loot = {}; w.gold = 0; w.in = false; w.skull = false;
+  uiDirty = true;
+}
+function leaveWild(why) {
+  bankWild(why);
+  S.ctarget = null; S.zone = bestZone(); S.activity = 'combat';
+  if (R.phase !== 'dead') { R.phase = 'walk'; R.ent = null; }
+}
+// a PKer can freeze you; revenants can't stop a teleport
+function tryEscape(why, e) {
+  if (e && e.d.pker) {
+    if (e.escapeTried) return false;
+    e.escapeTried = true;
+    if (Math.random() > PK_ESCAPE) { log(`❄️ ${e.d.name} froze you – you can't teleport! Fight!`, 'lg-bad'); showBanner(`❄️ Frozen by ${e.d.name}!`); return false; }
+  }
+  leaveWild(why);
+  return true;
+}
+function wildDeath(e) {
+  const w = S.wild, lostLoot = bagValue();
+  w.loot = {}; w.gold = 0; w.deaths++;
+  const keep = (w.skull ? 0 : 3) + (S.prayer === 'pitem' ? 1 : 0);
+  const worn = Object.entries(S.equip).filter(([, id]) => id).sort((a, b) => ITEMS[b[1]].value - ITEMS[a[1]].value);
+  const lost = worn.slice(keep);
+  for (const [sl] of lost) S.equip[sl] = null;
+  log(`☠️ ${e.d.name} killed you in the Revenant Caves. Lost ${lostLoot ? fmt(lostLoot) + ' gold of loot' : 'no loot'}${lost.length ? ' and ' + lost.map(([, id]) => ITEMS[id].name).join(', ') : ''}. You kept your ${Math.min(keep, worn.length)} most valuable item${keep === 1 ? '' : 's'}.`, 'lg-bad');
+  showBanner('☠️ Oh dear, you are dead!');
+  w.in = false; w.skull = false;
+  S.zone = bestZone(); S.ctarget = null;
+}
+function makePker() {
+  const lvl = clamp(combatLevel() + randi(-10, 6), 20, 126), m = clamp(Math.floor((lvl - 20) / 17), 0, 5);
+  const all = ['melee', 'ranged', 'magic'], main = all[randi(0, 2)];
+  const styles = Math.random() < 0.5 ? [main] : [main, all.filter(x => x !== main)[randi(0, 1)]];
+  const weapon = { melee: 'scimitar' + m, ranged: (m >= 3 ? 'lbow' : 'bow') + Math.min(4, m), magic: m >= 3 ? 'bstaff_' + ['air', 'water', 'earth', 'fire'][randi(0, 3)] : 'staff' + Math.min(4, m) }[main];
+  return { name: PK_NAMES[randi(0, PK_NAMES.length - 1)], pker: true, lvl, type: styles[0], styles: styles.length > 1 ? styles : null,
+    hp: 250 + lvl * 14, maxHit: Math.round(5 + lvl * 0.5), atk: Math.round(lvl * 0.95), def: Math.round(lvl * 0.9), speed: 2.3,
+    gold: [lvl * 25, lvl * 60], shape: 'humanoid', size: 1, color: '#f1c27d', body: METAL_COLORS[m], orb: '#c58bff', food: randi(2, 4),
+    drops: [[weapon, .35, 1, 1], ['armor' + m, .25, 1, 1], ['platelegs' + m, .25, 1, 1], ['fullhelm' + m, .2, 1, 1], ['emblem', .12, 1, 1], ['ether', .6, 5, 25]] };
+}
+
 function resetEncounter() {
   if (R.phase !== 'dead') { R.phase = 'walk'; R.ent = null; }
   uiDirty = true;
@@ -1749,7 +1860,7 @@ function togglePrayer(id) {
 /* ===== Slayer ===== */
 function taskOptions() {
   const out = [];
-  ZONES.forEach((z, i) => { if (zoneOpen(i)) for (const id of new Set(z.enemies)) out.push({ id, zone: i }); });
+  ZONES.forEach((z, i) => { if (zoneOpen(i) && !z.wild) for (const id of new Set(z.enemies)) out.push({ id, zone: i }); });
   return out;
 }
 function newTask() {
@@ -2030,7 +2141,7 @@ function drawBackground(z) {
     const by = GY + 4;
     if (th.decor === 'tree') { rr(x - 4 * s, by - 50 * s, 8 * s, 50 * s, 2, c); circle(x, by - 60 * s, 24 * s, c); circle(x - 14 * s, by - 48 * s, 16 * s, c); circle(x + 14 * s, by - 50 * s, 16 * s, c); }
     else if (th.decor === 'pine') { for (let k = 0; k < 3; k++) poly([x - (26 - k * 6) * s, by - (20 + k * 26) * s, x + (26 - k * 6) * s, by - (20 + k * 26) * s, x, by - (60 + k * 28) * s], c); rr(x - 4 * s, by - 22 * s, 8 * s, 22 * s, 1, c); }
-    else if (th.decor === 'stalag') poly([x - 16 * s, by, x + 16 * s, by, x + 2 * s, by - 70 * s], c);
+    else if (th.decor === 'stalag' || th.decor === 'wild') poly([x - 16 * s, by, x + 16 * s, by, x + 2 * s, by - 70 * s], c);
     else if (th.decor === 'rock') { poly([x - 34 * s, by, x - 20 * s, by - 30 * s, x + 6 * s, by - 42 * s, x + 30 * s, by - 18 * s, x + 36 * s, by], c); poly([x - 8 * s, by - 36 * s, x + 6 * s, by - 42 * s, x + 20 * s, by - 29 * s], '#f4f8fc'); }
     else if (th.decor === 'house') {
       rr(x - 18 * s, by - 30 * s, 36 * s, 30 * s, 2, shade(c, 0.12));
@@ -2258,7 +2369,7 @@ function drawEnemy(e) {
   let x = entScreenX(e) + e.lunge * (d.type === 'melee' ? -18 : -5);
   const dying = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
   ctx.save();
-  ctx.globalAlpha = dying;
+  ctx.globalAlpha = dying * (d.ghost ? 0.7 : 1);
   if (e.hit > 0.5) ctx.filter = 'brightness(2.2)';
   if (d.shape !== 'flyer') ellipse(x, GY + 2, 26 * s * (d.shape === 'dragon' ? 3 : 1), 5, 'rgba(0,0,0,0.25)');
   if (d.shape === 'blob') {
@@ -2657,7 +2768,7 @@ function outlined(text, x, y, color) {
 function font(weight, px) { ctx.font = `${weight} ${Math.round(px * FS)}px system-ui, sans-serif`; }
 
 function drawHud() {
-  if (S.hp < maxHp() * 0.3 && R.phase === 'act' && R.ent.kind === 'enemy') {
+  if (S.hp < maxHp() * 0.3 && R.phase === 'act' && R.ent && R.ent.kind === 'enemy') {
     const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.6);
     v.addColorStop(0, 'rgba(160,0,0,0)'); v.addColorStop(1, `rgba(160,0,0,${0.35 + 0.15 * Math.sin(time * 6)})`);
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
@@ -2689,15 +2800,16 @@ function drawHud() {
     ctx.fillStyle = '#d8efff'; ctx.fillText(t, 18, py + ph / 2);
   }
   const lair = S.ctarget && ENEMIES[S.ctarget] && ENEMIES[S.ctarget].boss ? S.ctarget : null;
-  if (S.activity === 'combat' && (lair || S.task)) {
-    const ready = !!lair;
-    const t = lair ? `👑 KC ${fmt(S.kc[lair] || 0)}` : `💀 ${S.task.left} left`;
+  if (S.activity === 'combat' && (lair || S.task || inWild())) {
+    const ready = !!lair || inWild();
+    const t = inWild() ? `🎒 ${fmt(bagValue())}` : lair ? `👑 KC ${fmt(S.kc[lair] || 0)}` : `💀 ${S.task.left} left`;
     font(600, 13);
     const bw = ctx.measureText(t).width + 20;
     rr(W - 10 - bw, 10, bw, lh, 6, ready ? 'rgba(150,100,0,0.8)' : 'rgba(0,0,0,0.45)');
     ctx.fillStyle = ready ? '#ffe9a8' : '#fff'; ctx.fillText(t, W - bw, 10 + lh / 2);
   }
 
+  if (inWild() && S.wild.skull) { font(400, 16); ctx.textAlign = 'center'; ctx.fillText('☠️', HX, GY - 108); ctx.textAlign = 'left'; }
   // hero HP + food left
   bar(HX - 25, GY - 92, 50, 6, S.hp / maxHp(), R.eatFlash > 0 ? '#b6ffb0' : '#5fd35f');
   if (S.activity === 'combat') {
@@ -2714,7 +2826,7 @@ function drawHud() {
     if (e.kind === 'enemy') {
       const top = Math.max(GY - entHeight(e) - 24, 34 * FS + 26);
       const tri = triangle(e);
-      const name = (e.d.boss ? '👑 ' : '') + TYPE_ICON[etype(e)] + ' ' + e.d.name + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
+      const name = (e.d.boss ? '👑 ' : e.d.pker ? '☠️ ' : '') + TYPE_ICON[etype(e)] + ' ' + e.d.name + (e.d.pker ? ` (lvl ${e.d.lvl})` : '') + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
       // name colour shows the combat triangle: green = your style is strong here, red = weak
       font(e.d.boss ? 700 : 600, e.d.boss ? 14 : 12); ctx.textAlign = 'center';
       ctx.fillStyle = tri > 0 ? '#9dffa0' : tri < 0 ? '#ffaaa0' : e.d.boss ? '#ffe27a' : '#fff';
@@ -2968,13 +3080,14 @@ const G3 = (() => {
         } else if (r < 0.75) tree(a, x, y, z, s, pal.leaf, pal.leaf2);
         else put(a, new T.BoxGeometry(0.5, 0.5, 0.5), '#8a6a3a', x, y + 0.25, z, k);   // crates
         break;
-      case 'stalag': case 'crystal': {
-        const c = th.decor === 'crystal';
+      case 'stalag': case 'crystal': case 'wild': {
+        const c = th.decor === 'crystal', wl = th.decor === 'wild';
         put(a, new T.ConeGeometry(0.4 * s, 2.4 * s, 5), mix(th.mid, '#000000', hash(k) * 0.3), x, y + 1.2 * s, z, k);
         put(a, new T.ConeGeometry(0.3 * s, 1.4 * s, 5), th.mid, x, 6.2 - 0.7 * s, z + 0.5, k, 1, 1, 1, Math.PI);
-        if (c || r < 0.25) {
-          put(g, new T.ConeGeometry(0.18 * s, 1.1 * s, 4), c ? '#7fe0f0' : '#b48cff', x + 0.5, y + 0.55 * s, z + 0.4, k, 1, 1, 1, 0, 0.2);
-          put(g, new T.ConeGeometry(0.13 * s, 0.7 * s, 4), c ? '#a8f4ff' : '#d6b8ff', x + 0.75, y + 0.35 * s, z + 0.5, k, 1, 1, 1, 0, -0.35);
+        if (wl && r > 0.6) { put(a, new T.BoxGeometry(0.7 * s, 0.07, 0.07), '#e8e0c8', x + 0.6, y + 0.04, z + 0.6, k); put(a, new T.IcosahedronGeometry(0.14 * s, 0), '#efe8d6', x + 1, y + 0.12, z + 0.5); }
+        if (c || r < 0.25 || (wl && r < 0.45)) {
+          put(g, new T.ConeGeometry(0.18 * s, 1.1 * s, 4), c ? '#7fe0f0' : wl ? '#6aff8a' : '#b48cff', x + 0.5, y + 0.55 * s, z + 0.4, k, 1, 1, 1, 0, 0.2);
+          put(g, new T.ConeGeometry(0.13 * s, 0.7 * s, 4), c ? '#a8f4ff' : wl ? '#b8ffc8' : '#d6b8ff', x + 0.75, y + 0.35 * s, z + 0.5, k, 1, 1, 1, 0, -0.35);
         }
         break;
       }
@@ -3258,6 +3371,7 @@ const G3 = (() => {
       g.add(at(shadow(2.4), 1, 0, 0));
     }
     if (d.shape !== 'humanoid') g.rotation.y = d.shape === 'dragon' ? 0.25 : 0.45;
+    if (d.ghost) g.traverse(n => { if (n.material && n.material.emissive) { n.material.opacity = 0.7; n.material.emissive.setRGB(0.05, 0.18, 0.06); } });
     g.userData.P = P;
     g.userData.mats = mats(g);
     return g;
@@ -3403,7 +3517,7 @@ const G3 = (() => {
     if (e.kind === 'enemy') {
       const d = e.d;
       x += e.lunge * (d.type === 'melee' ? -18 : -5);
-      flash(g, e.hit > 0.5 ? 0.6 : 0, e.hit > 0.5 ? 0.6 : 0, e.hit > 0.5 ? 0.6 : 0);
+      if (e.hit > 0.5) flash(g, 0.6, 0.6, 0.6); else flash(g, 0, e.d.ghost ? 0.18 : 0, 0);
       if (d.shape === 'blob') { const q = 1 + 0.08 * Math.sin(time * 5); P.body.scale.set(1.05 * q, 0.85 / q, 0.9 * q); P.body.position.y = 0.5 / q; }
       else if (d.shape === 'quad') { P.head.position.y = (d.id === 'lizard' ? 0.45 : 0.75) + Math.sin(time * 4) * 0.025; P.tail.rotation.z = 0.4 + Math.sin(time * 6) * 0.15; }
       else if (d.shape === 'flyer') { const fl = Math.sin(time * 16); P.fly.position.y = 1.9 + Math.sin(time * 4) * 0.2; P.wingR.rotation.y = fl * 0.5; P.wingL.rotation.y = -fl * 0.5; P.wingR.rotation.z = fl * 0.35; P.wingL.rotation.z = -fl * 0.35; }
@@ -3519,7 +3633,7 @@ const G3 = (() => {
 
 
 /* ================= WORLD MAP ================= */
-const MAP_LAND = { tree: '#6db24a', pine: '#2f6b35', stalag: '#4d465c', rock: '#e4ebf4', dead: '#4f5f38', crystal: '#2b5f6d', house: '#7cbf58' };
+const MAP_LAND = { wild: '#3a2a20', tree: '#6db24a', pine: '#2f6b35', stalag: '#4d465c', rock: '#e4ebf4', dead: '#4f5f38', crystal: '#2b5f6d', house: '#7cbf58' };
 let mapCache = null;
 function mapBlob(m, x, y, r, seed, color) {
   m.fillStyle = color; m.beginPath();
@@ -3558,6 +3672,12 @@ function mapDecor(m, s) {
     }
   } else if (d === 'pine') {
     for (const [x, y, q] of mapSpots(s, 26, s.i)) mapTri(m, x, y, r * 0.16, r * (0.22 + q * 0.12), q < .5 ? '#1d4a26' : '#245a2e');
+  } else if (d === 'wild') {
+    const g = m.createRadialGradient(s.x, s.y, 1, s.x, s.y, r);
+    g.addColorStop(0, 'rgba(200,40,30,0.55)'); g.addColorStop(1, 'rgba(120,10,10,0)');
+    m.fillStyle = g; m.beginPath(); m.arc(s.x, s.y, r, 0, 7); m.fill();
+    for (const [x, y, q] of mapSpots(s, 9, s.i)) mapTri(m, x, y, r * .14, r * (.15 + q * .15), '#2a1a12');
+    for (const [x, y] of mapSpots(s, 5, s.i + 21)) { m.fillStyle = '#e8e0c8'; m.beginPath(); m.arc(x, y, r * .05, 0, 7); m.fill(); m.fillStyle = '#111'; m.fillRect(x - r * .025, y - r * .01, r * .015, r * .015); m.fillRect(x + r * .01, y - r * .01, r * .015, r * .015); }
   } else if (d === 'stalag') {
     m.fillStyle = '#16121e'; m.beginPath(); m.ellipse(s.x, s.y + r * .15, r * .32, r * .2, 0, 0, 7); m.fill();
     for (const [x, y, q] of mapSpots(s, 12, s.i)) mapTri(m, x, y, r * .14, r * (.15 + q * .15), q < .5 ? '#6a6278' : '#59516a');
@@ -3613,7 +3733,7 @@ function paintMap(w, h, dpr) {
     m.beginPath(); m.moveTo(p.x, p.y); m.quadraticCurveTo((p.x + q.x) / 2 + (q.y - p.y) * 0.15, (p.y + q.y) / 2 - (q.x - p.x) * 0.15, q.x, q.y); m.stroke();
   };
   [[TOWN, 0], [0, 1], [1, 2], [2, 3], [3, 4]].forEach(([a, b]) => road(a, b, 'rgba(246,226,170,0.85)'));
-  [[1, 5], [2, 6], [4, 7]].forEach(([a, b]) => road(a, b, 'rgba(232,106,106,0.75)'));
+  [[1, 5], [2, 6], [4, 7], [1, WILD]].forEach(([a, b]) => road(a, b, 'rgba(232,106,106,0.75)'));
   m.setLineDash([]);
   // clouds in the corners
   for (const [cx, cy] of [[0, 0], [w, 0], [0, h], [w, h]]) {
@@ -3716,6 +3836,20 @@ function htmlActivity() {
   return h;
 }
 
+function wildPanel() {
+  const w = S.wild, bag = Object.entries(w.loot);
+  return `<div class="info wild"><b>☠️ Wilderness rules</b>
+    <p>Loot from the caves goes into your looting bag and is banked when you leave. If you die here you lose the bag and every worn item except your
+    <b>3 most valuable</b> (0 if you are skulled, +1 with the Protect Item prayer). Player killers roam the caves${w.flee ? ` – your hero tries to teleport away (${Math.round(PK_ESCAPE * 100)}%, they can freeze you)` : ' – your hero fights them for their gear'}.
+    Out of food at low HP, your hero teleports out.</p>
+    <p>🎒 Looting bag: <b class="lg-gold">${fmt(bagValue())} gold</b>${w.gold ? ` · 🪙 ${fmt(w.gold)}` : ''}${bag.map(([id, n]) => ` · ${ITEMS[id].icon} ${fmt(n)}`).join('')}</p>
+    <div class="btns">
+      <button data-a="wildleave" ${w.in ? '' : 'disabled'}>🏃 Teleport out and bank</button>
+      <button data-a="wildskull" class="${w.skull ? 'sel' : ''}" ${w.in ? '' : 'disabled'}>☠️ Skull ${w.skull ? 'ON' : 'off'}<small> +50% rare loot, keep 0 items</small></button>
+      <button data-a="wildflee" class="${w.flee ? 'sel' : ''}">${w.flee ? '🏃 Run from PKers' : '⚔️ Fight PKers'}</button>
+    </div>
+    <small class="muted">PKers defeated ${fmt(w.pks)} · deaths here ${fmt(w.deaths)} · banked ${fmt(w.banked)} gold</small></div>`;
+}
 function bossMechText(d) {
   const m = [];
   if (d.styles) m.push('switches between ' + d.styles.map(t => TYPE_ICON[t] + ' ' + TYPE_NAME[t]).join(', ') + ' – a protection prayer follows it');
@@ -3749,6 +3883,7 @@ function htmlLocAct(i, a) {
       return `<p class="need">${prev ? `Defeat ${prev} and reach combat level ${z.req} to fight here.` : `Reach combat level ${z.req} to fight here (you are ${combatLevel()}).`}</p>`;
     }
     const ct = combatType();
+    const wildBox = z.wild ? wildPanel() : '';
     const mon = id => {
       const d = ENEMIES[id], t = BEATS[ct] === d.type ? 1 : BEATS[d.type] === ct ? -1 : 0;
       const on = here && S.ctarget === id;
@@ -3759,7 +3894,7 @@ function htmlLocAct(i, a) {
         <div class="btns">${on ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="${id}">⚔️ Fight</button>`}</div></div>`;
     };
     const mixOn = here && !S.ctarget;
-    return `<div class="grid">
+    return wildBox + `<div class="grid">
       <div class="item ${mixOn ? 'on' : ''}"><div class="top"><span class="ic">🎲</span><span class="nm"><b>Fight everything</b><br><small>Meet whatever comes down the road here</small></span></div>
       <div class="btns">${mixOn ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="mix">⚔️ Fight</button>`}</div></div>`
       + [...new Set(z.enemies)].map(id => mon(id)).join('') + (z.boss ? bossCard(bossOf(z.boss), true) : '') + '</div>';
@@ -4206,6 +4341,9 @@ document.addEventListener('click', ev => {
   if (b.dataset.close) closeModal();
   switch (b.dataset.a) {
     case 'islot': itemMenu(id); break;
+    case 'wildleave': leaveWild('Teleported out'); break;
+    case 'wildskull': if (S.wild.in) { S.wild.skull = !S.wild.skull; log(S.wild.skull ? '☠️ You are skulled: better revenant loot, but you keep nothing if you die.' : 'Skull removed.', 'lg-bad'); } break;
+    case 'wildflee': S.wild.flee = !S.wild.flee; break;
     case 'mastery': masteryModal(id); break;
     case 'mspend': spendPool(b.dataset.skill, id); masteryModal(b.dataset.skill); break;
     case 'eslot': slotMenu(id); break;
@@ -4315,6 +4453,7 @@ canvas.addEventListener('pointermove', ev => {
 let lastFrame = performance.now(), lastWall = Date.now(), uiTimer = 0, saveTimer = 0;
 // fast-forward time the page was not running; the wall clock keeps counting while a phone sleeps
 function catchUp(sec) {
+  if (S.wild.in) leaveWild('You logged out');
   const before = snapshot();
   const done = simulate(sec);
   if (done > 600) R.rested = Math.min(1800, done * 0.1);
