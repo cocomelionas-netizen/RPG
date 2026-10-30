@@ -997,6 +997,7 @@ function locHas(i, act) {
   if (act === 'combat') return z.enemies.length > 0;
   if (act === 'thieving') return !!(z.npcs && z.npcs.length);
   if (act === 'firemaking') return !z.wild;
+  if (act === 'pvp') return !!z.wild;
   if (CRAFTING.has(act)) return (z.stations || []).includes(act);
   return locTiers(act, i).length > 0 || (act === 'mining' && !!z.ess);
 }
@@ -1182,7 +1183,7 @@ function spawnEntity() {
     const z = ZONES[S.zone];
     const lair = S.ctarget && S.ctarget === z.boss && bossOpen(bossOf(z.boss));
     const id = auto ? S.task.id : lair || (S.ctarget && z.enemies.includes(S.ctarget)) ? S.ctarget : z.enemies[Math.floor(Math.random() * z.enemies.length)];
-    const pk = z.wild && Math.random() < PK_CHANCE;
+    const pk = z.wild && (S.ctarget === 'pvp' || Math.random() < PK_CHANCE);
     const d = pk ? makePker() : ENEMIES[id];
     // archers and mages keep their distance
     const stop = (d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0);
@@ -1265,7 +1266,7 @@ function tick(dt) {
       if (R.ent.d && R.ent.d.boss) { showBanner(`👑 BOSS: ${R.ent.d.name}`); sfx('boss'); }
       if (R.ent.d && R.ent.d.pker) {
         log(`☠️ ${R.ent.d.name} (level ${R.ent.d.lvl}) attacks you!`, 'lg-bad'); showBanner(`☠️ PKer: ${R.ent.d.name} (level ${R.ent.d.lvl})`); sfx('boss');
-        if (S.wild.flee) tryEscape(`You ran from ${R.ent.d.name}`, R.ent);
+        if (S.wild.flee && S.ctarget !== 'pvp') tryEscape(`You ran from ${R.ent.d.name}`, R.ent);
       }
     }
   } else if (R.phase === 'act' && !R.ent) R.phase = 'walk';
@@ -1467,6 +1468,7 @@ function killEnemy(e) {
   sfx('coin');
   if (!SIM) { R.shake = Math.max(R.shake, e.d.boss ? 12 : 4); R.freeze = e.d.boss ? 0.2 : 0.08; }
   if (onTask(e)) slayerKill(e);
+  if (e.d.pker && S.ctarget === 'pvp') S.wild.gold += e.d.lvl * 40;   // bounty for hunting
   if (e.d.pker) { S.wild.pks++; log(`☠️ You defeated ${e.d.name}! Their gear is in your looting bag.`, 'lg-xp'); showBanner(`☠️ You PK'd ${e.d.name}!`); }
   const z = S.zone;
   if (BOSS_PETS[e.id]) rollPet(...BOSS_PETS[e.id]);
@@ -1548,6 +1550,7 @@ function bankWild(why) {
     showBanner(`🎒 Loot banked: ${fmt(val)} gold`);
   }
   w.loot = {}; w.gold = 0; w.in = false; w.skull = false;
+  if (S.ctarget === 'pvp') S.ctarget = null;
   uiDirty = true;
 }
 function leaveWild(why) {
@@ -3807,17 +3810,18 @@ function htmlCombatPanel() {
   return h;
 }
 
-const ACT_ORDER = ['combat', 'thieving', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting', 'firemaking'];
+const ACT_ORDER = ['combat', 'pvp', 'thieving', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting', 'firemaking'];
 const STATION_NAME = { smithing: '🔥 Furnace and 🔨 Anvil', cooking: '🔥 Campfire', fletching: '🪶 Fletching bench', runecrafting: '🔮 Rune altar', firemaking: '🔥 Campsite' };
 let mapSel = null, mapAct = null;
-function actIcon(a) { return a === 'combat' ? '⚔️' : SKILLS[a].icon; }
+function actIcon(a) { return a === 'combat' ? '⚔️' : a === 'pvp' ? '☠️' : SKILLS[a].icon; }
 function enemyLevel(d) { return Math.round((d.atk + d.def) / 2); }
 function dropIcons(d) { return [...new Set(d.drops.map(x => ITEMS[x[0]].icon))].join(''); }
 
 function htmlActivity() {
   if (mapSel === null) mapSel = S.zone;
   const acts = ACT_ORDER.filter(a => locHas(mapSel, a));
-  if (!acts.includes(mapAct)) mapAct = mapSel === S.zone && acts.includes(S.activity) ? S.activity : acts[0];
+  const hunting = S.activity === 'combat' && S.ctarget === 'pvp';
+  if (!acts.includes(mapAct)) mapAct = mapSel === S.zone && hunting ? 'pvp' : mapSel === S.zone && acts.includes(S.activity) ? S.activity : acts[0];
   let h = '<div class="map" id="worldmap"><canvas id="mapcv"></canvas>' + ZONES.map((z, i) => {
     const locked = !locOpen(i);
     const cls = ['loc', i === mapSel ? 'sel' : '', locked ? 'locked' : ''].join(' ');
@@ -3825,14 +3829,15 @@ function htmlActivity() {
       <span class="pin">${locked ? '🔒' : z.icon}${i === S.zone ? '<i class="me">🧍</i>' : ''}</span><span class="nm">${z.name}</span></button>`;
   }).join('') + '</div>';
   const z = ZONES[mapSel];
-  const kind = z.town ? 'Town' : z.slayer ? `💀 Slayer area · Slayer ${z.slayer}` : `Region ${mapSel + 1} · combat ${z.req}+`;
+  const kind = z.town ? 'Town' : z.wild ? `☠️ Wilderness · combat ${z.req}+` : z.slayer ? `💀 Slayer area · Slayer ${z.slayer}` : `Region ${mapSel + 1} · combat ${z.req}+`;
   h += `<div class="info locpanel"><div class="row" style="justify-content:space-between"><b class="locname">${z.icon} ${z.name}</b><span class="tag">${kind}</span></div>
     <p class="muted">${z.desc}${mapSel === S.zone ? ' <b>Your hero is here.</b>' : ''}</p>`;
   if (!locOpen(mapSel)) return h + `<p class="need">Reach Slayer level ${z.slayer} to enter (you are ${LV.slayer}).</p></div>`;
-  h += '<div class="acticons">' + acts.map(a => `<button class="${a === mapAct ? 'sel' : ''} ${S.zone === mapSel && S.activity === a ? 'doing' : ''}" data-a="mapact" data-id="${a}">
-    <span class="big">${actIcon(a)}</span>${a === 'combat' ? 'Combat' : SKILLS[a].name}<small>${a === 'combat' ? 'Combat ' + combatLevel() : 'Level ' + LV[a]}</small></button>`).join('') + '</div>';
+  const doing = a => S.zone === mapSel && (a === 'pvp' ? hunting : S.activity === a && !(a === 'combat' && hunting));
+  h += '<div class="acticons">' + acts.map(a => `<button class="${a === mapAct ? 'sel' : ''} ${doing(a) ? 'doing' : ''}" data-a="mapact" data-id="${a}">
+    <span class="big">${actIcon(a)}</span>${a === 'combat' ? 'Combat' : a === 'pvp' ? 'PvP' : SKILLS[a].name}<small>${a === 'combat' ? 'Combat ' + combatLevel() : a === 'pvp' ? `${fmt(S.wild.pks)} PKs` : 'Level ' + LV[a]}</small></button>`).join('') + '</div>';
   h += htmlLocAct(mapSel, mapAct) + '</div>';
-  if (mapAct === 'combat' && S.activity === 'combat' && S.zone === mapSel) h += `<div class="info">${htmlCombatPanel()}</div>`;
+  if ((mapAct === 'combat' || mapAct === 'pvp') && S.activity === 'combat' && S.zone === mapSel) h += `<div class="info">${htmlCombatPanel()}</div>`;
   return h;
 }
 
@@ -3846,7 +3851,7 @@ function wildPanel() {
     <div class="btns">
       <button data-a="wildleave" ${w.in ? '' : 'disabled'}>🏃 Teleport out and bank</button>
       <button data-a="wildskull" class="${w.skull ? 'sel' : ''}" ${w.in ? '' : 'disabled'}>☠️ Skull ${w.skull ? 'ON' : 'off'}<small> +50% rare loot, keep 0 items</small></button>
-      <button data-a="wildflee" class="${w.flee ? 'sel' : ''}">${w.flee ? '🏃 Run from PKers' : '⚔️ Fight PKers'}</button>
+      ${S.ctarget === 'pvp' ? '' : `<button data-a="wildflee" class="${w.flee ? 'sel' : ''}">${w.flee ? '🏃 Run from PKers' : '⚔️ Fight PKers'}</button>`}
     </div>
     <small class="muted">PKers defeated ${fmt(w.pks)} · deaths here ${fmt(w.deaths)} · banked ${fmt(w.banked)} gold</small></div>`;
 }
@@ -3877,6 +3882,15 @@ function bossCard(b, fromMap) {
 
 function htmlLocAct(i, a) {
   const z = ZONES[i], here = S.zone === i && S.activity === a;
+  if (a === 'pvp') {
+    if (!zoneOpen(i)) return `<p class="need">Reach combat level ${z.req} to enter the Wilderness (you are ${combatLevel()}).</p>`;
+    const on = S.zone === i && S.activity === 'combat' && S.ctarget === 'pvp';
+    return wildPanel() + `<div class="grid"><div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">☠️</span>
+      <span class="nm"><b>Hunt players</b> <span class="tag">PvP</span><br>
+      <small>Every encounter is a player killer close to your combat level (${Math.max(20, combatLevel() - 10)}–${combatLevel() + 6}). They switch styles, eat food and can freeze you.</small><br>
+      <small>Win: their gear, emblems, ether and a gold bounty – all into your looting bag. Lose: the Wilderness death rules above.</small></span></div>
+      <div class="btns">${on ? '<button class="sel" disabled>☠️ Hunting…</button>' : `<button data-a="fight" data-z="${i}" data-id="pvp">☠️ Hunt players</button>`}</div></div></div>`;
+  }
   if (a === 'combat') {
     if (!zoneOpen(i)) {
       const prev = i > 0 && i < MAIN_ZONES && !S.bosses[i - 1] ? ENEMIES[ZONES[i - 1].boss].name : null;
