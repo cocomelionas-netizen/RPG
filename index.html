@@ -1272,7 +1272,7 @@ function tick(dt) {
     if (R.ent.x - R.worldX <= R.ent.stop) {
       R.phase = 'act'; startAct();
       if (R.ent.d && R.ent.d.boss) { showBanner(`👑 BOSS: ${R.ent.d.name}`); sfx('boss'); }
-      if (R.ent.d && R.ent.d.pker) {
+      if (R.ent.d && R.ent.d.pker && !R.ent.d.real) {
         log(`☠️ ${R.ent.d.name} (level ${R.ent.d.lvl}) attacks you!`, 'lg-bad'); showBanner(`☠️ PKer: ${R.ent.d.name} (level ${R.ent.d.lvl})`); sfx('boss');
         if (S.wild.flee && S.ctarget !== 'pvp') tryEscape(`You ran from ${R.ent.d.name}`, R.ent);
       }
@@ -1280,7 +1280,7 @@ function tick(dt) {
   } else if (R.phase === 'act' && !R.ent) R.phase = 'walk';
   else if (R.phase === 'act') {
     const k = R.ent.kind;
-    if (k === 'enemy') combatTick(dt); else if (k === 'npc') thieveTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
+    if (k === 'enemy') { if (R.ent.replay) replayTick(dt); else combatTick(dt); } else if (k === 'npc') thieveTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
   } else if (R.phase === 'dead') {
     R.deadT -= dt;
     if (R.deadT <= 0) {
@@ -2969,14 +2969,14 @@ async function netLogin(signup) {
   } catch (e) { accErr('Could not reach the server. Try again.'); }
 }
 async function onSignedIn(user, typed) {
-  let { data: prof } = await sb.from('profiles').select('name').eq('id', user.id).maybeSingle();
+  let { data: prof } = await sb.from('profiles').select('name, rating, wins, losses').eq('id', user.id).maybeSingle();
   if (!prof) {
     // signed up but the name was never claimed (closed tab): claim it now
     const r = await sb.rpc('claim_name', { p_name: typed || (user.email || '').split('@')[0].replace(/\./g, ' ').slice(0, 12) });
     if (r.error || !r.data.ok) { NET.status = '⚠️ ' + ((r.data && r.data.reason) || 'No hero name'); return; }
     prof = { name: r.data.name };
   }
-  me = { id: user.id, name: prof.name };
+  me = { id: user.id, name: prof.name, rating: prof.rating || 1000, wins: prof.wins || 0, losses: prof.losses || 0 };
   const { data: row } = await sb.from('saves').select('data').eq('user_id', user.id).maybeSingle();
   if (row && row.data) useCloud(row.data, `☁️ Welcome back, ${me.name}! Loaded your hero from the cloud.`);
   else log(`☁️ Welcome, ${me.name}! Uploading this device's hero to your account.`, 'lg-xp');
@@ -3015,14 +3015,117 @@ async function netLogout() {
   log('👤 Signed out. Your hero keeps playing on this device.');
 }
 
+/* --- PvP against other players' heroes: the server rolls the fight, the game plays it back --- */
+const PVP = { targets: null, history: null, busy: false, msg: '' };
+async function pvpFind() {
+  if (!me || PVP.busy) return;
+  PVP.busy = true; PVP.msg = ''; uiDirty = true;
+  try {
+    const [t, h] = await Promise.all([
+      sb.rpc('pvp_targets'),
+      sb.from('pvp_fights').select('attacker,defender,attacker_name,defender_name,winner,rating_change,gold,created_at')
+        .or(`attacker.eq.${me.id},defender.eq.${me.id}`).order('created_at', { ascending: false }).limit(8),
+    ]);
+    PVP.targets = t.error ? [] : t.data; PVP.history = h.error ? [] : h.data;
+    if (t.error) PVP.msg = t.error.message;
+  } catch (e) { PVP.msg = 'Could not reach the server'; }
+  PVP.busy = false; uiDirty = true;
+}
+async function pvpFight(id) {
+  if (!me || PVP.busy) return;
+  if (R.ent && R.ent.replay) { PVP.msg = 'Finish this fight first'; uiDirty = true; return; }
+  if (!zoneOpen(WILD)) { PVP.msg = `Reach combat level ${ZONES[WILD].req} to fight in the Wilderness`; uiDirty = true; return; }
+  PVP.busy = true; PVP.msg = ''; uiDirty = true;
+  await netSync();   // the server fights with your latest saved hero
+  try {
+    const { data, error } = await sb.rpc('pvp_attack', { p_target: id });
+    if (error) PVP.msg = error.message;
+    else if (!data.ok) PVP.msg = data.reason;
+    else startReplay(data);
+  } catch (e) { PVP.msg = 'Could not reach the server'; }
+  PVP.busy = false; uiDirty = true;
+}
+function startReplay(r) {
+  if (S.zone !== WILD || S.activity !== 'combat') travel(WILD, 'combat');
+  const o = r.opp, eq = o.equip || {}, it = sl => eq[sl] && ITEMS[eq[sl]];
+  const d = { name: o.name, pker: true, real: true, lvl: o.combat, type: o.type, hp: o.hp, maxHit: o.maxhit, atk: Math.round(o.atk), def: o.def,
+    speed: o.speed, gold: [0, 0], shape: 'humanoid', size: 1, color: '#f1c27d', body: it('body') ? it('body').color : '#5a4a3a', orb: '#c58bff', drops: [] };
+  R.ent = { kind: 'enemy', id: 'player', d, hp: o.hp, maxHp: o.hp, atk: d.atk, def: d.def, atkT: 99, x: R.worldX + Math.max(420, W - HX - 40),
+    stop: o.type === 'melee' && wtype() === 'melee' ? 70 : 140, hit: 0, lunge: 0, pend: 0, style: o.type, swap: 99, food: 0,
+    replay: r.log, rt: 0, ri: 0, result: r, hpBack: S.hp };
+  R.phase = 'walk'; R.events = [];
+  S.hp = r.me.hp;
+  showBanner(`⚔️ PvP: ${o.name} (level ${o.combat})`); sfx('boss');
+  log(`⚔️ You challenge ${o.name} (level ${o.combat}, rating ${o.rating || '?'}).`, 'lg-xp');
+}
+// play the server's fight log back at 1.5x speed
+function replayTick(dt) {
+  const e = R.ent, ev = e.replay, ex = entScreenX(e), ey = GY - entHeight(e) * 0.5;
+  e.rt += dt * 1.5;
+  while (e.ri < ev.length && ev[e.ri].t <= e.rt) {
+    const v = ev[e.ri++];
+    if (v.s === 'a') {
+      R.swing = 1; e.hp = v.hp; if (v.d) e.hit = 1;
+      if (wtype() !== 'melee') shoot(HX + 18, GY - 48, ex, ey, wtype() === 'ranged' ? 'arrow' : 'orb', '#fff', 0.25);
+      hitsplat(ex, ey, v.d, v.d ? 'hit' : 'miss'); sfx(v.d ? 'hit' : 'miss');
+    } else if (v.s === 'd') {
+      e.lunge = 1; S.hp = Math.min(maxHp(), v.hp); if (v.d) R.heroHit = 1;
+      if (e.d.type !== 'melee') shoot(ex - 10, ey, HX + 6, GY - 44, e.d.type === 'ranged' ? 'arrow' : 'orb', e.d.orb, 0.25);
+      hitsplat(HX, GY - 42, v.d, v.d ? 'hit' : 'miss', true); if (v.d) sfx('hurt');
+    } else if (v.s === 'ae') { S.hp = Math.min(maxHp(), v.hp); R.eatFlash = 1; floatText(HX + 18, GY - 120, '+' + v.h, '#6fd27a', 1, 1, true); }
+    else if (v.s === 'be') { e.hp = v.hp; floatText(ex, GY - entHeight(e) - 40, `🍖 +${v.h}`, '#6fd27a', 1.2); }
+  }
+  if (e.ri >= ev.length) endReplay(e);
+}
+function endReplay(e) {
+  const r = e.result, name = e.d.name;
+  if (me) { me.rating = r.rating; if (r.win) me.wins++; else me.losses++; }
+  if (r.win) {
+    S.gold += r.gold; S.hp = Math.max(1, e.hpBack);
+    R.phase = 'done'; R.doneT = 0.8; e.dying = true;
+    showBanner(`🏆 You beat ${name}! +${r.rating_change} rating · +${fmt(r.gold)} gold`); sfx('level');
+    log(`🏆 PvP: you beat ${name}. Rating ${r.rating} (+${r.rating_change}), +${fmt(r.gold)} gold.`, 'lg-gold');
+  } else {
+    S.hp = 0; R.phase = 'dead'; R.deadT = 4;
+    showBanner(`💀 ${name} won the fight (${r.rating_change} rating)`);
+    log(`💀 PvP: ${name} beat you. Rating ${r.rating} (${r.rating_change}). You keep your items – real PvP only costs rating.`, 'lg-bad');
+  }
+  PVP.history = null; PVP.targets = null; uiDirty = true;
+}
+function htmlRealPvp() {
+  let h = '<h3>🌐 Real players</h3>';
+  if (!sb) return h + '<p class="muted">Fighting other players needs a connection to the server.</p>';
+  if (!me) return h + '<p class="muted">Log in to fight other players\' heroes. <button data-a="acct">👤 Log in</button></p>';
+  if (!PVP.targets && !PVP.busy) pvpFind();
+  h += `<p class="muted">The server fights your saved hero against theirs with the real stats, gear and food – nobody can fake the result.
+    Winning gives rating and gold; losing costs only rating. Your rating: <b>${fmt(me.rating)}</b> · ${me.wins} W / ${me.losses} L</p>`;
+  if (PVP.msg) h += `<p class="need">${PVP.msg}</p>`;
+  h += `<div class="btns"><button data-a="pvpfind" ${PVP.busy ? 'disabled' : ''}>🔍 Find opponents</button></div>`;
+  if (!PVP.targets) return h + '<p class="muted">Loading…</p>';
+  if (!PVP.targets.length) h += '<p class="muted">No other heroes yet – invite a friend!</p>';
+  h += '<div class="grid">' + PVP.targets.map(t => {
+    const eq = t.equip || {}, gear = Object.values(eq).filter(id => id && ITEMS[id]).map(id => ITEMS[id].icon).join('');
+    return `<div class="item"><div class="top"><span class="ic">🧍</span><span class="nm"><b>${t.name}</b> <span class="tag">Combat ${t.combat}</span> <span class="tag">⚔️ ${t.rating}</span><br>
+      <small>Total level ${t.total_level} · ${t.wins} W / ${t.losses} L · ${gear || 'no gear'}</small></span></div>
+      <div class="btns"><button data-a="pvpfight" data-id="${t.id}" ${PVP.busy ? 'disabled' : ''}>⚔️ Fight</button></div></div>`;
+  }).join('') + '</div>';
+  if (PVP.history && PVP.history.length) {
+    h += '<h3>Recent fights</h3><div class="info">' + PVP.history.map(f => {
+      const mine = f.attacker === me.id, won = f.winner === me.id, other = mine ? f.defender_name : f.attacker_name;
+      return `<div>${won ? '🏆' : '💀'} ${mine ? `You attacked <b>${other}</b>` : `<b>${other}</b> attacked you`} and ${won ? 'won' : 'lost'} <span class="muted">(${won ? '+' : '−'}${Math.abs(f.rating_change)} rating)</span></div>`;
+    }).join('') + '</div>';
+  }
+  return h;
+}
+
 /* --- hiscores --- */
 let progSub = 'progress', hsSkill = 'overall', hsRows = null, hsAt = 0, hsKey = '', hsLoading = false;
 async function loadHiscores() {
   hsLoading = true;
   try {
-    let q = sb.from('hiscores').select('name,total_level,total_xp,combat,skills,kills,bosses,pks,imported');
+    let q = sb.from('hiscores').select('name,total_level,total_xp,combat,skills,kills,bosses,pks,imported,rating');
     q = hsSkill === 'overall' ? q.order('total_level', { ascending: false }).order('total_xp', { ascending: false })
-      : hsSkill === 'pks' ? q.order('pks', { ascending: false }) : hsSkill === 'bosses' ? q.order('bosses', { ascending: false })
+      : hsSkill === 'pks' ? q.order('pks', { ascending: false }) : hsSkill === 'rating' ? q.order('rating', { ascending: false }) : hsSkill === 'bosses' ? q.order('bosses', { ascending: false })
       : q.order(`skills->${hsSkill}`, { ascending: false, nullsFirst: false });
     const { data, error } = await q.limit(50);
     hsRows = error ? { error: error.message } : data;
@@ -3032,7 +3135,7 @@ async function loadHiscores() {
 function htmlHiscores() {
   if (!sb) return '<p class="muted">The hiscores need a connection to the server.</p>';
   if (!hsLoading && (!hsRows || hsKey !== hsSkill || Date.now() - hsAt > 60000)) loadHiscores();
-  const opts = [['overall', '🏆 Overall'], ['pks', '☠️ PKs'], ['bosses', '👑 Bosses'], ...Object.entries(SKILLS).map(([k, sk]) => [k, sk.icon + ' ' + sk.name])];
+  const opts = [['overall', '🏆 Overall'], ['rating', '⚔️ PvP rating'], ['pks', '☠️ PKs'], ['bosses', '👑 Bosses'], ...Object.entries(SKILLS).map(([k, sk]) => [k, sk.icon + ' ' + sk.name])];
   let h = `<p class="muted">${me ? `Signed in as <b>${me.name}</b>.` : '<button data-a="acct">👤 Log in</button> to appear on the hiscores.'} Only progress the server accepted counts; ⓘ marks heroes that brought progress from before their account.</p>
     <div class="chips">` + opts.map(([k, n]) => `<button class="${hsSkill === k ? 'sel' : ''}" data-a="hsk" data-id="${k}">${n}</button>`).join('') + '</div>';
   if (!hsRows || hsKey !== hsSkill) return h + '<p class="muted">Loading…</p>';
@@ -3040,11 +3143,12 @@ function htmlHiscores() {
   if (!hsRows.length) return h + '<p class="muted">Nobody here yet – be the first!</p>';
   const val = r => {
     if (hsSkill === 'overall') return [`${fmt(r.total_level)}`, `${fmt(r.total_xp)} XP`];
-    if (hsSkill === 'pks') return [`${fmt(r.pks)}`, 'players killed'];
+    if (hsSkill === 'pks') return [`${fmt(r.pks)}`, 'player killers beaten'];
+    if (hsSkill === 'rating') return [`${fmt(r.rating)}`, 'PvP rating'];
     if (hsSkill === 'bosses') return [`${fmt(r.bosses)} / ${BOSSES.length}`, 'bosses beaten'];
     const x = (r.skills && r.skills[hsSkill]) || 0; return [`${levelFromXp(x)}`, `${fmt(x)} XP`];
   };
-  return h + '<table class="hs"><thead><tr><th>#</th><th>Name</th><th>Combat</th><th>' + (hsSkill === 'overall' ? 'Total level' : hsSkill === 'pks' ? 'PKs' : hsSkill === 'bosses' ? 'Bosses' : 'Level') + '</th><th></th></tr></thead><tbody>'
+  return h + '<table class="hs"><thead><tr><th>#</th><th>Name</th><th>Combat</th><th>' + (hsSkill === 'overall' ? 'Total level' : hsSkill === 'rating' ? 'Rating' : hsSkill === 'pks' ? 'PKs' : hsSkill === 'bosses' ? 'Bosses' : 'Level') + '</th><th></th></tr></thead><tbody>'
     + hsRows.map((r, i) => { const [a, b] = val(r); return `<tr class="${me && r.name === me.name ? 'me' : ''}"><td>${i + 1}</td><td>${r.name}${r.imported ? ' <span class="muted" title="progress from before the account">ⓘ</span>' : ''}</td><td>${r.combat}</td><td><b>${a}</b></td><td class="muted">${b}</td></tr>`; }).join('')
     + '</tbody></table>';
 }
@@ -4029,10 +4133,10 @@ function htmlLocAct(i, a) {
     if (!zoneOpen(i)) return `<p class="need">Reach combat level ${z.req} to enter the Wilderness (you are ${combatLevel()}).</p>`;
     const on = S.zone === i && S.activity === 'combat' && S.ctarget === 'pvp';
     return wildPanel() + `<div class="grid"><div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">☠️</span>
-      <span class="nm"><b>Hunt players</b> <span class="tag">PvP</span><br>
+      <span class="nm"><b>Hunt player killers</b> <span class="tag">AI</span><br>
       <small>Every encounter is a player killer close to your combat level (${Math.max(20, combatLevel() - 10)}–${combatLevel() + 6}). They switch styles, eat food and can freeze you.</small><br>
       <small>Win: their gear, emblems, ether and a gold bounty – all into your looting bag. Lose: the Wilderness death rules above.</small></span></div>
-      <div class="btns">${on ? '<button class="sel" disabled>☠️ Hunting…</button>' : `<button data-a="fight" data-z="${i}" data-id="pvp">☠️ Hunt players</button>`}</div></div></div>`;
+      <div class="btns">${on ? '<button class="sel" disabled>☠️ Hunting…</button>' : `<button data-a="fight" data-z="${i}" data-id="pvp">☠️ Hunt player killers</button>`}</div></div></div>` + htmlRealPvp();
   }
   if (a === 'combat') {
     if (!zoneOpen(i)) {
@@ -4507,6 +4611,8 @@ document.addEventListener('click', ev => {
     case 'syncnow': netSync().then(accountModal); break;
     case 'progsub': progSub = id; break;
     case 'hsk': hsSkill = id; break;
+    case 'pvpfind': pvpFind(); break;
+    case 'pvpfight': pvpFight(id); break;
     case 'wildleave': leaveWild('Teleported out'); break;
     case 'wildskull': if (S.wild.in) { S.wild.skull = !S.wild.skull; log(S.wild.skull ? '☠️ You are skulled: better revenant loot, but you keep nothing if you die.' : 'Skull removed.', 'lg-bad'); } break;
     case 'wildflee': S.wild.flee = !S.wild.flee; break;
