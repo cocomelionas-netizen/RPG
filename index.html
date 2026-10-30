@@ -126,6 +126,14 @@
   .eq button { padding: 2px 8px; font-size: 12px; }
   .logtabs { display: flex; gap: 6px; margin-bottom: 8px; }
   .logtabs button { padding: 3px 10px; min-height: 0; font-size: 13px; }
+  #pm-new { background: var(--accent); color: #000; border-radius: 8px; padding: 0 5px; font-size: 11px; margin-left: 2px; }
+  .msgs { max-height: 260px; min-height: 100px; overflow-y: auto; overscroll-behavior: contain; font-size: 13px; display: flex; flex-direction: column; gap: 4px; margin-top: 8px; word-break: break-word; }
+  .friend { display: flex; align-items: center; gap: 6px; }
+  .friend .nm { flex: 1; min-width: 0; }
+  .friend button { padding: 2px 6px; min-height: 0; font-size: 13px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex: none; }
+  .dot.on { background: #3fe03f; box-shadow: 0 0 6px #3fe03f; }
+  .code { font: 700 22px/1.4 ui-monospace, monospace; letter-spacing: 2px; text-align: center; background: var(--bg); border: 1px dashed var(--accent); border-radius: 8px; padding: 10px; }
   #chat-new { background: var(--accent); color: #000; border-radius: 8px; padding: 0 5px; font-size: 11px; margin-left: 2px; }
   #chatlist { max-height: 260px; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; font-size: 13px; display: flex; flex-direction: column; gap: 3px; word-break: break-word; }
   .chatbar { display: flex; gap: 6px; margin-top: 8px; }
@@ -336,10 +344,11 @@
     <aside>
       <div class="card" id="hero"></div>
       <div class="card">
-        <div class="logtabs"><button class="sel" data-a="logtab" data-id="log">📜 Log</button><button data-a="logtab" data-id="chat">💬 Chat <span id="chat-new" hidden></span></button></div>
+        <div class="logtabs"><button class="sel" data-a="logtab" data-id="log">📜 Log</button><button data-a="logtab" data-id="chat">💬 Chat <span id="chat-new" hidden></span></button><button data-a="logtab" data-id="friends">👥 Friends <span id="pm-new" hidden></span></button></div>
         <div id="log"></div>
         <div id="chat" hidden><div id="chatlist"></div>
           <div class="chatbar"><input id="chat-input" maxlength="200" placeholder="Say something…" autocomplete="off"><button data-a="chatsend">Send</button></div></div>
+        <div id="friends" hidden></div>
       </div>
       <div class="card row">
         <button data-a="save">💾 Save</button>
@@ -2951,7 +2960,7 @@ function accountModal() {
   if (me) {
     openModal(`<h2>👤 ${me.name}</h2><p class="muted">Your hero is saved to the cloud every minute. The server checks every upload, so progress that is impossible in the game is refused.</p>
       <p>${NET.status || '☁️ Connected'}</p>
-      <div class="row"><button data-a="syncnow">☁️ Save now</button><button data-a="logout">Sign out</button><button data-a="close">Close</button></div>`);
+      <div class="row"><button data-a="syncnow">☁️ Save now</button><button data-a="recovery">🔑 Recovery code</button><button data-a="pwmodal">Change password</button><button data-a="logout">Sign out</button><button data-a="close">Close</button></div>`);
     return;
   }
   openModal(`<h2>👤 Play online</h2><p class="muted">Make an account to keep your hero in the cloud, play on any device and appear on the hiscores. A new account starts from the progress on this device.</p>
@@ -2959,7 +2968,7 @@ function accountModal() {
     <label class="fld">Password<input id="acc-pass" type="password" autocomplete="current-password" placeholder="at least 8 characters"></label>
     <p class="need" id="acc-err" hidden></p>
     <div class="row"><button data-a="login">Log in</button><button data-a="signup">Create account</button><button data-a="close">Cancel</button></div>
-    <p class="muted"><small>There is no password reset yet – keep your password safe.</small></p>`);
+    <p class="muted"><small>Forgot your password? <button data-a="forgot">🔑 Use a recovery code</button></small></p>`);
 }
 async function netLogin(signup) {
   const name = (document.getElementById('acc-name').value || '').trim(), pass = document.getElementById('acc-pass').value || '';
@@ -2990,7 +2999,7 @@ async function onSignedIn(user, typed) {
   const { data: row } = await sb.from('saves').select('data').eq('user_id', user.id).maybeSingle();
   if (row && row.data) useCloud(row.data, `☁️ Welcome back, ${me.name}! Loaded your hero from the cloud.`);
   else log(`☁️ Welcome, ${me.name}! Uploading this device's hero to your account.`, 'lg-xp');
-  renderAccount(); renderChat(); GE.offers = null;
+  renderAccount(); renderChat(); GE.offers = null; friendsStart(); renderFriends();
   await netSync();
 }
 function useCloud(data, msg) {
@@ -3026,8 +3035,115 @@ async function netSync() {
 }
 async function netLogout() {
   if (sb) await sb.auth.signOut();
-  me = null; renderAccount(); renderChat(); closeModal();
+  friendsStop(); me = null; renderAccount(); renderChat(); renderFriends(); closeModal();
   log('👤 Signed out. Your hero keeps playing on this device.');
+}
+
+/* --- account recovery: a one-time code replaces email --- */
+async function makeRecovery() {
+  try {
+    const { data, error } = await sb.rpc('set_recovery');
+    if (error || !data.ok) throw new Error();
+    openModal(`<h2>🔑 Your recovery code</h2><p>Write this down somewhere safe. It is shown only now and works once – with it you can set a new password if you forget yours.</p>
+      <p class="code">${esc(data.code)}</p><p class="muted">Making a new code cancels the old one.</p><button data-a="close">I wrote it down</button>`);
+  } catch (e) { openModal('<h2>🔑 Recovery code</h2><p class="need">Could not reach the server. Try again.</p><button data-a="close">Close</button>'); }
+}
+function forgotModal() {
+  openModal(`<h2>🔑 New password</h2><p class="muted">Enter your hero name, the recovery code you wrote down and a new password.</p>
+    <label class="fld">Hero name<input id="rc-name" maxlength="12" autocomplete="username"></label>
+    <label class="fld">Recovery code<input id="rc-code" maxlength="14" placeholder="XXXX-XXXX-XXXX" autocomplete="off"></label>
+    <label class="fld">New password<input id="rc-pass" type="password" autocomplete="new-password" placeholder="at least 8 characters"></label>
+    <p class="need" id="acc-err" hidden></p>
+    <div class="row"><button data-a="reset">Set new password</button><button data-a="close">Cancel</button></div>`);
+}
+async function doReset() {
+  const name = document.getElementById('rc-name').value.trim(), code = document.getElementById('rc-code').value, pass = document.getElementById('rc-pass').value;
+  if (pass.length < 8) return accErr('Use a password of at least 8 characters');
+  try {
+    const { data, error } = await sb.rpc('reset_password', { p_name: name, p_code: code, p_password: pass });
+    if (error || !data.ok) return accErr(error ? 'Could not reach the server' : data.reason);
+    const res = await sb.auth.signInWithPassword({ email: nameEmail(name), password: pass });
+    if (res.error) return accErr('Password changed – log in with it now');
+    await onSignedIn(res.data.session.user, name);
+    openModal('<h2>🔑 Password changed</h2><p>You are logged in. Make a new recovery code from the account menu – the old one is used up.</p><button data-a="close">OK</button>');
+  } catch (e) { accErr('Could not reach the server'); }
+}
+function pwModal() {
+  openModal(`<h2>Change password</h2><label class="fld">New password<input id="pw-new" type="password" autocomplete="new-password" placeholder="at least 8 characters"></label>
+    <p class="need" id="acc-err" hidden></p><div class="row"><button data-a="pwsave">Save</button><button data-a="close">Cancel</button></div>`);
+}
+async function pwSave() {
+  const pass = document.getElementById('pw-new').value;
+  if (pass.length < 8) return accErr('Use a password of at least 8 characters');
+  const { error } = await sb.auth.updateUser({ password: pass });
+  if (error) return accErr(error.message);
+  openModal('<h2>Password changed</h2><button data-a="close">OK</button>');
+}
+
+/* --- friends and private messages --- */
+const FR = { list: null, open: null, msgs: [], unread: {}, chan: null, at: 0, msg: '' };
+function friendsStart() {
+  if (!sb || !me || FR.chan) return;
+  FR.chan = sb.channel('pm-' + me.id).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pms', filter: `to_id=eq.${me.id}` }, pl => {
+    const m = pl.new;
+    if (FR.open === m.from_id && CHAT.tab === 'friends') FR.msgs.push(m);
+    else { FR.unread[m.from_id] = (FR.unread[m.from_id] || 0) + 1; log(`📩 ${esc(m.from_name)}: ${esc(m.body)}`, 'lg-xp'); }
+    renderFriends();
+  }).subscribe();
+}
+function friendsStop() { if (FR.chan) { sb.removeChannel(FR.chan); FR.chan = null; } FR.list = null; FR.open = null; FR.unread = {}; }
+async function friendsLoad() {
+  if (!me) return;
+  FR.at = Date.now();
+  try { const { data, error } = await sb.rpc('friends_list'); FR.list = error ? [] : data; } catch (e) { FR.list = []; }
+  renderFriends();
+}
+async function friendAdd() {
+  const inp = document.getElementById('fr-name'), name = inp.value.trim();
+  if (!name) return;
+  const { data, error } = await sb.rpc('friend_add', { p_name: name });
+  FR.msg = error ? 'Could not reach the server' : data.ok ? `Added ${data.name}` : data.reason;
+  if (data && data.ok) inp.value = '';
+  friendsLoad();
+}
+async function friendRemove(id) { await sb.rpc('friend_remove', { p_id: id }); if (FR.open === id) FR.open = null; friendsLoad(); }
+async function pmOpen(id) {
+  FR.open = id; FR.msgs = []; delete FR.unread[id]; renderFriends();
+  const { data } = await sb.from('pms').select('id,from_id,to_id,from_name,body,created_at')
+    .or(`and(from_id.eq.${me.id},to_id.eq.${id}),and(from_id.eq.${id},to_id.eq.${me.id})`).order('created_at', { ascending: false }).limit(40);
+  if (FR.open === id) { FR.msgs = (data || []).reverse(); renderFriends(); }
+}
+async function pmSend() {
+  const inp = document.getElementById('pm-input'), body = inp.value.trim();
+  if (!body || !FR.open) return;
+  inp.value = '';
+  const { data, error } = await sb.rpc('pm_send', { p_to: FR.open, p_body: body });
+  if (error || !data.ok) { inp.value = body; FR.msg = error ? 'Could not send' : data.reason; }
+  else FR.msgs.push({ from_id: me.id, from_name: me.name, body, created_at: new Date().toISOString() });
+  renderFriends();
+}
+function renderFriends() {
+  const el = document.getElementById('friends'), badge = document.getElementById('pm-new');
+  const unread = Object.values(FR.unread).reduce((a, n) => a + n, 0);
+  if (badge) { badge.hidden = !unread; badge.textContent = unread; }
+  if (!el || CHAT.tab !== 'friends') return;
+  if (!sb || !me) { el.innerHTML = '<div class="muted">Log in to add friends and send private messages.</div>'; return; }
+  if (FR.open) {
+    const f = (FR.list || []).find(x => x.id === FR.open) || { name: '…' };
+    el.innerHTML = `<div class="row"><button data-a="pmback">← Back</button><b>${esc(f.name)}</b></div>
+      <div id="pmlist" class="msgs">${FR.msgs.map(m => `<div><span class="muted">${new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> <b class="${m.from_id === me.id ? 'lg-gold' : ''}">${esc(m.from_name)}:</b> ${esc(m.body)}</div>`).join('') || '<div class="muted">No messages yet.</div>'}</div>
+      ${FR.msg ? `<div class="need">${esc(FR.msg)}</div>` : ''}
+      <div class="chatbar"><input id="pm-input" maxlength="200" placeholder="Message ${esc(f.name)}…" autocomplete="off"><button data-a="pmsend">Send</button></div>`;
+    const l = document.getElementById('pmlist'); l.scrollTop = l.scrollHeight;
+    return;
+  }
+  if (!FR.list || Date.now() - FR.at > 60000) { if (Date.now() - FR.at > 3000) friendsLoad(); }
+  el.innerHTML = `<div class="chatbar"><input id="fr-name" maxlength="12" placeholder="Hero name" autocomplete="off"><button data-a="fradd">➕ Add</button></div>
+    ${FR.msg ? `<div class="muted">${esc(FR.msg)}</div>` : ''}
+    <div class="msgs">${!FR.list ? '<div class="muted">Loading…</div>' : !FR.list.length ? '<div class="muted">No friends yet – add someone by their hero name.</div>'
+      : FR.list.map(f => `<div class="friend"><span class="dot ${f.online ? 'on' : ''}" title="${f.online ? 'online' : 'offline'}"></span>
+        <span class="nm"><b>${esc(f.name)}</b> <small class="muted">combat ${f.combat} · ⚔️ ${f.rating}</small>${FR.unread[f.id] ? ` <span class="tag good">${FR.unread[f.id]} new</span>` : ''}</span>
+        <button data-a="pmopen" data-id="${f.id}" title="Message">💬</button><button data-a="frfight" data-id="${f.id}" title="Challenge to a PvP fight">⚔️</button><button data-a="frdel" data-id="${f.id}" title="Remove">✖</button></div>`).join('')}</div>`;
 }
 
 /* --- PvP against other players' heroes: the server rolls the fight, the game plays it back --- */
@@ -3237,7 +3353,7 @@ function htmlGE() {
 }
 
 /* --- chat: live through Supabase Realtime --- */
-const CHAT = { open: false, loaded: false, msgs: [], unread: 0, chan: null };
+const CHAT = { open: false, tab: 'log', loaded: false, msgs: [], unread: 0, chan: null };
 async function chatStart() {
   if (!sb || CHAT.loaded) return;
   CHAT.loaded = true;
@@ -3274,12 +3390,11 @@ async function chatSend() {
   } catch (e) { inp.value = body; }
 }
 function logTab(which) {
-  CHAT.open = which === 'chat';
-  document.getElementById('log').hidden = CHAT.open;
-  document.getElementById('chat').hidden = !CHAT.open;
+  CHAT.tab = which; CHAT.open = which === 'chat';
+  for (const id of ['log', 'chat', 'friends']) document.getElementById(id).hidden = id !== which;
   document.querySelectorAll('.logtabs button').forEach(b => b.classList.toggle('sel', b.dataset.id === which));
   if (CHAT.open) { CHAT.unread = 0; chatStart(); }
-  renderChat();
+  renderChat(); renderFriends();
 }
 
 /* --- hiscores --- */
@@ -4775,6 +4890,17 @@ document.addEventListener('click', ev => {
     case 'gecollect': geCall('ge_collect_all', {}, d => log(`📦 Collected from the Grand Exchange: ${Object.entries(d.got || {}).map(([k, n]) => `${geItemName(k)} ×${fmt(n)}`).join(', ') || 'nothing'}.`, 'lg-gold')); break;
     case 'georefresh': GE.msg = ''; geLoad(); break;
     case 'logtab': logTab(id); break;
+    case 'recovery': makeRecovery(); break;
+    case 'forgot': forgotModal(); break;
+    case 'reset': doReset(); break;
+    case 'pwmodal': pwModal(); break;
+    case 'pwsave': pwSave(); break;
+    case 'fradd': friendAdd(); break;
+    case 'frdel': friendRemove(id); break;
+    case 'pmopen': pmOpen(id); break;
+    case 'pmback': FR.open = null; FR.msg = ''; renderFriends(); break;
+    case 'pmsend': pmSend(); break;
+    case 'frfight': pvpFight(id).then(() => { if (PVP.msg) { FR.msg = PVP.msg; renderFriends(); } }); break;
     case 'chatsend': chatSend(); break;
     case 'acct': accountModal(); break;
     case 'login': netLogin(false); break;
@@ -4945,7 +5071,12 @@ function init() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) { save(); netSync(); } });
   netInit();
   document.addEventListener('change', ev => { if (ev.target.id === 'ge-item') geHint(document.querySelector('#modal [data-a="geplace"]').dataset.id); });
-  document.addEventListener('keydown', ev => { if (ev.target.id === 'chat-input' && ev.key === 'Enter') { ev.preventDefault(); chatSend(); } });
+  document.addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter') return;
+    if (ev.target.id === 'chat-input') { ev.preventDefault(); chatSend(); }
+    else if (ev.target.id === 'pm-input') { ev.preventDefault(); pmSend(); }
+    else if (ev.target.id === 'fr-name') { ev.preventDefault(); friendAdd(); }
+  });
   requestAnimationFrame(t => { lastFrame = t; lastWall = Date.now(); requestAnimationFrame(frame); });
 }
 init();
