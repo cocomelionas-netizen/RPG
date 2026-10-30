@@ -3065,7 +3065,7 @@ function forgotModal() {
     <label class="fld">Recovery code<input id="rc-code" maxlength="14" placeholder="XXXX-XXXX-XXXX" autocomplete="off"></label>
     <label class="fld">New password<input id="rc-pass" type="password" autocomplete="new-password" placeholder="at least 8 characters"></label>
     <p class="need" id="acc-err" hidden></p>
-    <div class="row"><button data-a="reset">Set new password</button><button data-a="close">Cancel</button></div>`);
+    <div class="row"><button data-a="pwreset">Set new password</button><button data-a="close">Cancel</button></div>`);
 }
 async function doReset() {
   const name = document.getElementById('rc-name').value.trim(), code = document.getElementById('rc-code').value, pass = document.getElementById('rc-pass').value;
@@ -4904,7 +4904,7 @@ document.addEventListener('click', ev => {
     case 'logtab': logTab(id); break;
     case 'recovery': makeRecovery(); break;
     case 'forgot': forgotModal(); break;
-    case 'reset': doReset(); break;
+    case 'pwreset': doReset(); break;
     case 'pwmodal': pwModal(); break;
     case 'pwsave': pwSave(); break;
     case 'fradd': friendAdd(); break;

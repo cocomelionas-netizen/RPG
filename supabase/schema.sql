@@ -718,6 +718,7 @@ begin
     -- first upload: accepted, but progress made before the account existed is marked on the hiscores
     insert into saves (user_id, data) values (uid, p_data);
     if total_xp(p_data) > 50000 then update profiles set imported = true where id = uid; end if;
+    update profiles set last_seen = now() where id = uid;
     perform update_hiscore(uid, p_data);
     return jsonb_build_object('ok', true, 'first', true);
   end if;
