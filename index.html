@@ -226,8 +226,8 @@
   .map canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   .map { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
   .mapin { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
-  .mapzoom { position: absolute; right: 8px; bottom: 8px; z-index: 3; display: flex; flex-direction: column; gap: 6px; }
-  .mapzoom button { width: 36px; height: 36px; min-height: 0; padding: 0; font-size: 20px; border-radius: 50%; background: rgba(20,16,32,0.8); }
+  .mapzoom { position: absolute; right: 6px; top: 6px; z-index: 3; display: flex; gap: 4px; }
+  .mapzoom button { width: 28px !important; height: 28px !important; min-height: 0 !important; min-width: 0 !important; padding: 0 !important; font-size: 15px; line-height: 1; border-radius: 8px; background: rgba(20,16,32,0.55); border: 1px solid rgba(255,255,255,0.15); opacity: 0.85; }
   .loc {
     position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px;
     background: none; border: 0; padding: 0; min-height: 0; z-index: 1;
@@ -5645,14 +5645,17 @@ function paintMap(w, h, dpr) {
 // the map is bigger than its window: drag it with a finger or the mouse, pinch or scroll to zoom
 const MAPV = { z: 1, x: null, y: null, ptr: new Map(), moved: 0, pinch: 0 };
 function mapBase(vw) { return vw < 700 ? 1.9 : 1.3; }
-function applyMapView() {
+function applyMapView(drag) {
   const vp = document.getElementById('worldmap'), inn = document.getElementById('mapin');
   if (!vp || !inn) return;
   const vw = vp.clientWidth, vh = vp.clientHeight, B = mapBase(vw), iw = Math.round(vw * B), ih = Math.round(vh * B);
   inn.style.width = iw + 'px'; inn.style.height = ih + 'px';
   MAPV.z = clamp(MAPV.z, 1 / B, 2.2 / B * 1.2);
   if (MAPV.x === null) { const z = ZONES[S.zone]; MAPV.x = vw / 2 - z.x * iw * MAPV.z; MAPV.y = vh / 2 - z.y * ih * MAPV.z; }
-  MAPV.x = clamp(MAPV.x, vw - iw * MAPV.z, 0); MAPV.y = clamp(MAPV.y, vh - ih * MAPV.z, 0);
+  // the map can be pulled a little past its edges, so it always moves under the finger
+  const m = drag ? Math.min(vw, vh) * 0.3 : 0;
+  MAPV.x = clamp(MAPV.x, Math.min(0, vw - iw * MAPV.z) - m, Math.max(0, vw - iw * MAPV.z) + m);
+  MAPV.y = clamp(MAPV.y, Math.min(0, vh - ih * MAPV.z) - m, Math.max(0, vh - ih * MAPV.z) + m);
   inn.style.transform = `translate(${MAPV.x}px,${MAPV.y}px) scale(${MAPV.z})`;
 }
 function mapZoom(f, px, py) {
@@ -5673,14 +5676,20 @@ function mapInput() {
     if (!MAPV.ptr.has(ev.pointerId) || !document.getElementById('worldmap')) return;
     const old = MAPV.ptr.get(ev.pointerId), now = pos(ev);
     MAPV.ptr.set(ev.pointerId, now);
-    if (MAPV.ptr.size === 1) { MAPV.x += now[0] - old[0]; MAPV.y += now[1] - old[1]; MAPV.moved += Math.abs(now[0] - old[0]) + Math.abs(now[1] - old[1]); applyMapView(); }
+    if (MAPV.ptr.size === 1) { MAPV.x += now[0] - old[0]; MAPV.y += now[1] - old[1]; MAPV.moved += Math.abs(now[0] - old[0]) + Math.abs(now[1] - old[1]); applyMapView(true); }
     else if (MAPV.ptr.size === 2) {
       const [a, b] = [...MAPV.ptr.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
       if (MAPV.pinch) mapZoom(d / MAPV.pinch, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
       MAPV.pinch = d; MAPV.moved = 99;
     }
   });
-  const up = ev => { MAPV.ptr.delete(ev.pointerId); MAPV.pinch = 0; };
+  const up = ev => {
+    if (!MAPV.ptr.delete(ev.pointerId)) return;
+    MAPV.pinch = 0;
+    // let go: glide back so no empty sea shows past the edge
+    const inn = document.getElementById('mapin');
+    if (inn && !MAPV.ptr.size) { inn.style.transition = 'transform .25s ease-out'; applyMapView(); setTimeout(() => { inn.style.transition = ''; }, 260); }
+  };
   window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   // a drag must not count as a tap on a place
   document.addEventListener('click', ev => { if (MAPV.moved > 8 && ev.target.closest('#worldmap .mapin')) { ev.stopPropagation(); ev.preventDefault(); } MAPV.moved = 0; }, true);
