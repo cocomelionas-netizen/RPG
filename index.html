@@ -85,6 +85,17 @@
   }
   main { display: grid; grid-template-columns: 1fr 320px; gap: 12px; margin-top: 12px; }
   @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+  /* computers: keep the game view on screen while the panels scroll, and use big monitors */
+  @media (min-width: 821px) and (min-height: 760px) {
+    #stage { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0 8px; margin-top: -12px; }
+    #view { max-width: calc(40vh * 3); margin-inline: auto; }
+  }
+  @media (min-width: 1600px) and (min-height: 1000px) {
+    .wrap { max-width: 1440px; }
+    main { grid-template-columns: 1fr 360px; }
+  }
+  #install { padding: 2px 10px; min-height: 0; font-size: 13px; line-height: 1.4; margin-left: 6px; }
+  .kbd { display: inline-block; min-width: 18px; padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; font-size: 11px; text-align: center; color: var(--muted); }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
   nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); }
   nav.tabs button { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -325,7 +336,7 @@
 </head>
 <body>
 <header>
-  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button></h1>
+  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button><button id="install" data-a="install" hidden>⬇️ Install</button></h1>
   <span class="stat" id="gold">Gold: <b>0</b></span>
   <span class="stat" id="cmb">Combat level: <b>1</b></span>
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
@@ -2901,6 +2912,31 @@ function openModal(html) {
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('modal').hidden = false;
   document.body.classList.add('modal-open');
+}
+/* ================= INSTALL (PWA: phones and computers) ================= */
+let installEv = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function installInit() {
+  const btn = document.getElementById('install');
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (standalone()) return;
+  window.addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); installEv = ev; btn.hidden = false; });
+  window.addEventListener('appinstalled', () => { installEv = null; btn.hidden = true; log('📲 Endless Road installed – open it from your home screen or desktop.', 'lg-xp'); });
+  if (ios) btn.hidden = false;   // Safari has no install prompt: show the steps instead
+}
+function installApp() {
+  if (installEv) {
+    installEv.prompt();
+    installEv.userChoice.then(() => { installEv = null; document.getElementById('install').hidden = true; }).catch(() => {});
+    return;
+  }
+  openModal(`<h2>📲 Install Endless Road</h2>
+    <p>Play full screen, straight from your home screen – no app store needed. Your save stays the same.</p>
+    <ul><li><b>iPhone / iPad (Safari):</b> tap <b>Share</b> → <b>Add to Home Screen</b>.</li>
+    <li><b>Android (Chrome):</b> menu <b>⋮</b> → <b>Install app</b> / <b>Add to Home screen</b>.</li>
+    <li><b>PC / Mac (Chrome or Edge):</b> click the install icon at the right of the address bar.</li></ul>
+    <p><small>Log in to keep the same character on your phone and your computer.</small></p>
+    <button data-a="close">OK</button>`);
 }
 function closeModal() { document.getElementById('modal').hidden = true; document.body.classList.remove('modal-open'); }
 
@@ -7037,6 +7073,7 @@ document.addEventListener('click', ev => {
     case 'journey-yes': newJourney(); closeModal(); openTab('activity'); break;
     case 'save': save(); log('💾 Game saved.'); break;
     case 'close': closeModal(); break;
+    case 'install': installApp(); break;
     case 'reset':
       openModal(`<h2>Start over?</h2><p>All progress will be permanently deleted.</p>
         <div class="row"><button data-a="reset-yes">Yes, delete</button><button data-a="close">Cancel</button></div>`);
@@ -7139,6 +7176,20 @@ function init() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) { save(); netSync(); } });
   netInit();
   document.addEventListener('change', ev => { if (ev.target.id === 'ge-item') geHint(document.querySelector('#modal [data-a="geplace"]').dataset.id); });
+  // keyboard play on computers: 1-7 switch tabs, M mute, Esc closes a window
+  document.addEventListener('keydown', ev => {
+    const t = ev.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    const modal = !document.getElementById('modal').hidden;
+    if (ev.key === 'Escape' && modal) { ev.preventDefault(); closeModal(); return; }
+    if (modal) return;
+    const tabs = [...document.querySelectorAll('nav.tabs [data-tab]')];
+    const n = +ev.key;
+    if (n >= 1 && n <= tabs.length) { ev.preventDefault(); openTab(tabs[n - 1].dataset.tab); }
+    else if (ev.key === 'm' || ev.key === 'M') document.getElementById('mute').click();
+  });
+  if (matchMedia('(pointer: fine)').matches) document.querySelectorAll('nav.tabs [data-tab]').forEach((b, i) => { b.title = `Shortcut: ${i + 1}`; });
+  installInit();
   document.addEventListener('keydown', ev => {
     if (ev.key !== 'Enter') return;
     if (ev.target.id === 'chat-input') { ev.preventDefault(); chatSend(); }
