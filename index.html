@@ -4121,7 +4121,7 @@ async function clanLoad() {
         CL.chan ? null : sb.from('clan_chat').select('id,name,body,created_at').eq('clan_id', cid).order('created_at', { ascending: false }).limit(40),
         sb.rpc('clan_week')]);
       CL.info = info.error ? null : info.data;
-      CL.week = wk.error || !wk.data || !wk.data.ok ? null : wk.data;
+      CL.week = wk.error || !wk.data || !wk.data.ok || !Array.isArray(wk.data.tiers) ? null : wk.data;
       if (chat) { CL.msgs = (chat.data || []).reverse(); clanSub(cid); }
     } else {
       CL.info = null;
@@ -4141,7 +4141,7 @@ function clanSub(cid) {
 }
 // the clan's weekly goal: everyone's XP since Monday fills three tiers; each helper collects every tier once
 function clanWeekHtml() {
-  const w = CL.week; if (!w) return '';
+  const w = CL.week; if (!w || !w.tiers) return '';
   const top = w.tiers[w.tiers.length - 1], reached = w.tiers.filter(t => w.xp >= t).length, next = w.tiers.find(t => w.xp < t);
   const can = reached > w.claimed && w.mine >= w.need;
   return `<div class="info" style="margin:6px 0"><b>🎯 Clan goal this week</b> <small class="muted">· ends in ${fmtTime(Math.max(0, (new Date(w.ends).getTime() - Date.now()) / 1000))}</small>
