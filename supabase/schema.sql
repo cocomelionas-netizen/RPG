@@ -818,6 +818,17 @@ $$;
 
 -- titles: the save picks one, the server only shows it when the save really earned it
 alter table public.hiscores add column if not exists title text;
+alter table public.hiscores add column if not exists ncolor text;
+-- name colours are bought with gold in the game; the server only shows one the save owns
+create or replace function public.ncolor_for(d jsonb) returns text
+language plpgsql immutable set search_path = public as $$
+declare c text := d -> 'cos' ->> 'nc';
+begin
+  if c is null or c not in ('gold', 'ruby', 'emerald', 'sapphire', 'amethyst', 'rainbow') then return null; end if;
+  if jsonb_typeof(d -> 'cos' -> 'own') = 'object' and (d -> 'cos' -> 'own') ? ('nc_' || c) then return c; end if;
+  return null;
+exception when others then return null;
+end $$;
 create or replace function public.title_for(d jsonb, tl int) returns text
 language plpgsql stable set search_path = public as $$
 declare t text := d ->> 'title'; got int; pets int; total int; pct numeric;
@@ -856,13 +867,13 @@ begin
                 + coalesce((lv ->> 'defence')::int, 1) + coalesce((lv ->> 'hitpoints')::int, 1)) / 3);
   select count(*) into bosses from jsonb_each_text(coalesce(d -> 'kc', '{}')) e
     where e.key = any (array['kingslime','gobchief','bonelord','frosttroll','dragon','bogmother','warden','overlord']) and e.value::numeric > 0;
-  insert into hiscores (user_id, name, total_level, total_xp, combat, skills, kills, bosses, pks, imported, updated_at, rating, week_key, week_base, title)
+  insert into hiscores (user_id, name, total_level, total_xp, combat, skills, kills, bosses, pks, imported, updated_at, rating, week_key, week_base, title, ncolor)
   select uid, p.name, tl, tx, cmb, coalesce(d -> 'skills', '{}'), coalesce((d ->> 'kills')::numeric, 0), bosses,
-         coalesce((d -> 'wild' ->> 'pks')::int, 0), p.imported, now(), p.rating, week_key(), tx, title_for(d, tl)
+         coalesce((d -> 'wild' ->> 'pks')::int, 0), p.imported, now(), p.rating, week_key(), tx, title_for(d, tl), ncolor_for(d)
   from profiles p where p.id = uid
   on conflict (user_id) do update set name = excluded.name, total_level = excluded.total_level, total_xp = excluded.total_xp,
     combat = excluded.combat, skills = excluded.skills, kills = excluded.kills, bosses = excluded.bosses, pks = excluded.pks,
-    imported = excluded.imported, rating = excluded.rating, updated_at = now(), title = excluded.title,
+    imported = excluded.imported, rating = excluded.rating, updated_at = now(), title = excluded.title, ncolor = excluded.ncolor,
     -- a new week starts counting from the XP the hero had at the last save of the old one
     week_base = case when hiscores.week_key is distinct from excluded.week_key then hiscores.total_xp else hiscores.week_base end,
     week_key = excluded.week_key;
@@ -1257,6 +1268,7 @@ create table if not exists public.chat_messages (
 );
 create index if not exists chat_messages_time on public.chat_messages (created_at desc);
 alter table public.chat_messages add column if not exists title text;
+alter table public.chat_messages add column if not exists ncolor text;
 alter table public.chat_messages enable row level security;
 drop policy if exists "recent chat is public" on public.chat_messages;
 create policy "recent chat is public" on public.chat_messages for select
@@ -1276,7 +1288,7 @@ begin
      or (select count(*) from chat_messages where user_id = uid and created_at > now() - interval '1 minute') >= 15 then
     return jsonb_build_object('ok', false, 'reason', 'Slow down a little');
   end if;
-  insert into chat_messages (user_id, name, body, title) values (uid, prof.name, b, (select title from hiscores where user_id = uid));
+  insert into chat_messages (user_id, name, body, title, ncolor) select uid, prof.name, b, h.title, h.ncolor from (select 1) one left join hiscores h on h.user_id = uid;
   return jsonb_build_object('ok', true);
 end $$;
 
@@ -1527,6 +1539,18 @@ create table if not exists public.clans (
   motd text not null default '' check (char_length(motd) <= 120),
   created_at timestamptz not null default now()
 );
+-- gold the members gave to the clan; it unlocks clan perks for everyone
+alter table public.clans add column if not exists treasury bigint not null default 0;
+create table if not exists public.clan_donations (
+  id bigserial primary key,
+  clan_id bigint not null references public.clans (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  amount bigint not null check (amount > 0),
+  created_at timestamptz not null default now()
+);
+create index if not exists clan_donations_clan on public.clan_donations (clan_id);
+create index if not exists clan_donations_user on public.clan_donations (user_id, created_at);
+alter table public.clan_donations enable row level security;
 create table if not exists public.clan_members (
   user_id uuid primary key references auth.users (id) on delete cascade,
   clan_id bigint not null references public.clans (id) on delete cascade,
@@ -1542,6 +1566,7 @@ create table if not exists public.clan_chat (
 );
 create index if not exists clan_chat_time on public.clan_chat (clan_id, created_at desc);
 alter table public.clan_chat add column if not exists title text;
+alter table public.clan_chat add column if not exists ncolor text;
 alter table public.clans enable row level security;
 alter table public.clan_members enable row level security;
 alter table public.clan_chat enable row level security;
@@ -1633,8 +1658,10 @@ $$;
 
 create or replace function public.clan_info(p_id bigint) returns jsonb
 language sql stable security definer set search_path = public as $$
-  select jsonb_build_object('id', c.id, 'name', c.name, 'tag', c.tag, 'motd', c.motd, 'owner', c.owner,
-    'members', coalesce((select jsonb_agg(jsonb_build_object('id', m.user_id, 'name', p.name, 'total_level', h.total_level, 'total_xp', h.total_xp, 'combat', h.combat, 'title', h.title,
+  select jsonb_build_object('id', c.id, 'name', c.name, 'tag', c.tag, 'motd', c.motd, 'owner', c.owner, 'treasury', c.treasury,
+    'donors', coalesce((select jsonb_agg(x order by x.gold desc) from (select p2.name, sum(d.amount) as gold from clan_donations d join profiles p2 on p2.id = d.user_id
+      where d.clan_id = c.id group by p2.name order by sum(d.amount) desc limit 5) x), '[]'),
+    'members', coalesce((select jsonb_agg(jsonb_build_object('id', m.user_id, 'name', p.name, 'total_level', h.total_level, 'total_xp', h.total_xp, 'combat', h.combat, 'title', h.title, 'ncolor', h.ncolor,
       'week', case when h.week_key = week_key() then greatest(0, h.total_xp - h.week_base) else 0 end) order by h.total_xp desc nulls last)
       from clan_members m join profiles p on p.id = m.user_id left join hiscores h on h.user_id = m.user_id where m.clan_id = c.id), '[]'))
   from clans c where c.id = p_id
@@ -1651,7 +1678,7 @@ begin
   b := left(trim(regexp_replace(coalesce(p_body, ''), '[[:cntrl:]]', '', 'g')), 200);
   if b = '' then return jsonb_build_object('ok', false, 'reason', 'Empty message'); end if;
   if exists (select 1 from clan_chat where user_id = uid and created_at > now() - interval '2 seconds') then return jsonb_build_object('ok', false, 'reason', 'Slow down a little'); end if;
-  insert into clan_chat (clan_id, user_id, name, body, title) values (cid, uid, prof.name, b, (select title from hiscores where user_id = uid));
+  insert into clan_chat (clan_id, user_id, name, body, title, ncolor) select cid, uid, prof.name, b, h.title, h.ncolor from (select 1) one left join hiscores h on h.user_id = uid;
   return jsonb_build_object('ok', true);
 end $$;
 
@@ -1665,7 +1692,7 @@ grant execute on function public.wb_state(), public.wb_hit(bigint), public.wb_cl
 create or replace function public.hiscores_week() returns jsonb
 language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(x order by x.gain desc), '[]') from (
-    select h.name, h.title, h.combat, h.total_level, (h.total_xp - h.week_base) as gain, h.imported
+    select h.name, h.title, h.ncolor, h.combat, h.total_level, (h.total_xp - h.week_base) as gain, h.imported
     from hiscores h join profiles p on p.id = h.user_id
     where h.week_key = week_key() and h.total_xp > h.week_base and not p.banned
     order by h.total_xp - h.week_base desc limit 50) x
@@ -1732,3 +1759,27 @@ revoke execute on function public.title_for(jsonb, int) from public, anon, authe
 revoke execute on function public.week_key(), public.hiscores_week(), public.clan_week_xp(bigint), public.clan_week(), public.clan_week_claim() from public, anon, authenticated;
 grant execute on function public.hiscores_week() to anon, authenticated;
 grant execute on function public.clan_week(), public.clan_week_claim() to authenticated;
+
+-- ---------- clan treasury: members give gold, the clan levels up and every member gets its perks ----------
+-- the gold must be in the hero's last save, less what was already given since that save
+create or replace function public.clan_donate(p_amount bigint) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); cid bigint; sv saves; gave numeric; t bigint;
+begin
+  if uid is null then return jsonb_build_object('ok', false, 'reason', 'Sign in first'); end if;
+  if p_amount is null or p_amount < 10000 or p_amount > 1000000000 then return jsonb_build_object('ok', false, 'reason', 'Give between 10K and 1B gold'); end if;
+  select clan_id into cid from clan_members where user_id = uid;
+  if cid is null then return jsonb_build_object('ok', false, 'reason', 'Join a clan first'); end if;
+  if exists (select 1 from profiles where id = uid and banned) then return jsonb_build_object('ok', false, 'reason', 'Not allowed'); end if;
+  select * into sv from saves where user_id = uid;
+  if sv.user_id is null then return jsonb_build_object('ok', false, 'reason', 'Save your game first'); end if;
+  select coalesce(sum(amount), 0) into gave from clan_donations where user_id = uid and created_at > sv.updated_at;
+  if coalesce((sv.data ->> 'gold')::numeric, 0) - gave < p_amount then return jsonb_build_object('ok', false, 'reason', 'Not enough gold in your last save'); end if;
+  if exists (select 1 from clan_donations where user_id = uid and created_at > now() - interval '3 seconds') then return jsonb_build_object('ok', false, 'reason', 'Slow down a little'); end if;
+  insert into clan_donations (clan_id, user_id, amount) values (cid, uid, p_amount);
+  update clans set treasury = treasury + p_amount where id = cid returning treasury into t;
+  return jsonb_build_object('ok', true, 'treasury', t);
+exception when others then return jsonb_build_object('ok', false, 'reason', 'Could not donate');
+end $$;
+revoke execute on function public.clan_donate(bigint), public.ncolor_for(jsonb) from public, anon, authenticated;
+grant execute on function public.clan_donate(bigint) to authenticated;
