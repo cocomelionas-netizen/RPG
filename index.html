@@ -630,6 +630,7 @@ const PETS = [
   { id: 'bogsy',   name: 'Bogsy',       icon: '🐸', dr: 0.03, desc: '+3% damage reduction', from: 'the Bog Mother' },
   { id: 'shard',   name: 'Shard',       icon: '🔷', acc: 0.04, desc: '+4% accuracy', from: 'the Crystal Warden' },
   { id: 'voidling', name: 'Voidling',   icon: '👾', dmg: 0.05, desc: '+5% max hit', from: 'the Abyssal Overlord' },
+  { id: 'roaddog', name: 'Road Dog',    icon: '🐕', gold: 5, desc: '+5% gold', from: 'a 28-day login streak' },
 ];
 const PET_CHANCE = 1 / 3000;   // per skill action
 
@@ -1044,7 +1045,7 @@ function take(id, n = 1) {
 function has(id) { return S.inv[id] || 0; }
 
 function addXp(skill, amt, raw) {
-  if (!raw) amt *= (MASTERY_SKILLS.includes(skill) ? mXpMult(skill) : 1) * xpMult() * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1) * roomXp(skill) * (1 + potB('wis'));
+  if (!raw) amt *= (MASTERY_SKILLS.includes(skill) ? mXpMult(skill) : 1) * xpMult() * roadEventXp(skill) * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1) * roomXp(skill) * (1 + potB('wis'));
   const before = LV[skill];
   S.skills[skill] += amt;
   LV[skill] = levelFromXp(S.skills[skill]);
@@ -1227,8 +1228,8 @@ const UNLOCKS = [
   { id: 'home', icon: '🏡', name: 'My Home: Construction & Farming', acts: ['farming', 'construction'], sub: ['craft', 'construction'], need: 'Total level 35', test: () => totalLevel() >= 35 },
   { id: 'agility', icon: '🏃', name: 'Agility courses', act: 'agility', need: 'Total level 30', test: () => totalLevel() >= 30 },
   { id: 'herblore', icon: '🧪', name: 'Herblore & potions', act: 'herblore', sub: ['craft', 'herblore'], need: 'Farming level 3', test: () => LV.farming >= 3 },
-  { id: 'daily', icon: '📅', name: 'Daily & weekly tasks', sub: ['quests', 'daily'], need: 'Total level 40', test: () => totalLevel() >= 40 },
-  { id: 'queue', icon: '📋', name: 'Action queue (on the Map)', need: 'Total level 60', test: () => totalLevel() >= 60 },
+  { id: 'daily', icon: '📅', name: 'Daily & weekly tasks', sub: ['quests', 'daily'], need: 'Defeat your first enemy', test: () => S.kills >= 1 || totalLevel() >= 40 },
+  { id: 'queue', icon: '📋', name: 'Action queue (on the Map)', need: 'Finish the quest "Forged in Bronze"', test: () => qDone('q2') || totalLevel() >= 60 },
   { id: 'summoning', icon: '🐺', name: 'Summoning & familiars', act: 'summoning', sub: ['craft', 'summoning'], need: 'Total level 120', test: () => totalLevel() >= 120 },
   { id: 'mastery', icon: '🎓', name: 'Mastery', need: 'Any gathering or crafting skill at level 15', test: () => MASTERY_SKILLS.some(k => LV[k] >= 15) },
   { id: 'progress', icon: '🏆', name: 'Achievements, Journeys & Hiscores', tab: 'progress', need: 'Total level 50', test: () => totalLevel() >= 50 },
@@ -2674,6 +2675,22 @@ function htmlQueue() {
   return h + '</div>';
 }
 
+/* ===== Weekly road event: a different skill group gets bonus XP each week ===== */
+const ROAD_EVENTS = [
+  { id: 'lumber', icon: '🪓', name: 'Lumber Week', skills: ['woodcutting', 'firemaking', 'fletching'] },
+  { id: 'mine', icon: '⛏️', name: 'Deep Vein Week', skills: ['mining', 'smithing'] },
+  { id: 'fish', icon: '🎣', name: 'Big Catch Week', skills: ['fishing', 'cooking'] },
+  { id: 'war', icon: '⚔️', name: 'War Week', skills: ['attack', 'strength', 'defence', 'hitpoints'] },
+  { id: 'aim', icon: '🏹', name: 'Archer & Mage Week', skills: ['ranged', 'magic', 'prayer'] },
+  { id: 'green', icon: '🌱', name: 'Green Thumb Week', skills: ['farming', 'herblore', 'construction'] },
+  { id: 'rogue', icon: '🗝️', name: 'Rogue Week', skills: ['thieving', 'agility', 'slayer'] },
+  { id: 'arcane', icon: '🔮', name: 'Arcane Week', skills: ['runecrafting', 'summoning', 'magic'] },
+];
+const ROAD_EVENT_XP = 1.25;
+function roadEvent() { const k = weekKey(); let h = 0; for (const ch of k) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return ROAD_EVENTS[h % ROAD_EVENTS.length]; }
+function roadEventXp(skill) { return roadEvent().skills.includes(skill) ? ROAD_EVENT_XP : 1; }
+function roadEventText() { const ev = roadEvent(); return `${ev.icon} <b>${ev.name}</b>: +25% XP in ${ev.skills.filter(k => SKILLS[k]).map(k => SKILLS[k].icon + ' ' + SKILLS[k].name).join(', ')} until Monday`; }
+
 /* ===== Daily and weekly tasks with a login streak ===== */
 const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 const weekKey = () => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return 'w' + d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
@@ -2695,6 +2712,9 @@ function taskPool(k) {
   opts.push({ t: 'bury', n: 40 * k });
   const out = [];
   while (out.length < 3 && opts.length) out.push(opts.splice(randi(0, opts.length - 1), 1)[0]);
+  // one task always fits what the hero is doing now, so it gets done while idling
+  const fit = GATHERING.includes(S.activity) ? o => o.t === 'gather' && o.skill === S.activity : S.activity === 'combat' ? o => o.t === 'kill' : S.activity === 'smithing' ? o => o.t === 'smith' : S.activity === 'cooking' ? o => o.t === 'cook' : null;
+  if (fit && !out.some(fit) && out.length) { const o = GATHERING.includes(S.activity) ? { t: 'gather', skill: S.activity, n: 120 * k } : S.activity === 'combat' ? { t: 'kill', id: en[randi(0, en.length - 1)], n: 40 * k } : { t: S.activity === 'smithing' ? 'smith' : 'cook', n: (S.activity === 'smithing' ? 30 : 60) * k }; out[out.length - 1] = o; }
   return out.map(o => ({ o, base: objVal(o), c: false }));
 }
 function dailyCheck() {
@@ -2702,8 +2722,12 @@ function dailyCheck() {
   if (D.day !== today) {
     const y = new Date(); y.setDate(y.getDate() - 1);
     const yk = `${y.getFullYear()}-${y.getMonth() + 1}-${y.getDate()}`;
-    D.streak = D.day === yk ? D.streak + 1 : 1;
-    D.day = today; D.tasks = taskPool(1); D.login = false;
+    const y2 = new Date(); y2.setDate(y2.getDate() - 2);
+    const y2k = `${y2.getFullYear()}-${y2.getMonth() + 1}-${y2.getDate()}`;
+    if (D.day === yk) D.streak++;
+    else if (D.day === y2k && (D.freeze || 0) > 0) { D.freeze--; D.streak++; D.froze = true; log('🧊 A streak freeze saved your login streak (you missed one day).', 'lg-xp'); }
+    else D.streak = 1;
+    D.day = today; D.tasks = taskPool(1); D.login = false; D.bonus = false; D.reroll = false;
   }
   if (D.wk !== wk) { D.wk = wk; D.wtasks = taskPool(6); }
 }
@@ -2715,18 +2739,28 @@ function claimTask(kind, k) {
   x.c = true;
   const g = kind === 'w' ? 500 + totalLevel() * 8 : 100 + totalLevel() * 2;
   S.gold += g; give('lamp');
-  if (kind === 'w') give(Math.random() < 0.5 ? 'clue_medium' : 'clue_hard');
+  if (kind === 'w') { give(Math.random() < 0.5 ? 'clue_medium' : 'clue_hard'); if ((D.freeze || 0) < 2) { D.freeze = (D.freeze || 0) + 1; log('🧊 +1 streak freeze (it saves your login streak if you miss a day).', 'lg-xp'); } }
+  // all three dailies done: a bonus chest
+  if (kind === 'd' && !D.bonus && D.tasks.every(t => t.c)) { D.bonus = true; give('lamp'); give('clue_easy'); log('🎁 All daily tasks done – bonus: an XP Lamp and an easy clue scroll!', 'lg-gold'); setTimeout(() => showBanner('🎁 Daily bonus chest!'), 1500); }
   log(`📅 ${kind === 'w' ? 'Weekly' : 'Daily'} task done: +${fmt(g)} gold, an XP Lamp${kind === 'w' ? ' and a clue scroll' : ''}`, 'lg-gold');
   showBanner(`📅 Task done! +${fmt(g)} gold`); sfx('chest');
 }
+// the 28-day track: what each 7th day gives on top of the gold
+const STREAK_MILESTONES = { 7: 'a hard clue and 2 XP Lamps', 14: 'an elite clue and 3 XP Lamps', 21: 'a hard clue, 4 XP Lamps and 3 Gathering potions', 28: 'the 🐕 Road Dog pet (+5% gold) and an elite clue' };
+const streakDay = n => (n - 1) % 28 + 1;
+function streakGold(n) { return Math.min(7, n) * (50 + totalLevel()); }
+function nextMilestone(n) { const d = streakDay(n); for (const m of [7, 14, 21, 28]) if (m >= d) return { m, in: m - d }; return { m: 7, in: 7 }; }
 function claimLogin() {
   const D = S.daily;
   if (D.login) return;
   D.login = true;
-  const g = Math.min(7, D.streak) * (50 + totalLevel());
+  const g = streakGold(D.streak), d = streakDay(D.streak);
   S.gold += g;
-  if (D.streak % 7 === 0) { give('clue_hard'); give('lamp', 2); }
-  log(`🔥 Login streak day ${D.streak}: +${fmt(g)} gold${D.streak % 7 === 0 ? ', a hard clue and 2 XP Lamps' : ''}`, 'lg-gold');
+  if (d === 7) { give('clue_hard'); give('lamp', 2); }
+  else if (d === 14) { give('clue_elite'); give('lamp', 3); }
+  else if (d === 21) { give('clue_hard'); give('lamp', 4); if (ITEMS.pot_gather) give('pot_gather', 3); }
+  else if (d === 28) { give('clue_elite'); if (S.pets.roaddog) give('lamp', 5); else rollPet('roaddog', 1); }
+  log(`🔥 Login streak day ${D.streak}: +${fmt(g)} gold${STREAK_MILESTONES[d] ? ', ' + STREAK_MILESTONES[d] : ''}`, 'lg-gold');
   showBanner(`🔥 Day ${D.streak} streak: +${fmt(g)} gold`); sfx('chest');
 }
 function htmlDaily() {
@@ -2736,11 +2770,16 @@ function htmlDaily() {
     const pr = dTaskProg(x), done = pr >= x.o.n;
     return `<div class="item quest ${done && !x.c ? 'ready' : ''}"><div class="top"><span class="ic">${x.c ? '✅' : done ? '🎁' : '📅'}</span><span class="nm"><b>${objText(x.o)}</b><br>
       <small>${fmt(pr)} / ${fmt(x.o.n)}</small><div class="bar"><i style="width:${(pr / x.o.n * 100).toFixed(1)}%"></i></div></span></div>
-      ${x.c ? '' : `<div class="btns"><button data-a="dclaim" data-id="${kind}${k}" ${done ? '' : 'disabled'}>🎁 Claim</button></div>`}</div>`;
+      ${x.c ? '' : `<div class="btns"><button data-a="dclaim" data-id="${kind}${k}" ${done ? '' : 'disabled'}>🎁 Claim</button>${kind === 'd' && !done && !D.reroll ? `<button data-a="dreroll" data-id="${k}" title="One free reroll a day">🎲 New task</button>` : ''}</div>`}</div>`;
   };
-  return `<div class="info"><b>🔥 Login streak: ${D.streak} day${D.streak === 1 ? '' : 's'}</b> <span class="muted">· come back every day – day 7, 14, 21… gives a hard clue scroll</span>
-      <div class="btns"><button data-a="dlogin" ${D.login ? 'disabled' : ''}>${D.login ? '✅ Collected today' : `🎁 Collect ${fmt(Math.min(7, D.streak) * (50 + totalLevel()))} gold`}</button></div></div>
-    <h3>Today</h3><div class="grid">${D.tasks.map((x, k) => card(x, k, 'd')).join('')}</div>
+  const nm = nextMilestone(D.login ? D.streak + 1 : D.streak), sd = streakDay(D.streak);
+  const track = [...Array(28)].map((_, k) => { const d = k + 1, big = d % 7 === 0; return `<span title="Day ${d}${big ? ' – reward' : ''}" style="flex:1;height:${big ? 14 : 8}px;border-radius:3px;background:${d < sd || (d === sd && D.login) ? '#f2c94c' : d === sd ? '#ff9a3a' : '#3a3550'};${big ? 'outline:2px solid #f2c94c' : ''}"></span>`; }).join('');
+  return `<div class="info">${roadEventText()}</div>
+    <div class="info"><b>🔥 Login streak: ${D.streak} day${D.streak === 1 ? '' : 's'}</b> <span class="muted">· 🧊 freezes: ${D.freeze || 0}/2 (each weekly task gives one; a freeze saves the streak if you miss a day)</span>
+      <div style="display:flex;gap:2px;align-items:center;margin:8px 2px">${track}</div>
+      <small class="muted">${nm.in === 0 && !D.login ? `Today: ${STREAK_MILESTONES[nm.m]}!` : `🎁 In ${nm.in || 7} day${nm.in === 1 ? '' : 's'}: ${STREAK_MILESTONES[nm.m]}`}</small>
+      <div class="btns"><button data-a="dlogin" ${D.login ? 'disabled' : ''}>${D.login ? '✅ Collected today' : `🎁 Collect ${fmt(streakGold(D.streak))} gold`}</button></div></div>
+    <h3>Today <small class="muted">${D.bonus ? '· ✅ bonus chest collected' : '· finish all 3 for a bonus chest 🎁'}</small></h3><div class="grid">${D.tasks.map((x, k) => card(x, k, 'd')).join('')}</div>
     <h3>This week</h3><div class="grid">${D.wtasks.map((x, k) => card(x, k, 'w')).join('')}</div>
     <p class="muted">Daily tasks give gold and an 🪔 XP Lamp; weekly tasks also give a clue scroll. New tasks every day and every Monday.</p>`;
 }
@@ -2782,10 +2821,20 @@ function showOfflineSummary(sec, before) {
   for (const a of ACH) if (S.ach[a.id] && !before.ach[a.id]) lines.push(`🏆 Achievement: ${a.name}`);
   if (S.kills !== before.kills) lines.push(`⚔️ Enemies defeated: ${S.kills - before.kills}`);
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
+  // the best news first: level-ups, bosses and achievements, then the rest
+  const rank = l => l.includes('<b>(') ? 0 : /👑|🏆/.test(l) ? 1 : 2;
+  lines.sort((a, b) => rank(a) - rank(b));
+  const cap = offlineCap(), full = sec >= cap - 60, pct = Math.min(100, sec / cap * 100);
+  if (isOpen('daily')) dailyCheck();
+  const D = S.daily, streakBtn = isOpen('daily') && !D.login ? `<button data-a="dlogin" data-close="1" style="background:#f2c94c;color:#222;font-weight:700">🔥 Day ${D.streak} streak – collect ${fmt(streakGold(D.streak))} gold${STREAK_MILESTONES[streakDay(D.streak)] ? ' + ' + STREAK_MILESTONES[streakDay(D.streak)] : ''}</button>` : '';
   openModal(`<h2>Welcome back!</h2>
     <p class="muted">While you were away (${h ? h + 'h ' : ''}${m}m), your hero kept travelling:</p>
     ${R.rested > 0 ? `<p>😴 Well rested: <b>+50% XP</b> for the next ${Math.ceil(R.rested / 60)} minutes.</p>` : ''}
-    <ul>${lines.map(l => `<li>${l}</li>`).join('') || '<li>Nothing much happened.</li>'}</ul>
+    <ul>${lines.slice(0, 14).map(l => `<li>${l}</li>`).join('') || '<li>Nothing much happened.</li>'}${lines.length > 14 ? `<li class="muted">…and ${lines.length - 14} more</li>` : ''}</ul>
+    <div style="margin:8px 0"><small>${full ? `⏳ Your hero reached the ${Math.round(cap / 3600)}h limit – time after that was lost. Come back sooner!` : `🎒 Offline time used: ${Math.round(pct)}% of ${Math.round(cap / 3600)}h`}</small>
+      <div class="bar"><i style="width:${pct.toFixed(1)}%;${full ? 'background:#e0453a' : ''}"></i></div></div>
+    <p><small>${roadEventText()}</small></p>
+    ${streakBtn}
     <button data-a="close">Continue</button>`);
 }
 function openModal(html) {
@@ -3779,7 +3828,7 @@ function useCloud(data, msg) {
   applySave(data);
   R.phase = 'walk'; R.ent = null; R.events = [];
   const away = (Date.now() - (S.last || Date.now())) / 1000;
-  if (away > 60) catchUp(away);
+  if (away > 60) catchUp(away); else if (S.kills) weekNews();
   save(); uiDirty = true; lastHero = '';
   log(msg, 'lg-xp');
 }
@@ -4371,7 +4420,7 @@ function htmlHiscores() {
 }
 
 function applyGfx() {
-  if (S.gfx !== '2d' && G3.ok === undefined) G3.ok = G3.init(document.getElementById('scene3d'));
+  if (S.gfx !== '2d' && G3.ok === undefined) G3.ok = !!G3.init && G3.init(document.getElementById('scene3d'));
   G3.on = !!G3.ok && S.gfx !== '2d';
   document.getElementById('view').classList.toggle('g3', G3.on);
   const b = $('#gfx'); b.hidden = !window.THREE; b.textContent = G3.on ? '3D' : '2D';
@@ -6513,6 +6562,7 @@ function nextGoal() {
     return { t: wtype() === 'ranged' ? 'Out of arrows – fletch or buy more' : 'Out of runes – craft or buy more', tab: wtype() === 'ranged' ? 'fletching' : 'runecrafting' };
   const ready = QUESTS.find(q => questReady(q));
   if (ready) return { t: `Quest "${ready.name}" is complete – claim your reward`, tab: 'quests' };
+  if (isOpen('daily')) { dailyCheck(); if (dailyClaimable()) return { t: S.daily.login ? '📅 A daily task is done – claim your reward' : `🔥 Collect your day ${S.daily.streak} login streak reward`, tab: 'daily' }; }
   const upg = Object.keys(S.inv).find(id => ITEMS[id].slot && isUpgrade(id));
   if (upg) return { t: `Equip your ${ITEMS[upg].name}`, tab: 'inventory' };
   if (foodCount() < 5) {
@@ -6559,13 +6609,13 @@ function renderGoal() {
   });
 }
 // old tab names (used by goals and buttons) map to a tab plus its sub-view
-const TAB_ALIAS = { firemaking: ['craft', 'firemaking'], smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], herblore: ['craft', 'herblore'], construction: ['craft', 'construction'], summoning: ['craft', 'summoning'], shop: ['inventory', 'shop'] };
+const TAB_ALIAS = { firemaking: ['craft', 'firemaking'], smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], herblore: ['craft', 'herblore'], construction: ['craft', 'construction'], summoning: ['craft', 'summoning'], shop: ['inventory', 'shop'], daily: ['quests', 'daily'] };
 function openTab(name, scroll) {
   const al = TAB_ALIAS[name];
   const lk = al ? lockFor(al[0], al[1]) || lockFor(al[0]) : lockFor(name);
   if (lk) { lockedMsg(lk); return; }
   freshTabs.delete(al ? al[0] : name);
-  if (al) { name = al[0]; if (name === 'craft') craftSub = al[1]; else bagSub = al[1]; }
+  if (al) { name = al[0]; if (name === 'craft') craftSub = al[1]; else if (name === 'quests') questSub = al[1]; else bagSub = al[1]; }
   else if (name === 'craft' && CRAFTING.has(S.activity) && !lockFor('craft', S.activity)) craftSub = S.activity;
   if (name === 'activity' && tab !== 'activity') { mapSel = null; mapAct = null; }
   tab = name;
@@ -6675,6 +6725,7 @@ document.addEventListener('click', ev => {
     case 'qdel': { const q = S.queue.splice(+id, 1)[0]; if (+id === 0 && S.queue.length) qApply(S.queue[0]); if (q) log(`📋 Removed: ${qName(q)}`); break; }
     case 'dclaim': claimTask(id[0], +id.slice(1)); break;
     case 'dlogin': claimLogin(); break;
+    case 'dreroll': { const D = S.daily; if (!D.reroll && D.tasks[+id] && !D.tasks[+id].c) { D.reroll = true; const cur = D.tasks.map(t => JSON.stringify(t.o)); let n = null; for (let k = 0; k < 10 && !n; k++) { const c = taskPool(1)[randi(0, 2)]; if (c && !cur.includes(JSON.stringify(c.o))) n = c; } if (n) D.tasks[+id] = n; } break; }
     case 'lamp': if (has('lamp')) lampModal(); break;
     case 'rub': if (take('lamp')) { const xp = lampXp(id); addXp(id, xp, true); log(`🪔 +${fmt(xp)} ${SKILLS[id].name} XP`, 'lg-xp'); } break;
     case 'locked': lockedMsg(UNLOCK[id]); break;
@@ -6763,7 +6814,16 @@ function catchUp(sec) {
   const done = simulate(sec);
   if (done > 600) R.rested = Math.min(1800, done * 0.1);
   if (done > 60) showOfflineSummary(done, before);
+  weekNews();
   uiDirty = true;
+}
+// once a week: say which skills get the bonus XP this week
+function weekNews() {
+  if (S.evWk === weekKey()) return;
+  S.evWk = weekKey();
+  const ev = roadEvent();
+  log(`📣 This week on the road – ${ev.icon} ${ev.name}: +25% XP in ${ev.skills.filter(k => SKILLS[k]).map(k => SKILLS[k].name).join(', ')}!`, 'lg-gold');
+  setTimeout(() => showBanner(`${ev.icon} ${ev.name}: +25% XP!`), 2500);
 }
 function frame(now) {
   let dt = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
@@ -6787,7 +6847,7 @@ function init() {
   mapInput();
   load();
   const away = (Date.now() - (S.last || Date.now())) / 1000;
-  if (away > 60) catchUp(away);
+  if (away > 60) catchUp(away); else if (S.kills) weekNews();
   log('Welcome! Your hero sets off on the endless road.');
   // the game moved to GitHub Pages; the old Netlify copy points players there
   if (location.hostname.endsWith('netlify.app')) {
