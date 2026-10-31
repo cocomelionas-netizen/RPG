@@ -196,6 +196,11 @@
   .eqstats b { color: #fff; text-align: right; }
   .imenu .ihead { display: flex; gap: 12px; align-items: center; }
   .imenu .big { font-size: 38px; }
+  img.ii { width: 1.3em; height: 1.3em; vertical-align: -0.3em; filter: drop-shadow(1px 1.5px 0 rgba(0,0,0,.55)); }
+  .slot .si img.ii { width: 36px; height: 36px; vertical-align: middle; filter: drop-shadow(1px 2px 0 rgba(0,0,0,.7)); }
+  .doll.sm .slot .si img.ii { width: 30px; height: 30px; }
+  .imenu .big img.ii, .item .ic img.ii, .mrow .ic img.ii { width: 1.4em; height: 1.4em; }
+  .clog span img.ii { width: 26px; height: 26px; }
   .imenu .opts { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
   .imenu .opts button { text-align: left; }
   .uqs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
@@ -469,7 +474,7 @@ const TREE_N = ['Birch', 'Oak', 'Maple', 'Yew', 'Elder Tree'];
 const LOG_N = ['Birch Logs', 'Oak Logs', 'Maple Logs', 'Yew Logs', 'Elder Logs'];
 const FISH_N = ['Roach', 'Perch', 'Pike', 'Salmon', 'Eel'];
 const COOKED_N = ['Cooked Roach', 'Cooked Perch', 'Cooked Pike', 'Cooked Salmon', 'Cooked Eel'];
-const STAFF_N = ['Apprentice Staff', 'Adept Staff', 'Mystic Staff', 'Master Staff', 'Archmage Staff'];
+const STAFF_N = ['Apprentice Staff', 'Adept Staff', 'Arcane Staff', 'Master Staff', 'Archmage Staff'];
 const GATHER_REQ = [1, 15, 30, 50, 70];
 const GATHER_TIME = [3, 3.5, 4, 4.5, 5];
 const GATHER_XP = [10, 20, 35, 55, 80];
@@ -532,7 +537,7 @@ for (let t = 0; t < 5; t++) {
 for (const el of Object.keys(ELEMENT)) {
   const E = ELEMENT[el];
   defItem('bstaff_' + el, { name: `${E.name} Battlestaff`, icon: '🪄', color: E.color, value: 200, slot: 'weapon', wtype: 'magic', power: 9, req: 30, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
-  defItem('mstaff_' + el, { name: `Mystic ${E.name} Staff`, icon: '🪄', color: E.color, value: 700, slot: 'weapon', wtype: 'magic', power: 15, req: 50, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
+  defItem('mstaff_' + el, { name: `Arcane ${E.name} Staff`, icon: '🪄', color: E.color, value: 700, slot: 'weapon', wtype: 'magic', power: 15, req: 50, rune: el, type: 'Equipment', note: `unlimited ${E.name.toLowerCase()} runes` });
   FLETCH.push({ out: 'bstaff_' + el, req: 40, xp: 90, mats: { log2: 2, ['r_' + el]: 100, essence: 20 } });
   FLETCH.push({ out: 'mstaff_' + el, req: 65, xp: 160, mats: { log3: 2, ['r_' + el]: 300, gem: 1 } });
 }
@@ -1132,7 +1137,7 @@ function curSpell() {
   return best;
 }
 function castRunes(sp) { for (const [id, n] of Object.entries(sp.runes)) if (runeHave(id) !== Infinity) take(id, n); }
-function runeText(sp) { return Object.entries(sp.runes).map(([id, n]) => `${runeHave(id) === Infinity ? '∞' : n}${ITEMS[id].icon}`).join(' '); }
+function runeText(sp) { return Object.entries(sp.runes).map(([id, n]) => `${runeHave(id) === Infinity ? '∞' : n}${ico(id)}`).join(' '); }
 // a bow without arrows or a staff without runes leaves the hero punching
 function attackMode() {
   const t = wtype();
@@ -1849,7 +1854,7 @@ function masteryModal(skill) {
     <div class="mlist">` + masteryItems(skill).map(m => {
       const l = mLv(skill, m.key), xp = mXp(skill, m.key), cur = XP_TABLE[l] / 10, nxt = mNext(skill, m.key);
       const cost = l < 99 ? Math.ceil(nxt - xp) : 0, locked = LV[skill] < m.req;
-      return `<div class="mrow ${locked ? 'lock' : ''}"><span class="ic">${m.icon || ITEMS[m.item].icon}</span>
+      return `<div class="mrow ${locked ? 'lock' : ''}"><span class="ic">${m.icon || ico(m.item)}</span>
         <span class="nm"><b>${m.name || ITEMS[m.item].name}</b> <span class="tag m">🎓 ${l}</span><div class="bar"><i style="width:${l < 99 ? ((xp - cur) / (nxt - cur) * 100).toFixed(1) : 100}%"></i></div></span>
         ${l < 99 ? `<button data-a="mspend" data-skill="${skill}" data-id="${m.key}" ${pool >= cost ? '' : 'disabled'}>+1 lv<small>${fmt(cost)}</small></button>` : '<b class="lg-gold">★ 99</b>'}</div>`;
     }).join('') + `</div><div class="row" style="margin-top:10px"><button data-a="close">Close</button></div>`);
@@ -2114,7 +2119,7 @@ function objText(o) {
     case 'burn': return 'Burn logs';
     case 'boss': return `Defeat ${ENEMIES[ZONES[o.z].boss].name}`;
     case 'level': return `Reach ${SKILLS[o.skill].name} level`;
-    case 'bring': return `Bring ${ITEMS[o.id].icon} ${ITEMS[o.id].name}`;
+    case 'bring': return `Bring ${ico(o.id)} ${ITEMS[o.id].name}`;
     case 'room': return `Build a ${ROOM[o.id].icon} ${ROOM[o.id].name} at home`;
     case 'plant': return 'Plant seeds';
     case 'harvest': return 'Harvest crops';
@@ -2174,7 +2179,7 @@ function defSeed(o) {
   defSeed({ id: 'seed_' + k, sname: n + ' Seed', kind: 'herb', lvl, time: 900 + i * 180, out: 'herb_' + k, n: [3, 6], px: Math.round(8 + lvl * 1.1), hx: Math.round(6 + lvl), color, sv: Math.round(4 + lvl * 0.9) });
 });
 [['potato', 'Potato', '🥔', 1, '#c8a060', 10], ['onion', 'Onion', '🧅', 5, '#e8c890', 14], ['cabbage', 'Cabbage', '🥬', 9, '#7ac85a', 18], ['tomato', 'Tomato', '🍅', 15, '#e04a3a', 25],
- ['sweetcorn', 'Sweetcorn', '🌽', 25, '#f2d24a', 35], ['strawberry', 'Strawberry', '🍓', 35, '#e83a5a', 50], ['watermelon', 'Watermelon', '🍉', 50, '#3a9a4a', 75], ['snape', 'Snape Grass', '🌾', 61, '#9ad86a', 0]].forEach(([k, n, icon, lvl, color, heal], i) => {
+ ['sweetcorn', 'Sweetcorn', '🌽', 25, '#f2d24a', 35], ['strawberry', 'Strawberry', '🍓', 35, '#e83a5a', 50], ['watermelon', 'Watermelon', '🍉', 50, '#3a9a4a', 75], ['snape', 'Silvergrass', '🌾', 61, '#9ad86a', 0]].forEach(([k, n, icon, lvl, color, heal], i) => {
   defItem('crop_' + k, Object.assign({ name: n, icon, color, tier: i, value: Math.round(2 + lvl * 0.35) }, heal ? { heal, type: 'Food' } : { type: 'Herbs', note: 'Herbalism ingredient' }));
   defSeed({ id: 'seed_' + k, sname: n + ' Seed', kind: 'allot', lvl, time: 300 + i * 150, out: 'crop_' + k, n: [6, 12], px: Math.round(5 + lvl * 0.8), hx: Math.round(2 + lvl * 0.45), color, sv: Math.round(2 + lvl * 0.5) });
 });
@@ -2561,10 +2566,10 @@ function famTick(dt) {
 const CLUE_T = ['easy', 'medium', 'hard', 'elite'];
 CLUE_T.forEach((t, i) => defItem('clue_' + t, { name: `Clue Scroll (${t})`, icon: '📜', color: ['#d8c8a0', '#7ad0ff', '#c070ff', '#ffd24a'][i], tier: i, value: [10, 25, 50, 100][i], type: 'Misc', clue: i, note: 'read it to start a treasure trail' }));
 const CLUE_UNIQ = [
-  [['tcape', 'Team Cape', '🧣', 'cape', { armor: 1, acc: 0.01 }], ['hwmask', 'Highwayman Mask', '🎭', 'helm', { armor: 2, acc: 0.01 }], ['bwhat', 'Blue Wizard Hat', '🎩', 'helm', { armor: 1, dmg: 0.01 }], ['flared', 'Flared Trousers', '👖', 'legs', { armor: 2 }]],
-  [['rboots', 'Ranger Boots', '🥾', 'feet', { armor: 2, acc: 0.03 }], ['wboots', 'Wizard Boots', '🥾', 'feet', { armor: 2, dmg: 0.02 }], ['hsandals', 'Holy Sandals', '🩴', 'feet', { armor: 2, dr: 0.02 }], ['gnomescarf', 'Gnome Scarf', '🧣', 'cape', { armor: 1, walk: 0.05 }]],
-  [['rhood', 'Robin Hood Hat', '🎩', 'helm', { armor: 4, acc: 0.04 }], ['gplate', 'Gilded Platebody', '🥋', 'body', { armor: 15, req: 40 }], ['gshield', 'Gilded Kiteshield', '🛡️', 'shield', { armor: 7, req: 40 }], ['pirhat', 'Pirate Hat', '🏴‍☠️', 'helm', { armor: 3, dmg: 0.03 }]],
-  [['tagplate', '3rd Age Platebody', '🥋', 'body', { armor: 22, dr: 0.02, req: 65 }], ['tagwand', '3rd Age Wand', '🪄', 'weapon', { wtype: 'magic', power: 22, req: 65 }], ['tagbow', '3rd Age Bow', '🏹', 'weapon', { wtype: 'ranged', power: 50, speed: 2.0, acc: 0.1, req: 65 }], ['tagcloak', '3rd Age Cloak', '🧣', 'cape', { armor: 4, dmg: 0.04, acc: 0.03 }]],
+  [['tcape', 'Guild Cape', '🧣', 'cape', { armor: 1, acc: 0.01 }], ['hwmask', 'Bandit Mask', '🎭', 'helm', { armor: 2, acc: 0.01 }], ['bwhat', 'Starry Wizard Hat', '🎩', 'helm', { armor: 1, dmg: 0.01 }], ['flared', 'Bell Trousers', '👖', 'legs', { armor: 2 }]],
+  [['rboots', 'Trail Boots', '🥾', 'feet', { armor: 2, acc: 0.03 }], ['wboots', 'Mage Slippers', '🥾', 'feet', { armor: 2, dmg: 0.02 }], ['hsandals', 'Pilgrim Sandals', '🩴', 'feet', { armor: 2, dr: 0.02 }], ['gnomescarf', 'Woolly Scarf', '🧣', 'cape', { armor: 1, walk: 0.05 }]],
+  [['rhood', 'Outlaw Hat', '🎩', 'helm', { armor: 4, acc: 0.04 }], ['gplate', 'Gold-trimmed Platebody', '🥋', 'body', { armor: 15, req: 40 }], ['gshield', 'Gold-trimmed Kiteshield', '🛡️', 'shield', { armor: 7, req: 40 }], ['pirhat', 'Pirate Hat', '🏴‍☠️', 'helm', { armor: 3, dmg: 0.03 }]],
+  [['tagplate', 'Starforged Platebody', '🥋', 'body', { armor: 22, dr: 0.02, req: 65 }], ['tagwand', 'Starforged Wand', '🪄', 'weapon', { wtype: 'magic', power: 22, req: 65 }], ['tagbow', 'Starforged Bow', '🏹', 'weapon', { wtype: 'ranged', power: 50, speed: 2.0, acc: 0.1, req: 65 }], ['tagcloak', 'Starforged Cloak', '🧣', 'cape', { armor: 4, dmg: 0.04, acc: 0.03 }]],
 ];
 CLUE_UNIQ.forEach((list, t) => list.forEach(([id, name, icon, slot, st]) => defItem(id, Object.assign({ name, icon, color: ['#c8a060', '#5a8ad8', '#f2c94c', '#e8e8f0'][t], tier: t, slot, value: [400, 1500, 6000, 20000][t], type: 'Equipment', unique: true, clueItem: t, note: 'treasure trail reward' }, st))));
 // clues drop from monsters (harder clues in harder places), thieving and, rarely, any skilling
@@ -2632,7 +2637,7 @@ function clueTick() {
   if (Math.random() < [1 / 10, 1 / 12, 1 / 14, 1 / 18][t]) {
     const [id] = CLUE_UNIQ[t][randi(0, 3)];
     give(id); S.clog[id] = (S.clog[id] || 0) + 1; S.stats.uniques++;
-    got.push(`<b>${ITEMS[id].icon} ${ITEMS[id].name}</b>`);
+    got.push(`<b>${ico(id)} ${ITEMS[id].name}</b>`);
     if (!SIM) showBanner(`🎁 Rare reward: ${ITEMS[id].name}!`);
   } else if (!SIM) showBanner(`🎁 Casket opened: ${fmt(g)} gold`);
   log(`🎁 Treasure trail (${CLUE_T[t]}) complete! ${got.join(', ')}`, 'lg-gold'); sfx('chest');
@@ -2647,7 +2652,7 @@ function htmlClues() {
     h += have.length ? '<div class="btns">' + have.map(id => `<button data-a="readclue" data-id="${id}">📜 Read ${ITEMS[id].name} (${has(id)})</button>`).join('') + '</div>' : '<p class="muted">No clue scrolls in your bag right now.</p>';
   }
   h += `<h3>Rewards <small class="muted">· ${fmt(S.stats.clues)} caskets opened</small></h3>` + CLUE_UNIQ.map((list, t) => `<div class="info"><b>${CLUE_T[t][0].toUpperCase() + CLUE_T[t].slice(1)}</b> ` +
-    list.map(([id]) => `<span class="uq ${S.clog[id] ? 'got' : ''}">${ITEMS[id].icon} ${ITEMS[id].name}</span>`).join(' ') + '</div>').join('');
+    list.map(([id]) => `<span class="uq ${S.clog[id] ? 'got' : ''}">${ico(id)} ${ITEMS[id].name}</span>`).join(' ') + '</div>').join('');
   return h;
 }
 
@@ -2883,7 +2888,7 @@ function showOfflineSummary(sec, before) {
   const ids = new Set([...Object.keys(S.inv), ...Object.keys(before.inv)]);
   for (const id of ids) {
     const d = (S.inv[id] || 0) - (before.inv[id] || 0);
-    if (d) lines.push(`${ITEMS[id].icon} ${ITEMS[id].name}: <span class="${d > 0 ? 'have' : 'need'}">${d > 0 ? '+' : ''}${d}</span>`);
+    if (d) lines.push(`${ico(id)} ${ITEMS[id].name}: <span class="${d > 0 ? 'have' : 'need'}">${d > 0 ? '+' : ''}${d}</span>`);
   }
   if (S.gold !== before.gold) lines.push(`🪙 Gold: ${S.gold > before.gold ? '+' : '−'}${fmt(Math.abs(S.gold - before.gold))}`);
   if (S.deaths !== before.deaths) lines.push(`💀 Deaths: ${S.deaths - before.deaths}`);
@@ -4366,7 +4371,7 @@ function htmlRealPvp() {
 /* --- Trading Post: the server holds offers in escrow and matches them --- */
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const GE = { offers: null, collect: null, trades: null, busy: false, msg: '', at: 0, told: false };
-function geItemName(id) { return id === '__gold' ? '🪙 Gold' : ITEMS[id] ? `${ITEMS[id].icon} ${ITEMS[id].name}` : esc(id); }
+function geItemName(id) { return id === '__gold' ? '🪙 Gold' : ITEMS[id] ? `${ico(id)} ${ITEMS[id].name}` : esc(id); }
 async function geLoad() {
   if (!me) return;
   try {
@@ -6257,7 +6262,7 @@ const STATION_NAME = { smithing: '🔥 Furnace and 🔨 Anvil', cooking: '🔥 C
 let mapSel = null, mapAct = null;
 function actIcon(a) { return a === 'combat' ? '⚔️' : a === 'pvp' ? '☠️' : SKILLS[a].icon; }
 function enemyLevel(d) { return Math.round((d.atk + d.def) / 2); }
-function dropIcons(d) { return [...new Set(d.drops.map(x => ITEMS[x[0]].icon))].join(''); }
+function dropIcons(d) { return [...new Set(d.drops.map(x => x[0]))].map(ico).join(''); }
 
 function htmlActivity() {
   if (mapSel === null) mapSel = S.zone;
@@ -6289,7 +6294,7 @@ function wildPanel() {
     <p>Loot from the caves goes into your loot sack and is banked when you leave. If you die here you lose the bag and every worn item except your
     <b>3 most valuable</b> (0 if you are skulled, +1 with the Guard Item prayer). Player killers roam the caves${w.flee ? ` – your hero tries to teleport away (${Math.round(PK_ESCAPE * 100)}%, they can freeze you)` : ' – your hero fights them for their gear'}.
     Out of food at low HP, your hero teleports out.</p>
-    <p>🎒 Looting bag: <b class="lg-gold">${fmt(bagValue())} gold</b>${w.gold ? ` · 🪙 ${fmt(w.gold)}` : ''}${bag.map(([id, n]) => ` · ${ITEMS[id].icon} ${fmt(n)}`).join('')}</p>
+    <p>🎒 Looting bag: <b class="lg-gold">${fmt(bagValue())} gold</b>${w.gold ? ` · 🪙 ${fmt(w.gold)}` : ''}${bag.map(([id, n]) => ` · ${ico(id)} ${fmt(n)}`).join('')}</p>
     <div class="btns">
       <button data-a="wildleave" ${w.in ? '' : 'disabled'}>🏃 Teleport out and bank</button>
       <button data-a="wildskull" class="${w.skull ? 'sel' : ''}" ${w.in ? '' : 'disabled'}>☠️ Skull ${w.skull ? 'ON' : 'off'}<small> +25% rare loot, keep 0 items</small></button>
@@ -6306,7 +6311,7 @@ function bossMechText(d) {
 function bossCard(b, fromMap) {
   const d = ENEMIES[b.id], q = QUESTS.find(x => x.id === b.quest), open = bossOpen(b);
   const on = S.activity === 'combat' && S.zone === b.zone && S.ctarget === b.id;
-  const uniq = (BOSS_UNIQUES[b.id] || []).map(([it, ch]) => `<span class="uq ${S.clog[it] ? 'got' : ''}">${ITEMS[it].icon} ${ITEMS[it].name} · 1/${Math.round(1 / ch)}</span>`).join('');
+  const uniq = (BOSS_UNIQUES[b.id] || []).map(([it, ch]) => `<span class="uq ${S.clog[it] ? 'got' : ''}">${ico(it)} ${ITEMS[it].name} · 1/${Math.round(1 / ch)}</span>`).join('');
   const [petId, petCh] = BOSS_PETS[b.id], pet = PETS.find(x => x.id === petId);
   let btn;
   if (!open) {
@@ -6385,7 +6390,7 @@ function htmlLocAct(i, a) {
       const n = NPCS[id], locked = LV.thieving < n.lvl, on = here && (S.tsel === id || (!S.tsel && cur === id));
       return `<div class="item ${on ? 'on' : ''}"><div class="top"><span class="ic">🥷</span>
         <span class="nm"><b>${n.name}</b> <span class="tag">Thieving ${n.lvl}</span>${mTag('thieving', id)}<br>
-        <small>${locked ? '🔒 ' : ''}${Math.round(stealChance(n) * 100)}% success · ${n.xp} XP · ${n.gold[0]}–${n.gold[1]} 🪙 · drops <span class="drops">${[...new Set(n.drops.map(d => ITEMS[d[0]].icon))].join('')}</span></small><br>
+        <small>${locked ? '🔒 ' : ''}${Math.round(stealChance(n) * 100)}% success · ${n.xp} XP · ${n.gold[0]}–${n.gold[1]} 🪙 · drops <span class="drops">${[...new Set(n.drops.map(d => d[0]))].map(ico).join('')}</span></small><br>
         <small>Getting caught stuns you for ${STUN_TIME}s and hits up to ${n.maxHit}</small></span></div>
         <div class="btns">${on ? '<button class="sel" disabled>🥷 Pickpocketing…</button>' : `<button data-a="thieve" data-z="${i}" data-id="${id}" ${locked ? 'disabled' : ''}>🥷 Pickpocket</button>`}</div></div>`;
     }).join('') + '</div>';
@@ -6435,10 +6440,10 @@ function htmlFarm(i) {
     if (!ks.some(k => patchKind(k) === kind)) continue;
     const have = SEEDS.filter(s => s.kind === kind && has(s.id)), sel = S.home.sel[kind];
     h += `<h3>${PATCH_NAME[kind]}es</h3><div class="chips"><button class="${!sel ? 'sel' : ''}" data-a="fsel" data-skill="${kind}" data-id="">✨ Best seed</button>` +
-      have.map(s => `<button class="${sel === s.id ? 'sel' : ''}" data-a="fsel" data-skill="${kind}" data-id="${s.id}" ${LV.farming < s.lvl ? 'disabled' : ''}>${ITEMS[s.out].icon} ${ITEMS[s.id].name} ×${fmt(has(s.id))}${LV.farming < s.lvl ? ' 🔒' + s.lvl : ''}</button>`).join('') + '</div><div class="grid">';
+      have.map(s => `<button class="${sel === s.id ? 'sel' : ''}" data-a="fsel" data-skill="${kind}" data-id="${s.id}" ${LV.farming < s.lvl ? 'disabled' : ''}>${ico(s.out)} ${ITEMS[s.id].name} ×${fmt(has(s.id))}${LV.farming < s.lvl ? ' 🔒' + s.lvl : ''}</button>`).join('') + '</div><div class="grid">';
     h += ks.filter(k => patchKind(k) === kind).map(k => {
       const p = patch(k), sd = p.s && SEED_BY[p.s], f = growFrac(p);
-      return `<div class="item ${sd && f >= 1 ? 'on' : ''}"><div class="top"><span class="ic">${sd ? (f >= 1 ? ITEMS[sd.out].icon : '🌱') : '🟫'}</span><span class="nm"><b>${sd ? ITEMS[sd.out].name : 'Empty ' + PATCH_NAME[kind].toLowerCase()}</b><br>
+      return `<div class="item ${sd && f >= 1 ? 'on' : ''}"><div class="top"><span class="ic">${sd ? (f >= 1 ? ico(sd.out) : '🌱') : '🟫'}</span><span class="nm"><b>${sd ? ITEMS[sd.out].name : 'Empty ' + PATCH_NAME[kind].toLowerCase()}</b><br>
         <small>${sd ? (f >= 1 ? '✅ Ready to harvest' : `Growing ${Math.floor(f * 100)}% · ${fmtTime(growLeft(p))} left`) : bestSeed(kind) ? 'Ready to plant' : 'No seeds for this patch'}</small>
         ${sd ? `<div class="bar"><i style="width:${(f * 100).toFixed(1)}%"></i></div>` : ''}</span></div>
         <div class="btns">${sd && f >= 1 ? `<button data-a="harv" data-id="${k}">🧺 Harvest</button>` : !sd ? `<button data-a="plant" data-id="${k}" ${bestSeed(kind) ? '' : 'disabled'}>🌱 Plant${bestSeed(kind) ? ' ' + ITEMS[bestSeed(kind)].name.replace(/ (Seed|Sapling)$/, '') : ''}</button>` : ''}</div></div>`;
@@ -6480,13 +6485,124 @@ const SLOT_NAME = { helm: 'Head', cape: 'Cape', amulet: 'Neck', ammo: 'Ammo', we
 const SLOT_HINT = { helm: 'Smith helms at the anvil.', body: 'Smith platebodies and chainbodies at the anvil.', legs: 'Smith platelegs at the anvil.', shield: 'Smith kiteshields at the anvil.',
   weapon: 'Smith weapons, or fletch bows.', cape: 'Buy a cape in the Shop – bosses drop better ones.', hands: 'Buy gloves in the Shop – bosses drop better ones.',
   feet: 'Buy boots in the Shop – bosses drop better ones.', ring: 'Rings drop from bosses.', amulet: 'Amulets come from the Slayer shop and rare drops.' };
+/* ================= ITEM ICONS: a small drawn picture for every item, built from its kind and colour ================= */
+const ICON_CACHE = {};
+function hexMix(a, b, t) {
+  const p = h => { h = h.replace('#', ''); if (h.length === 3) h = h.replace(/./g, x => x + x); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+  const x = p(a), y = p(b);
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+const WOOD_C = ['#c8a070', '#9a6a38', '#c07030', '#5a3e22', '#7a4aa0'];
+const ICON_C = { amu_acc: '#4a8aff', amu_def: '#5ac85a', amu_str: '#e04a3a', amu_slayer: '#3a3a3a', amu_fury: '#f2c94c', gem: '#3aa8e8', essence: '#c8d8f0', bones: '#efe8d8', bigbones: '#e8dcc0', dragonbones: '#c8d8b0', scale: '#3a8a5a', bread: '#d89a50' };
+function iconSvg(id) {
+  const it = ITEMS[id] || {}, O = '#1b1612', d = /(\d)$/.exec(id), t = d ? +d[1] : 0;
+  const c = ICON_C[id] || it.color || TIER_COLORS[t] || '#a08060', L = (x, a = 0.35) => hexMix(x, '#ffffff', a), D = (x, a = 0.35) => hexMix(x, '#000000', a);
+  const S = `stroke="${O}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"`;
+  const metal = it.metal != null ? METAL_COLORS[it.metal] : /^(bar|arrow|tips)\d/.test(id) ? METAL_COLORS[t] : c;
+  const sword = (len, w, curve, mc) => `<g transform="rotate(45 16 16)">${curve
+      ? `<path d="M15 ${22 - len} Q${21 + w} ${22 - len * 0.55} 17.5 22 H14.5 Q16 ${22 - len * 0.5} 15 ${22 - len}Z" fill="${L(mc, 0.25)}" ${S}/>`
+      : `<path d="M${16 - w / 2} 22 V${24 - len} L16 ${21 - len} L${16 + w / 2} ${24 - len} V22Z" fill="${L(mc, 0.25)}" ${S}/><path d="M16 ${22 - len} V21" stroke="${L(mc, 0.6)}" stroke-width="1"/>`}
+    <rect x="${16 - w / 2 - 4}" y="21" width="${w + 8}" height="2.6" rx="1" fill="#c8a040" ${S}/><rect x="15" y="23.6" width="2" height="5" fill="#6a4426" ${S}/><circle cx="16" cy="29.4" r="1.4" fill="#c8a040" ${S}/></g>`;
+  const body = (fc, chain) => `<path d="M6 10 L11 6 H21 L26 10 L27 18 H23 V27 H9 V18 H5Z" fill="${fc}" ${S}/><path d="M11 6 Q16 10 21 6" fill="none" ${S}/><path d="M16 9 V27" stroke="${D(fc, 0.3)}" stroke-width="1.2"/>`
+    + (chain ? [10, 14, 18, 22].map(y => `<path d="M10 ${y + 2} H22" stroke="${D(fc, 0.35)}" stroke-width="1" stroke-dasharray="1.5 1.5"/>`).join('') : `<path d="M10 12 Q16 15 22 12" fill="none" stroke="${L(fc, 0.45)}" stroke-width="1.4"/>`);
+  const legs = fc => `<path d="M8 5 H24 L25 28 H18.5 L16 13 L13.5 28 H7Z" fill="${fc}" ${S}/><path d="M8 8 H24" stroke="${D(fc, 0.35)}" stroke-width="1.6"/>`;
+  const fish = (fc, extra = '') => `<path d="M24 16 L30 10 L29 16 L30 22Z" fill="${D(fc, 0.15)}" ${S}/><ellipse cx="15" cy="16" rx="10.5" ry="6.5" fill="${fc}" ${S}/><path d="M7 18 Q15 22 23 18" fill="none" stroke="${L(fc, 0.45)}" stroke-width="1.6"/><path d="M14 10 Q17 7 20 10" fill="${D(fc, 0.2)}" ${S}/>${extra}<circle cx="9" cy="14.5" r="1.4" fill="#111"/>`;
+  const seeds = sc => `<ellipse cx="11" cy="21" rx="3" ry="4.2" transform="rotate(-25 11 21)" fill="#8a6038" ${S}/><ellipse cx="19" cy="23" rx="3" ry="4.2" transform="rotate(20 19 23)" fill="#7a5230" ${S}/><ellipse cx="15" cy="15" rx="3" ry="4.2" fill="#9a7040" ${S}/><path d="M15 11 Q13 5 18 4 Q20 9 15 11Z" fill="${sc}" ${S}/>`;
+  const runeSym = {
+    air: `<path d="M16 16 m-1 0 a1.5 1.5 0 1 1 3 0 a3.5 3.5 0 1 1 -7 0 a5.5 5.5 0 1 1 11 0" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`,
+    water: `<path d="M16 9 Q22 17 16 22 Q10 17 16 9Z" fill="${c}"/>`, blood: `<path d="M16 9 Q22 17 16 22 Q10 17 16 9Z" fill="${c}"/><circle cx="16" cy="18" r="1.5" fill="#fff8"/>`,
+    earth: `<path d="M9 21 L14 11 L17 16 L19 13 L23 21Z" fill="${c}"/>`, fire: `<path d="M16 8 Q22 14 19 21 Q16 23 13 21 Q10 15 14 12 Q14 16 16 16 Q17 12 16 8Z" fill="${c}"/>`,
+    mind: `<circle cx="16" cy="15.5" r="5.5" fill="none" stroke="${c}" stroke-width="2.2"/><circle cx="16" cy="15.5" r="1.8" fill="${c}"/>`,
+    chaos: `<path d="M18 8 L12 17 H16 L14 23 L21 13 H17Z" fill="${c}"/>`,
+    death: `<path d="M11 15 A5 5 0 0 1 21 15 V18 H19 V21 H13 V18 H11Z" fill="${c}"/><circle cx="14" cy="15" r="1.4" fill="#5a5464"/><circle cx="18" cy="15" r="1.4" fill="#5a5464"/>`,
+  };
+  const k = id.replace(/^(crop|herb|seed|sapling)_/, '');
+  let g = '';
+  if (/^ore_/.test(id)) {
+    const rock = id === 'ore_coal' ? '#38342f' : '#7d756c', fl = id === 'ore_coal' ? '#14110e' : c;
+    g = `<path d="M4 23 L7 13 L14 7 L23 8 L28 16 L26 25 L12 27Z" fill="${rock}" ${S}/><path d="M7 13 L14 7 L23 8 L19 13 L11 14Z" fill="${L(rock, 0.2)}"/>`
+      + [[11, 18, 2.6], [19, 15, 2.2], [17, 22, 2.4], [23, 20, 1.6], [13, 11.5, 1.5]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${fl}" stroke="${D(fl, 0.4)}" stroke-width=".8"/><circle cx="${x - r / 3}" cy="${y - r / 3}" r="${r / 3}" fill="${L(fl, 0.6)}"/>`).join('');
+  } else if (/^bar\d/.test(id)) g = `<path d="M9 12 H23 L27 19 H5Z" fill="${L(metal, 0.3)}" ${S}/><path d="M5 19 H27 V24 H5Z" fill="${metal}" ${S}/><path d="M11 14 H19" stroke="${L(metal, 0.7)}" stroke-width="1.4"/>`;
+  else if (it.kind === 'dagger') g = sword(10, 3, false, metal);
+  else if (it.kind === 'sword') g = sword(15, 3, false, metal);
+  else if (it.kind === 'scimitar') g = sword(16, 4, true, metal);
+  else if (it.kind === '2h') g = sword(19, 4.5, false, metal);
+  else if (it.kind === 'medhelm') g = `<path d="M7 22 Q7 7 16 7 Q25 7 25 22Z" fill="${metal}" ${S}/><path d="M6 21 H26 V24 H6Z" fill="${D(metal, 0.15)}" ${S}/><path d="M11 11 Q14 9 17 9" fill="none" stroke="${L(metal, 0.6)}" stroke-width="1.6"/>`;
+  else if (it.kind === 'fullhelm') g = `<path d="M7 27 V15 Q7 5 16 5 Q25 5 25 15 V27Z" fill="${metal}" ${S}/><path d="M10 15 H22 M16 15 V25" stroke="${O}" stroke-width="2"/><path d="M10 9 Q13 7 16 7" fill="none" stroke="${L(metal, 0.6)}" stroke-width="1.6"/>`;
+  else if (it.kind === 'platebody' || it.kind === 'chainbody') g = body(metal, it.kind === 'chainbody');
+  else if (it.kind === 'platelegs') g = legs(metal);
+  else if (it.kind === 'kiteshield') g = `<path d="M16 4 L26 8 Q26 20 16 29 Q6 20 6 8Z" fill="${metal}" ${S}/><path d="M16 7 V25 M10 12 H22" stroke="${L(metal, 0.45)}" stroke-width="2"/>`;
+  else if (/^arrow\d/.test(id)) g = [0, 1, 2].map(i => `<g transform="translate(${(i - 1) * 3.5} ${(i - 1) * 3.5})"><path d="M8 26 L22 12" stroke="#8a6038" stroke-width="2"/><path d="M8 26 L5 25 L7 29 Z M8 26 L7 23 L11 25Z" fill="#f0f0f0" stroke="${O}" stroke-width="0.8"/><path d="M20 11 L26 8 L23 14Z" fill="${L(metal, 0.2)}" ${S}/></g>`).join('');
+  else if (/^tips\d/.test(id)) g = [[9, 12], [21, 11], [15, 22]].map(([x, y]) => `<path d="M${x} ${y - 6} L${x + 4} ${y + 4} L${x} ${y + 2} L${x - 4} ${y + 4}Z" fill="${L(metal, 0.2)}" ${S}/>`).join('');
+  else if (/^l?bow\d/.test(id) || id === 'craw' || id === 'cbow' || id === 'tagbow') {
+    const lb = /^lbow|craw|tagbow/.test(id), wc = id === 'cbow' ? '#8ae8ff' : id === 'craw' ? '#6aff8a' : id === 'tagbow' ? '#f2e6c0' : WOOD_C[t];
+    g = `<path d="M9 ${lb ? 2 : 5} L9 ${lb ? 30 : 27}" stroke="#eee8d8" stroke-width="1"/><path d="M9 ${lb ? 2 : 5} Q${lb ? 31 : 27} 16 9 ${lb ? 30 : 27}" fill="none" stroke="${O}" stroke-width="5" stroke-linecap="round"/><path d="M9 ${lb ? 2 : 5} Q${lb ? 31 : 27} 16 9 ${lb ? 30 : 27}" fill="none" stroke="${wc}" stroke-width="2.8" stroke-linecap="round"/><rect x="16.5" y="13.5" width="3" height="5" rx="1" fill="#5a3e22" ${S}/>`;
+  } else if (/staff|wand|sceptre/i.test(it.name || '') && it.slot === 'weapon') {
+    const el = /_(air|water|earth|fire)$/.exec(id), oc = el ? ELEMENT[el[1]].color : id === 'sstaff' ? '#7a3aa0' : id === 'thammaron' ? '#6aff8a' : ['#4a8aff', '#3ad0c0', '#b46bff', '#e0453a', '#f2c94c'][t] || c;
+    const stick = /staff/.test(id) || /^bstaff|^mstaff/.test(id) ? '#7a5230' : '#c8b890';
+    g = `<path d="M7 28 L22 11" stroke="${O}" stroke-width="4.4" stroke-linecap="round"/><path d="M7 28 L22 11" stroke="${/^mstaff/.test(id) ? '#5a5a6a' : stick}" stroke-width="2.4" stroke-linecap="round"/><circle cx="24" cy="8.5" r="4.5" fill="${oc}" ${S}/><circle cx="22.6" cy="7" r="1.5" fill="#ffffffaa"/>`;
+  } else if (/^log\d/.test(id)) g = `<path d="M5 12 H23 V23 H5 Q2 17.5 5 12Z" fill="${WOOD_C[t]}" ${S}/><path d="M7 15 H19 M8 20 H17" stroke="${D(WOOD_C[t], 0.3)}" stroke-width="1.2"/><ellipse cx="23" cy="17.5" rx="4" ry="5.5" fill="#e6c896" ${S}/><ellipse cx="23" cy="17.5" rx="1.8" ry="2.6" fill="none" stroke="#b08850" stroke-width="1"/>`;
+  else if (/^plank\d/.test(id)) g = `<path d="M3 20 L22 8 L29 12 L10 24Z" fill="${L(WOOD_C[t], 0.2)}" ${S}/><path d="M3 20 L10 24 V27 L3 23Z M10 24 L29 12 V15 L10 27Z" fill="${D(WOOD_C[t], 0.15)}" ${S}/><path d="M8 19 L21 11 M12 21 L24 13.5" stroke="${D(WOOD_C[t], 0.25)}" stroke-width="1"/>`;
+  else if (/^fish\d/.test(id)) g = fish(TIER_COLORS[t]);
+  else if (/^cooked\d/.test(id)) g = `<ellipse cx="16" cy="22" rx="14" ry="5" fill="#e8e4dc" ${S}/>` + `<g transform="translate(0 -2)">${fish(hexMix(TIER_COLORS[t], '#b0682a', 0.65), '<path d="M11 12 L9 20 M15 11 L13 21 M19 11 L17 21" stroke="#5a2e12" stroke-width="1.4"/>')}</g>`;
+  else if (id === 'burnt') g = fish('#2e2622', '<path d="M12 13 L14 15 M18 17 L20 15" stroke="#5a4a40" stroke-width="1"/>');
+  else if (id === 'bread') g = `<path d="M4 21 Q4 10 16 10 Q28 10 28 21 Q28 25 24 25 H8 Q4 25 4 21Z" fill="#d89a50" ${S}/><path d="M10 14 L12 19 M15 13 L17 19 M20 13 L22 19" stroke="#a86a2a" stroke-width="1.6"/><path d="M8 13 Q12 11 15 11.5" stroke="#f0c890" stroke-width="1.5" fill="none"/>`;
+  else if (/^crop_/.test(id)) g = {
+    potato: `<path d="M5 18 Q6 9 16 10 Q27 10 27 18 Q26 25 16 25 Q5 25 5 18Z" fill="${c}" ${S}/><circle cx="11" cy="15" r="1" fill="${D(c, 0.4)}"/><circle cx="19" cy="20" r="1" fill="${D(c, 0.4)}"/><circle cx="22" cy="14" r="1" fill="${D(c, 0.4)}"/>`,
+    onion: `<path d="M16 29 Q6 27 7 19 Q8 12 16 9 Q24 12 25 19 Q26 27 16 29Z" fill="${c}" ${S}/><path d="M16 9 Q14 5 15 2 M16 9 Q18 5 20 3" stroke="#6ab04a" stroke-width="2" fill="none"/><path d="M12 14 Q10 20 13 26 M20 14 Q22 20 19 26" stroke="${D(c, 0.25)}" fill="none"/>`,
+    cabbage: `<circle cx="16" cy="17" r="11" fill="${c}" ${S}/><path d="M16 7 Q10 17 16 28 M16 7 Q22 17 16 28 M6 15 Q16 13 26 15" stroke="${L(c, 0.4)}" fill="none" stroke-width="1.4"/>`,
+    tomato: `<circle cx="16" cy="18" r="10" fill="${c}" ${S}/><path d="M16 8 L13 6 L16 10 L19 6Z M12 9 L20 9" fill="#4a9a3a" stroke="#2a6a2a" stroke-width="1.6"/><ellipse cx="12" cy="15" rx="2.5" ry="1.5" fill="#ffffff66"/>`,
+    sweetcorn: `<ellipse cx="16" cy="15" rx="5.5" ry="11" fill="#f2d04a" ${S}/><path d="M11 10 H21 M10.5 15 H21.5 M11 20 H21 M16 4 V26" stroke="#c8a030" stroke-width="1"/><path d="M16 28 Q8 22 9 10 Q12 22 16 28 Q24 22 23 10 Q20 22 16 28Z" fill="#6ab04a" ${S}/>`,
+    strawberry: `<path d="M16 29 Q5 18 8 12 Q16 8 24 12 Q27 18 16 29Z" fill="${c}" ${S}/>${[[12, 15], [16, 14], [20, 15], [14, 19], [18, 19], [16, 23]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".9" fill="#ffe08a"/>`).join('')}<path d="M9 11 L13 8 L16 10 L19 8 L23 11 L16 13Z" fill="#4a9a3a" ${S}/>`,
+    watermelon: `<path d="M3 13 A13 13 0 0 0 29 13Z" fill="#3a8a3a" ${S}/><path d="M5.5 13 A10.5 10.5 0 0 0 26.5 13Z" fill="#e8405a"/><path d="M3 13 H29" ${S}/>${[[11, 17], [16, 20], [21, 17], [16, 15.5]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx=".9" ry="1.4" fill="#222"/>`).join('')}`,
+    snape: [-8, -4, 0, 4, 8].map(a => `<path d="M16 29 Q${16 + a} 16 ${16 + a * 1.5} 4" fill="none" stroke="${O}" stroke-width="3.6" stroke-linecap="round"/><path d="M16 29 Q${16 + a} 16 ${16 + a * 1.5} 4" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/>`).join(''),
+  }[k] || `<circle cx="16" cy="17" r="10" fill="${c}" ${S}/>`;
+  else if (/^herb_/.test(id)) {
+    const n = 3 + (it.tier || 0) % 3, sh = (it.tier || 0) % 4;
+    g = Array.from({ length: n }, (_, i) => { const a = (i - (n - 1) / 2) * (60 / n); return `<g transform="rotate(${a} 16 27)">${sh === 0 ? `<path d="M16 26 Q11 14 16 4 Q21 14 16 26Z"` : sh === 1 ? `<ellipse cx="16" cy="13" rx="5" ry="8"` : sh === 2 ? `<path d="M16 26 L12 18 L14 17 L11 11 L14 11 L16 4 L18 11 L21 11 L18 17 L20 18Z"` : `<path d="M16 26 Q8 12 16 3 Q17 14 16 26Z"`} fill="${i & 1 ? D(c, 0.15) : c}" ${S}/></g>`; }).join('')
+      + `<path d="M16 26 V30" ${S}/><rect x="13" y="24" width="6" height="2.6" rx="1" fill="#c8a060" ${S}/>`;
+  } else if (/^seed_/.test(id)) g = seeds((ITEMS['crop_' + k] || ITEMS['herb_' + k] || {}).color || '#6ab04a');
+  else if (/^sapling_/.test(id)) g = `<path d="M9 20 H23 L21 29 H11Z" fill="#b8643a" ${S}/><path d="M8 18 H24 V21 H8Z" fill="#c8744a" ${S}/><path d="M16 18 V8" stroke="#5a3e22" stroke-width="2"/><path d="M16 12 Q9 11 8 5 Q14 5 16 12Z M16 9 Q22 8 24 3 Q18 2 16 9Z" fill="${['#3f8f3a', '#d0702f', '#2f6b45', '#b06be0'][['oak', 'maple', 'yew', 'magic'].indexOf(k)] || '#3f8f3a'}" ${S}/>`;
+  else if (it.potion || /^pot_/.test(id)) g = `<path d="M13 4 H19 V11 Q26 14 26 21 A10 9 0 0 1 6 21 Q6 14 13 11Z" fill="#d8eef455" ${S}/><path d="M7 19 Q16 16 25 19 Q26 27 16 29 Q6 27 7 19Z" fill="${c}"/><path d="M13 4 H19 V11 Q26 14 26 21 A10 9 0 0 1 6 21 Q6 14 13 11Z" fill="none" ${S}/><rect x="12.5" y="2" width="7" height="4" rx="1" fill="#8a6a44" ${S}/><path d="M10 15 Q9 18 10 21" stroke="#ffffffaa" stroke-width="1.6" fill="none"/>`;
+  else if (/^r_/.test(id)) g = `<rect x="5" y="5" width="22" height="22" rx="6" fill="#8a8494" ${S}/><rect x="7" y="7" width="18" height="18" rx="4.5" fill="#6e6878"/>` + (runeSym[id.slice(2)] || `<circle cx="16" cy="16" r="5" fill="${c}"/>`);
+  else if (/bones$/.test(id)) { const s = id === 'bones' ? 0.85 : id === 'bigbones' ? 1 : 1.08; g = `<g transform="translate(16 16) scale(${s}) rotate(-35) translate(-16 -16)"><path d="M9 13 A3 3 0 1 1 11 10 H21 A3 3 0 1 1 23 13 A3 3 0 1 1 23 19 A3 3 0 1 1 21 22 H11 A3 3 0 1 1 9 19 A3 3 0 1 1 9 13Z" transform="translate(0 0) scale(1 .8) translate(0 4)" fill="${c}" ${S}/></g>`; }
+  else if (id === 'gem' || /^charm_/.test(id)) { const s = id === 'gem' ? 1 : 0.7; g = `<g transform="translate(16 16) scale(${s}) translate(-16 -16)"><path d="M6 12 L11 6 H21 L26 12 L16 27Z" fill="${c}" ${S}/><path d="M6 12 H26 M11 6 L13 12 L16 27 L19 12 L21 6" fill="none" stroke="${D(c, 0.3)}" stroke-width="1"/><path d="M12 8 L10 11" stroke="#fff" stroke-width="1.4"/></g>`; }
+  else if (id === 'essence' || id === 'shard') g = (id === 'shard' ? [[10, 22, 0.7], [21, 21, 0.8], [16, 14, 1]] : [[16, 16, 1.2]]).map(([x, y, s]) => `<path d="M${x} ${y - 10 * s} L${x + 5 * s} ${y - 2 * s} L${x + 2 * s} ${y + 8 * s} H${x - 3 * s} L${x - 5 * s} ${y - 3 * s}Z" fill="${c}" ${S}/><path d="M${x} ${y - 10 * s} L${x} ${y + 8 * s}" stroke="${L(c, 0.5)}" stroke-width="1"/>`).join('');
+  else if (it.slot === 'amulet') g = `<path d="M7 4 Q8 18 16 20 Q24 18 25 4" fill="none" stroke="#c8a040" stroke-width="2" stroke-dasharray="2 1.2"/><circle cx="16" cy="23" r="5.5" fill="#c8a040" ${S}/><circle cx="16" cy="23" r="3.3" fill="${c}"/><circle cx="15" cy="22" r="1" fill="#fff9"/>`;
+  else if (it.slot === 'ring') g = `<ellipse cx="16" cy="19" rx="9" ry="8" fill="none" stroke="${O}" stroke-width="5"/><ellipse cx="16" cy="19" rx="9" ry="8" fill="none" stroke="#d8b040" stroke-width="3"/><path d="M12 9 L16 5 L20 9 L16 13Z" fill="${c}" ${S}/>`;
+  else if (it.slot === 'hands') g = `<path d="M8 28 V16 L6 11 Q6 9 8 10 L11 14 V6 Q12 4 13.5 6 V13 V4 Q15 2 16.5 4 V13 V5 Q18 3 19.5 5 V14 V8 Q21 6 22.5 8 V20 Q22 25 20 28Z" fill="${c}" ${S}/><path d="M8 24 H20.5" stroke="${D(c, 0.35)}" stroke-width="2"/>`;
+  else if (it.slot === 'feet') g = `<path d="M9 4 H18 V18 L27 21 Q29 24 27 27 H6 Q5 18 9 4Z" fill="${c}" ${S}/><path d="M6 24 H27.5" stroke="${D(c, 0.4)}" stroke-width="2.4"/><path d="M9 8 H18" stroke="${L(c, 0.35)}" stroke-width="1.6"/>`;
+  else if (it.slot === 'cape') g = `<path d="M11 4 H21 L27 28 Q16 25 5 28Z" fill="${c}" ${S}/><path d="M11 4 Q16 8 21 4" fill="${D(c, 0.3)}" ${S}/><path d="M13 9 L10 25 M19 9 L22 25" stroke="${D(c, 0.25)}" stroke-width="1.2"/>`;
+  else if (it.slot === 'body') g = body(c, false);
+  else if (it.slot === 'legs') g = legs(c);
+  else if (it.slot === 'shield') g = `<path d="M16 4 L26 8 Q26 20 16 29 Q6 20 6 8Z" fill="${c}" ${S}/><path d="M16 7 V25 M10 12 H22" stroke="#f2c94c" stroke-width="2"/>`;
+  else if (it.slot === 'helm') g = /hat|bwhat|rhood/.test(id) ? `<path d="M5 24 Q16 20 27 24 Q16 28 5 24Z" fill="${D(c, 0.15)}" ${S}/><path d="M9 23 Q14 6 21 4 Q19 12 23 23Z" fill="${c}" ${S}/>`
+    : `<path d="M7 24 Q6 6 16 5 Q26 6 25 24 Q20 20 16 20 Q12 20 7 24Z" fill="${c}" ${S}/><path d="M11 15 Q16 11 21 15" fill="none" stroke="${D(c, 0.35)}" stroke-width="2"/>`;
+  else if (id === 'whip') g = `<path d="M6 26 L10 22" stroke="#5a3e22" stroke-width="4" stroke-linecap="round"/><path d="M10 22 Q24 26 24 15 Q24 7 16 8 Q9 10 12 16 Q15 20 20 15" fill="none" stroke="${O}" stroke-width="3.6"/><path d="M10 22 Q24 26 24 15 Q24 7 16 8 Q9 10 12 16 Q15 20 20 15" fill="none" stroke="${c}" stroke-width="1.8"/>`;
+  else if (it.slot === 'weapon' && it.wtype === 'melee') g = `<path d="M7 27 L19 13" stroke="${O}" stroke-width="4" stroke-linecap="round"/><path d="M7 27 L19 13" stroke="#6a4426" stroke-width="2.2" stroke-linecap="round"/><circle cx="21" cy="11" r="6" fill="${c}" ${S}/>${[0, 72, 144, 216, 288].map(a => `<path d="M21 11 l0 -8.5" transform="rotate(${a} 21 11)" stroke="${O}" stroke-width="2"/>`).join('')}<circle cx="21" cy="11" r="4.6" fill="${c}"/>`;
+  else if (/^clue_/.test(id)) { const rc = { easy: '#5ac85a', medium: '#4a8aff', hard: '#b46bff', elite: '#f2c94c' }[id.slice(5)]; g = `<path d="M8 6 H24 V24 Q24 28 20 28 H8Z" fill="#efe2c0" ${S}/><path d="M8 6 Q4 6 4 9 Q4 12 8 12" fill="#d8c8a0" ${S}/><path d="M11 12 H20 M11 16 H21 M11 20 H18" stroke="#9a8a6a" stroke-width="1.2"/><path d="M14 22 H20 V30 L17 28 L14 30Z" fill="${rc}" ${S}/>`; }
+  else if (id === 'lamp') g = `<path d="M5 19 Q16 26 25 18 L29 13 L24 15 Q16 13 8 16Z" fill="#e8b830" ${S}/><path d="M12 15 Q16 9 20 15" fill="#f2d050" ${S}/><path d="M5 19 Q2 15 6 14" fill="none" ${S}/><path d="M29 13 Q28 9 26 8" stroke="#bbb" fill="none" stroke-width="1.4"/>`;
+  else if (id === 'mark') g = `<path d="M24 4 Q28 16 14 24 L8 28 L13 22 Q6 12 24 4Z" fill="${c}" ${S}/><path d="M24 4 L9 27" stroke="${D(c, 0.4)}" stroke-width="1.2"/>`;
+  else if (id === 'nails') g = [[10, 0], [16, 4], [22, -2]].map(([x, r]) => `<g transform="rotate(${r * 4} ${x} 16)"><rect x="${x - 3.5}" y="5" width="7" height="2.4" rx="1" fill="#9aa0a8" ${S}/><path d="M${x - 1} 7.4 H${x + 1} L${x} 27Z" fill="#b8bec8" ${S}/></g>`).join('');
+  else if (id === 'ether') g = `<path d="M16 4 Q25 16 16 28 Q7 16 16 4Z" fill="${c}" ${S}/><path d="M16 9 Q20 16 16 22" fill="none" stroke="#e8ffe8" stroke-width="1.6"/>`;
+  else if (id === 'emblem') g = `<path d="M11 3 L16 12 L21 3" fill="none" stroke="#c84040" stroke-width="3"/><circle cx="16" cy="19" r="8" fill="${c}" ${S}/><path d="M16 14 L17.5 18 L21.5 18 L18.3 20.5 L19.5 24.5 L16 22 L12.5 24.5 L13.7 20.5 L10.5 18 L14.5 18Z" fill="${L(c, 0.5)}"/>`;
+  else if (id === 'statuette') g = `<path d="M11 28 H21 L20 24 Q24 18 21 12 Q23 8 19 6 Q16 3 13 6 Q9 8 11 12 Q8 18 12 24Z" fill="${c}" ${S}/><path d="M13 12 H19" stroke="${D(c, 0.35)}" stroke-width="1.4"/>`;
+  else if (id === 'totem') g = `<rect x="10" y="4" width="12" height="25" rx="2" fill="${c}" ${S}/><path d="M10 13 H22 M10 21 H22" ${S}/><circle cx="13.5" cy="8.5" r="1.4" fill="${O}"/><circle cx="18.5" cy="8.5" r="1.4" fill="${O}"/><path d="M13 17 H19" stroke="${O}" stroke-width="1.6"/>`;
+  else if (id === 'scale') g = `<path d="M16 4 Q27 8 26 18 Q24 27 16 29 Q8 27 6 18 Q5 8 16 4Z" fill="${c}" ${S}/><path d="M9 14 Q16 20 23 14 M10 21 Q16 26 22 21" fill="none" stroke="${L(c, 0.35)}" stroke-width="1.4"/>`;
+  else if (/^pouch_/.test(id)) g = `<path d="M8 13 Q4 28 16 29 Q28 28 24 13Z" fill="#9a7448" ${S}/><path d="M10 13 L8 7 Q16 10 24 7 L22 13Z" fill="#7a5a34" ${S}/><path d="M9 13 H23" stroke="#d8c070" stroke-width="2"/><text x="16" y="25.5" font-size="11" text-anchor="middle">${it.icon}</text>`;
+  if (!g) g = `<circle cx="16" cy="16" r="13" fill="${c}33"/><text x="16" y="22" font-size="17" text-anchor="middle">${it.icon || '❔'}</text>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${g}</svg>`;
+}
+function iconUrl(id) { return ICON_CACHE[id] || (ICON_CACHE[id] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(iconSvg(id))); }
+// the picture of an item, for HTML; falls back to the emoji for things that are not items
+function ico(id) { return ITEMS[id] ? `<img class="ii" src="${iconUrl(id)}" alt="" draggable="false">` : ''; }
 // OSRS stack numbers: yellow, then white in thousands (K), then green in millions (M)
 function stackText(n) { return n < 100000 ? [fmt(n), ''] : n < 1e7 ? [Math.floor(n / 1000) + 'K', 'w'] : [Math.floor(n / 1e6) + 'M', 'g']; }
 function slotHtml(id, n, attrs, ph, extra = '') {
   const it = id && ITEMS[id];
   const st = it && (n > 1 || it.type === 'Ammo' || it.type === 'Runes') ? stackText(n) : null;
   const bg = it && it.color ? ` style="background:radial-gradient(circle at 50% 55%, ${it.color}66 0%, ${it.color}00 68%), #2b2520"` : '';
-  return `<button class="slot ${extra}" ${attrs}${bg} aria-label="${it ? it.name : 'Empty'}">${it ? `<span class="si">${it.icon}</span>` : `<span class="si ph">${ph}</span>`}${st ? `<span class="sn ${st[1]}">${st[0]}</span>` : ''}</button>`;
+  return `<button class="slot ${extra}" ${attrs}${bg} aria-label="${it ? it.name : 'Empty'}">${it ? `<span class="si">${ico(id)}</span>` : `<span class="si ph">${ph}</span>`}${st ? `<span class="sn ${st[1]}">${st[0]}</span>` : ''}</button>`;
 }
 function dollHtml(small) {
   return `<div class="doll ${small ? 'sm' : ''}">` + DOLL.map(sl => {
@@ -6517,7 +6633,7 @@ function itemMenu(id) {
   if (!it || !n) return;
   const worn = it.slot && S.equip[it.slot] && ITEMS[S.equip[it.slot]];
   const sk = it.slot && reqSkill(it);
-  openModal(`<div class="imenu"><div class="ihead"><span class="big">${it.icon}</span><div><b>${it.name}</b><br><small class="muted">${it.type} · ${fmt(n)} in bag · ${fmt(it.value)} gold each</small></div></div>
+  openModal(`<div class="imenu"><div class="ihead"><span class="big">${ico(id)}</span><div><b>${it.name}</b><br><small class="muted">${it.type} · ${fmt(n)} in bag · ${fmt(it.value)} gold each</small></div></div>
     ${itemStats(it) ? `<p>${itemStats(it)}</p>` : ''}
     ${worn ? `<p class="muted">Worn now: ${worn.icon} ${worn.name}${itemStats(worn) ? ' · ' + itemStats(worn) : ''}</p>` : ''}
     ${it.slot && !canEquip(id) ? `<p class="need">Requires ${SKILLS[sk].name} level ${it.req}</p>` : ''}
@@ -6547,7 +6663,7 @@ function slotMenu(sl) {
   }
   const opts = invIds().filter(x => ITEMS[x].slot === sl);
   openModal(`<div class="imenu"><h2>${SLOT_ICON[sl]} ${SLOT_NAME[sl]}</h2><p class="muted">${opts.length ? 'Wear something from your bag:' : 'Nothing for this slot in your bag. ' + SLOT_HINT[sl]}</p>
-    <div class="opts">${opts.map(x => `<button data-a="equip" data-id="${x}" data-close="1" ${canEquip(x) ? '' : 'disabled'}>${ITEMS[x].icon} ${ITEMS[x].name}${itemStats(ITEMS[x]) ? ` <small>· ${itemStats(ITEMS[x])}</small>` : ''}</button>`).join('')}
+    <div class="opts">${opts.map(x => `<button data-a="equip" data-id="${x}" data-close="1" ${canEquip(x) ? '' : 'disabled'}>${ico(x)} ${ITEMS[x].name}${itemStats(ITEMS[x]) ? ` <small>· ${itemStats(ITEMS[x])}</small>` : ''}</button>`).join('')}
     <button data-a="close">Close</button></div></div>`);
 }
 function htmlBag() {
@@ -6586,7 +6702,7 @@ function htmlCraft() {
   return h + list.map(([r, i]) => {
     const it = ITEMS[r.out], locked = LV[sk] < r.req, mx = maxCraft(r.mats), n = recipeCount(r);
     const active = S.activity === sk && S.csel[sk] === i;
-    return `<div class="item"><div class="top"><span class="ic">${it.icon}</span><span class="nm">${n > 1 ? n + '× ' : ''}${itemLabel(r.out)}${mTag(sk, r.out)}<br>
+    return `<div class="item"><div class="top"><span class="ic">${ico(r.out)}</span><span class="nm">${n > 1 ? n + '× ' : ''}${itemLabel(r.out)}${mTag(sk, r.out)}<br>
       <small>${itemStats(it) ? itemStats(it) + ' · ' : ''}${r.xp} XP · ${locked ? '🔒 ' : ''}${SKILLS[sk].name} ${r.req}${r.station ? ' · ' + (r.station === 'furnace' ? '🔥 furnace' : '🔨 anvil') : ''}</small></span></div>
       <small>${matsHtml(r.mats)}</small>
       <div class="btns">${active ? `<button class="sel" disabled>${SKILLS[sk].icon} Working…</button>`
@@ -6635,7 +6751,7 @@ function htmlShop() {
   }
   h += '</div><h3>Supplies and gear</h3><div class="grid">' + SHOP.map((it, i) => {
     const d = ITEMS[it.id];
-    return `<div class="item"><div class="top"><span class="ic">${d.icon}</span>
+    return `<div class="item"><div class="top"><span class="ic">${ico(it.id)}</span>
       <span class="nm">${it.n > 1 ? it.n + '× ' : ''}${d.name}<br><small>${itemStats(d) || d.type} · ${it.cost} 🪙</small></span><span class="ct">${fmt(has(it.id))}</span></div>
       <div class="btns"><button data-a="buy" data-id="${i}" data-n="1" ${S.gold < it.cost ? 'disabled' : ''}>Buy</button>
       <button data-a="buy" data-id="${i}" data-n="10" ${S.gold < it.cost * 10 ? 'disabled' : ''}>Buy ×10</button></div></div>`;
@@ -6657,7 +6773,7 @@ function htmlSlayer() {
     `<div class="item"><div class="top"><span class="ic">${LV.slayer >= z.slayer ? '💀' : '🔒'}</span><span class="nm"><b>${z.name}</b><br><small>Slayer ${z.slayer} · ${zoneEnemies(z)}</small></span></div></div>`).join('') + '</div>';
   h += '<h3>Slayer shop</h3><div class="grid">' + SLAYER_SHOP.map((it, i) => {
     const d = it.id === 'autoslayer' ? it : ITEMS[it.id], owned = it.id === 'autoslayer' && S.ownsAutoSlayer;
-    return `<div class="item"><div class="top"><span class="ic">${d.icon}</span><span class="nm">${d.name}<br><small>${d.note}</small></span></div>
+    return `<div class="item"><div class="top"><span class="ic">${ITEMS[it.id] ? ico(it.id) : d.icon}</span><span class="nm">${d.name}<br><small>${d.note}</small></span></div>
       <div class="btns">${owned ? '<button disabled>Owned</button>' : `<button data-a="slayerbuy" data-id="${i}" ${S.scoins < it.cost ? 'disabled' : ''}>Buy – ${fmt(it.cost)} coins</button>`}</div></div>`;
   }).join('') + '</div>';
   return h;
@@ -6719,7 +6835,7 @@ function htmlClog() {
   for (const c of cats) {
     const got = c.ids.filter(id => S.got[id]).length;
     h += `<h3>${c.icon} ${c.name} <small class="muted">${got} / ${c.ids.length}</small></h3><div class="clog">`
-      + c.ids.map(id => `<span class="${S.got[id] ? '' : 'no'}" title="${S.got[id] ? ITEMS[id].name : '???'}"${ITEMS[id].color ? ` style="box-shadow:inset 0 -4px 0 ${ITEMS[id].color}"` : ''}>${ITEMS[id].icon}</span>`).join('') + '</div>';
+      + c.ids.map(id => `<span class="${S.got[id] ? '' : 'no'}" title="${S.got[id] ? ITEMS[id].name : '???'}"${ITEMS[id].color ? ` style="box-shadow:inset 0 -4px 0 ${ITEMS[id].color}"` : ''}>${ico(id)}</span>`).join('') + '</div>';
   }
   const pg = PETS.filter(p => S.pets[p.id]).length;
   h += `<h3>🐾 Pets <small class="muted">${pg} / ${PETS.length}</small></h3><div class="clog">` + PETS.map(p => `<span class="${S.pets[p.id] ? '' : 'no'}" title="${S.pets[p.id] ? p.name : '???'}">${p.icon}</span>`).join('') + '</div>';
