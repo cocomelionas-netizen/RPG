@@ -26,7 +26,7 @@ jobs:
         with:
           enablement: true
       - name: Collect site files
-        run: mkdir _site && cp index.html manifest.json sw.js icon-*.png _site/
+        run: mkdir _site && cp index.html manifest.json sw.js icon-*.png _site/ && cp supabase/schema.sql _site/schema.txt
       - uses: actions/upload-pages-artifact@v3
       - id: deployment
         uses: actions/deploy-pages@v4

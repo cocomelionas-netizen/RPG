@@ -6346,6 +6346,15 @@ function init() {
   const away = (Date.now() - (S.last || Date.now())) / 1000;
   if (away > 60) catchUp(away);
   log('Welcome! Your hero sets off on the endless road.');
+  // the game moved to GitHub Pages; the old Netlify copy points players there
+  if (location.hostname.endsWith('netlify.app')) {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:8px;right:8px;top:8px;z-index:9999;background:#2a2340;border:2px solid #f2c94c;border-radius:12px;padding:12px;color:#fff;font:15px system-ui;text-align:center;box-shadow:0 6px 20px #0008';
+    d.innerHTML = '🚚 <b>Endless Road has moved!</b><br><small>Log in (👤) and tap ☁️ Save now first so your hero is in the cloud, then open the new address and log in there.</small><br>'
+      + '<a href="https://cocomelionas-netizen.github.io/RPG/" style="display:inline-block;margin-top:8px;padding:8px 14px;background:#f2c94c;color:#222;border-radius:8px;font-weight:700;text-decoration:none">Open the new address</a> '
+      + '<button style="margin-top:8px" onclick="this.parentNode.remove()">Later</button>';
+    document.body.appendChild(d);
+  }
   $('#mute').textContent = S.muted ? '🔇' : '🔊';
   applyGfx();
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

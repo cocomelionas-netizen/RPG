@@ -1,10 +1,10 @@
 # Endless Road RPG – notes for Claude
 
 - Talk to the user in Lithuanian; game text stays in English.
-- Netlify (https://endless-road-rpg.netlify.app) auto-deploys every push to `main`, and every production deploy costs Netlify credits.
-  **Work and push on the `dev` branch.** Merge `dev` into `main` and push `main` only when the user asks to release ("išleisk").
-  Batch changes so a release is one deploy.
+- The game is hosted for free on GitHub Pages: https://cocomelionas-netizen.github.io/RPG/ (workflow `.github/workflows/pages.yml`,
+  deploys on every push to `main`). Push fixes to `main` straight away – the user wants them live immediately.
+- Netlify is retired: `netlify.toml` skips every build (credits). Its last deploy only shows a "moved" banner. Don't re-enable it.
 - Bump the cache version in `sw.js` once per release.
 - Server SQL lives in `supabase/schema.sql` (idempotent). The user runs it in the Supabase SQL Editor, often from a phone:
-  it is readable at https://endless-road-rpg.netlify.app/supabase/schema.sql (served as plain text via `_headers`).
+  it is readable as plain text at https://cocomelionas-netizen.github.io/RPG/schema.txt (copied there by the Pages workflow).
 - Never ask for or put the Supabase secret key in the game; the publishable key is fine.
