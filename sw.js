@@ -1,6 +1,6 @@
 // Offline support for the home-screen app. Network first so new versions show up right away,
 // falling back to the cached copy when there is no connection.
-const CACHE = 'endless-road-v13';
+const CACHE = 'endless-road-v14';
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
