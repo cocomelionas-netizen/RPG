@@ -1,6 +1,6 @@
 // Offline support for the home-screen app. Network first so new versions show up right away,
 // falling back to the cached copy when there is no connection.
-const CACHE = 'endless-road-v17';
+const CACHE = 'endless-road-v18';
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -17,7 +17,8 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (new URL(e.request.url).hostname.endsWith('supabase.co')) return;   // accounts and saves always go to the server
   e.respondWith(
-    fetch(e.request)
+    // our own files skip the browser's HTTP cache (GitHub Pages lets it keep pages for 10 minutes)
+    fetch(e.request, new URL(e.request.url).origin === location.origin ? { cache: 'no-cache' } : undefined)
       .then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, copy));

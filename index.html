@@ -6605,7 +6605,7 @@ function init() {
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { /* not supported */ }
   // the installed app stays upright where the browser allows it (Android); iOS uses the manifest and the rotate notice
   try { if (screen.orientation && screen.orientation.lock && navigator.standalone !== false) screen.orientation.lock('portrait').catch(() => {}); } catch (e) { /* not supported */ }
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
   // browsers only allow sound after the first tap
   window.addEventListener('pointerdown', unlockAudio, { passive: true });
   renderTab(true); renderHero(); renderGoal();
