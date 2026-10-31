@@ -224,6 +224,10 @@
   /* world map */
   .map { position: relative; width: 100%; aspect-ratio: 3 / 2; border-radius: 10px; overflow: hidden; background: #0b2a3d; border: 1px solid var(--line); }
   .map canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .map { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .mapin { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+  .mapzoom { position: absolute; right: 8px; bottom: 8px; z-index: 3; display: flex; flex-direction: column; gap: 6px; }
+  .mapzoom button { width: 36px; height: 36px; min-height: 0; padding: 0; font-size: 20px; border-radius: 50%; background: rgba(20,16,32,0.8); }
   .loc {
     position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px;
     background: none; border: 0; padding: 0; min-height: 0; z-index: 1;
@@ -4383,6 +4387,7 @@ const G3 = (() => {
   let renderer, scene, camera, hemi, sun, torch, fireLight, shadowGeo, shadowMat, glowTex;
   let zoneKey = -1, ridge = null, lavaMat = null, ceiling = false;
   const chunks = new Map();
+  const clearZ = [];   // [x0, x1, zBack] world areas kept free of scenery (ponds behind the road)
 
   /* --- helpers --- */
   const C = c => new T.Color(c);
@@ -4501,6 +4506,7 @@ const G3 = (() => {
     for (let i = 0; i < n; i++) {
       const s0 = ci * 977 + i * 13;
       const x = x0 + hash(s0) * CH, zz = z.home ? -10 - hash(s0 + 1) * (BACK - 11) : -3.2 - Math.pow(hash(s0 + 1), 0.8) * (BACK - 5), y = hgt(x, zz), s = 0.7 + hash(s0 + 2) * 0.7;
+      if (clearZ.some(([a, b, zb]) => x > a - 1.2 && x < b + 1.2 && zz > zb - 1.5)) continue;
       decor(a, g, th, pal, x, y, zz, s, s0);
     }
     // small things in front of the road (low enough never to hide the hero)
@@ -4515,7 +4521,7 @@ const G3 = (() => {
     }
     if (th.decor === 'house') {
       // low stone wall behind the road, with gaps
-      for (let x = x0; x < x0 + CH; x += 1.05) if (hash(x * 3.1 + 7) > 0.25) put(a, new T.BoxGeometry(1, 0.55, 0.32), hash(x) > 0.5 ? '#8e8a82' : '#9c978e', x + 0.5, 0.27, -2.6);
+      for (let x = x0; x < x0 + CH; x += 1.05) if (hash(x * 3.1 + 7) > 0.25 && !clearZ.some(([a, b]) => x > a - 0.5 && x < b + 0.5)) put(a, new T.BoxGeometry(1, 0.55, 0.32), hash(x) > 0.5 ? '#8e8a82' : '#9c978e', x + 0.5, 0.27, -2.6);
     }
     const grp = group(toMesh(a, chunkMat));
     if (g.p.length) grp.add(toMesh(g, lavaMat));
@@ -5064,7 +5070,11 @@ const G3 = (() => {
       // a real pond: every one has its own size and shape, and its own life that suits the place
       const th = ZONES[S.zone].th, sd = hash(e.x * 0.013 + 7.7) * 1000, rnd = k => hash(sd + k * 13.37);
       const rift = th.decor === 'spike' && !th.lava, swamp = th.decor === 'dead', cave = th.cave && !rift, crystal = th.decor === 'crystal';
-      const rx = 1.8 + rnd(1) * 2.0, rz = 1.0 + rnd(2) * 0.6, cx = -2.15 + rx, cz = 1.15 + rz * 0.15;
+      // the pond lies just behind the road; the hero casts from the road, next to a jetty
+      const rx = 3.2 + rnd(1) * 2.6, rz = 2.2 + rnd(2) * 1.6, cx = -3.4 + rx * 0.8, cz = -1.75 - rz;
+      const bx = P.bx = -1.6, bz = P.bz = cz + rz * 0.5;
+      clearZ.push([e.x / U3 + cx - rx * 1.5, e.x / U3 + cx + rx * 1.5, cz - rz * 1.6]); if (clearZ.length > 4) clearZ.shift();
+      for (const [ci, c] of chunks) if ((ci + 1) * CH > e.x / U3 + cx - rx * 1.5 && ci * CH < e.x / U3 + cx + rx * 1.5) { scene.remove(c); dispose(c); chunks.delete(ci); }
       const water = swamp ? ['#3c5a3e', '#56784e'] : rift ? ['#2a1040', '#4a2a6a'] : cave ? ['#16304e', '#24507a'] : th.snow ? ['#3a78a8', '#7fb6d8'] : crystal ? ['#1f6a7a', '#4ab0c0'] : ['#1f5f9a', '#3f8fcf'];
       const bank = th.snow ? '#e8eef4' : rift ? '#2a2030' : cave ? '#4a4252' : swamp ? '#4a4030' : '#b49a68';
       const shapeSeed = rnd(3) * 6;
@@ -5079,10 +5089,10 @@ const G3 = (() => {
       g.add(w);
       // a point on the bank (b = 1.05) or out on the water (b < 0.8) at angle t
       const spot = (t, b) => [cx + Math.cos(t) * rx * b, cz + Math.sin(t) * rz * b];
-      const wet = (t, b) => { const [x, z] = spot(t, b); return x > -1.4 || z > 1.6; };   // keep the jetty corner clear
+      const wet = (t, b) => { const [x, z] = spot(t, b); return (x > -2.2 || z < cz - rz * 0.4) && z < -1.75; };   // keep the jetty and the road clear
       // jetty the hero fishes from
-      for (let k = 0; k < 7; k++) g.add(box(0.3, 0.06, 1.1, k & 1 ? '#8a6238' : '#7a5530', -3.85 + k * 0.32, 0.05, 0.45));
-      for (const [px, pz] of [[-2.0, 0.0], [-2.0, 0.95], [-2.95, 0.95]]) g.add(box(0.09, 0.36, 0.09, '#5a3e22', px, 0.1, pz));
+      for (let k = 0; k < 7; k++) g.add(box(0.75, 0.06, 0.3, k & 1 ? '#8a6238' : '#7a5530', -2.9, 0.07, -1.45 - k * 0.32));
+      for (const [px, pz] of [[-3.3, -2.3], [-2.5, -2.3], [-3.3, -3.35], [-2.5, -3.35]]) g.add(box(0.09, 0.4, 0.09, '#5a3e22', px, 0.12, pz));
       // stones on the bank
       for (let k = 0; k < 3 + Math.floor(rnd(4) * 4); k++) { const t = rnd(10 + k) * Math.PI * 2; if (!wet(t, 1.08)) continue; const [x, z] = spot(t, 1.08); g.add(mk(new T.DodecahedronGeometry(0.14 + rnd(20 + k) * 0.14, 0), rift ? '#3a2a48' : '#8a8a90', x, 0.06, z)); }
       P.life = [];
@@ -5098,7 +5108,7 @@ const G3 = (() => {
       }
       const pads = th.snow || cave || rift ? 0 : 2 + Math.floor(rnd(6) * (swamp ? 10 : 7));
       for (let k = 0; k < pads; k++) {
-        const t = rnd(200 + k) * Math.PI * 2, [x, z] = spot(t, 0.25 + rnd(220 + k) * 0.5); if (Math.hypot(x + 0.3, z - 1) < 0.35) continue;
+        const t = rnd(200 + k) * Math.PI * 2, [x, z] = spot(t, 0.25 + rnd(220 + k) * 0.5); if (Math.hypot(x - bx, z - bz) < 0.35) continue;
         const lp = mk(new T.CylinderGeometry(0.15 + rnd(240 + k) * 0.1, 0.15, 0.02, 7), swamp ? '#5a7a32' : '#4f8f3a', x, 0.05, z); g.add(lp);
         if (rnd(260 + k) < 0.35) g.add(box(0.08, 0.06, 0.08, ['#f4a0c8', '#ffffff', '#ffe070'][k % 3], x, 0.09, z));
         const ph = rnd(280 + k) * 6; life(tm => { lp.position.y = 0.05 + Math.sin(tm * 1.5 + ph) * 0.008; });
@@ -5110,7 +5120,7 @@ const G3 = (() => {
         else g.add(mk(new T.CylinderGeometry(0.03, 0.03, 0.18, 4), '#d8d0c0', x, 0.09, z), mk(new T.SphereGeometry(0.11, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2), unlit(c), x, 0.18, z));
         g.add(at(glow(c, 0.7, 0.5), x, 0.25, z));
       }
-      if (th.snow) for (let k = 0; k < 2 + Math.floor(rnd(7) * 4); k++) { const t = rnd(330 + k) * Math.PI * 2, [x, z] = spot(t, 0.3 + rnd(340 + k) * 0.45); if (Math.hypot(x + 0.3, z - 1) < 0.4) continue; g.add(mk(new T.CylinderGeometry(0.22 + rnd(350 + k) * 0.25, 0.28, 0.05, 6), '#e8f4ff', x, 0.05, z)); }
+      if (th.snow) for (let k = 0; k < 2 + Math.floor(rnd(7) * 4); k++) { const t = rnd(330 + k) * Math.PI * 2, [x, z] = spot(t, 0.3 + rnd(340 + k) * 0.45); if (Math.hypot(x - bx, z - bz) < 0.4) continue; g.add(mk(new T.CylinderGeometry(0.22 + rnd(350 + k) * 0.25, 0.28, 0.05, 6), '#e8f4ff', x, 0.05, z)); }
       // animals: a few of the ones that live in this kind of water
       const pool = swamp ? ['frog', 'frog', 'gator', 'wisp', 'fly', 'log'] : rift ? ['tentacle', 'wisp', 'eel'] : cave ? ['glowfish', 'bat', 'glowfish'] : crystal ? ['jelly', 'jelly', 'glowfish']
         : th.snow ? ['seal', 'penguin', 'fishjump'] : ['duck', 'duck', 'frog', 'fly', 'fishjump', 'turtle', 'heron', 'butterfly'];
@@ -5162,7 +5172,7 @@ const G3 = (() => {
           A.add(box(0.14, 0.1, 0.08, '#3a2a3a', 0, 0, 0), wl, wr);
           life(tm => { const a = t0 + tm * 0.6; A.position.set(cx + Math.cos(a) * rx * 0.7, 1.4 + Math.sin(tm * 3 + ph) * 0.2, cz + Math.sin(a) * rz * 0.5); A.rotation.y = -a; wl.rotation.x = Math.sin(tm * 18) * 0.9; wr.rotation.x = -wl.rotation.x; });
         } else if (kind === 'seal') {
-          const [x, z] = spot(t0, 0.5); if (Math.hypot(x + 0.3, z - 1) < 0.5) continue;
+          const [x, z] = spot(t0, 0.5); if (Math.hypot(x - bx, z - bz) < 0.5) continue;
           A.add(mk(new T.CylinderGeometry(0.45, 0.5, 0.05, 6), '#e8f4ff', 0, 0.03, 0), box(0.5, 0.18, 0.22, '#7a8088', 0, 0.14, 0), box(0.16, 0.14, 0.16, '#8a9098', 0.28, 0.22, 0), box(0.04, 0.03, 0.03, '#111111', 0.37, 0.24, 0));
           A.position.set(x, 0.02, z);
           life(tm => { A.children[2].rotation.z = Math.max(0, Math.sin(tm * 0.8 + ph)) * 0.5; });
@@ -5176,9 +5186,9 @@ const G3 = (() => {
           life(tm => { const [x, z] = spot(t0 + Math.sin(tm * 0.1 + ph) * 0.4, 0.5); A.position.set(x, 0.02, z); A.rotation.y = tm * 0.05 + ph; });
         }
       }
-      P.rip = []; for (let k = 0; k < 2; k++) { const r = mk(new T.RingGeometry(0.9, 1, 20), unlit('#ffffff', { opacity: 0.5, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.set(-0.3, 0.08, 1.0); P.rip.push(r); g.add(r); }
-      P.fish = box(0.4, 0.14, 0.1, TIER_COLORS[e.tier], 0, 0, 1.0); g.add(P.fish);
-      P.bob = mk(new T.IcosahedronGeometry(0.06, 0), '#e84a4a', 0, 0.06, 1.0); g.add(P.bob);
+      P.rip = []; for (let k = 0; k < 2; k++) { const r = mk(new T.RingGeometry(0.9, 1, 20), unlit('#ffffff', { opacity: 0.5, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.set(bx, 0.08, bz); P.rip.push(r); g.add(r); }
+      P.fish = box(0.4, 0.14, 0.1, TIER_COLORS[e.tier], 0, 0, bz); g.add(P.fish);
+      P.bob = mk(new T.IcosahedronGeometry(0.06, 0), '#e84a4a', bx, 0.06, bz); g.add(P.bob);
       P.line = new T.Line(new T.BufferGeometry().setFromPoints(Array.from({ length: 9 }, () => new T.Vector3())), new T.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.7 }));
       P.line.frustumCulled = false; scene.add(P.line); g.userData.line = P.line;
     }
@@ -5421,15 +5431,15 @@ const G3 = (() => {
       if (P.life) for (const f of P.life) f(time);
       P.rip.forEach((r, k) => { const p = (time * 0.6 + k * 0.5) % 1; r.scale.set(0.15 + p * 0.9, 0.06 + p * 0.25, 1); r.material.opacity = 0.5 * (1 - p) * dying; });
       P.fish.visible = e.hit > 0.2;
-      if (P.fish.visible) { const p = 1 - e.hit; P.fish.position.set(-0.3 - p * 1.25, 0.1 + Math.sin(p * Math.PI) * 1.25, 1.0); P.fish.rotation.z = 1 - p * 2; }
+      if (P.fish.visible) { const p = 1 - e.hit; P.fish.position.set(P.bx + (-3.1 - P.bx) * p, 0.1 + Math.sin(p * Math.PI) * 1.25, P.bz * (1 - p)); P.fish.rotation.z = 1 - p * 2; }
       const show = S.activity === 'fishing' && R.phase === 'act' && R.ent === e;
       P.bob.visible = P.line.visible = show;
-      P.bob.position.set(-0.3 + Math.sin(time * 2) * 0.08, 0.06 + Math.sin(time * 4) * 0.03, 1.0);
+      P.bob.position.set(P.bx + Math.sin(time * 2) * 0.08, 0.06 + Math.sin(time * 4) * 0.03, P.bz);
       if (show && heroObj) {
         heroObj.updateMatrixWorld(true);
         const tool = heroObj.userData.p.userData.P.armF.children[2], tip = new T.Vector3();
         if (tool && tool.userData.tip) tool.userData.tip.getWorldPosition(tip);
-        const end = new T.Vector3(x / U3 - 0.3 + Math.sin(time * 2) * 0.08, 0.08, 1.0), pos = P.line.geometry.attributes.position;
+        const end = new T.Vector3(x / U3 + P.bx + Math.sin(time * 2) * 0.08, 0.08, P.bz), pos = P.line.geometry.attributes.position;
         for (let i = 0; i < 9; i++) { const t = i / 8; pos.setXYZ(i, tip.x + (end.x - tip.x) * t, tip.y + (end.y - tip.y) * t - Math.sin(t * Math.PI) * 0.35, tip.z + (end.z - tip.z) * t); }
         pos.needsUpdate = true;
       }
@@ -5632,11 +5642,55 @@ function paintMap(w, h, dpr) {
   }
   return c;
 }
+// the map is bigger than its window: drag it with a finger or the mouse, pinch or scroll to zoom
+const MAPV = { z: 1, x: null, y: null, ptr: new Map(), moved: 0, pinch: 0 };
+function mapBase(vw) { return vw < 700 ? 1.9 : 1.3; }
+function applyMapView() {
+  const vp = document.getElementById('worldmap'), inn = document.getElementById('mapin');
+  if (!vp || !inn) return;
+  const vw = vp.clientWidth, vh = vp.clientHeight, B = mapBase(vw), iw = Math.round(vw * B), ih = Math.round(vh * B);
+  inn.style.width = iw + 'px'; inn.style.height = ih + 'px';
+  MAPV.z = clamp(MAPV.z, 1 / B, 2.2 / B * 1.2);
+  if (MAPV.x === null) { const z = ZONES[S.zone]; MAPV.x = vw / 2 - z.x * iw * MAPV.z; MAPV.y = vh / 2 - z.y * ih * MAPV.z; }
+  MAPV.x = clamp(MAPV.x, vw - iw * MAPV.z, 0); MAPV.y = clamp(MAPV.y, vh - ih * MAPV.z, 0);
+  inn.style.transform = `translate(${MAPV.x}px,${MAPV.y}px) scale(${MAPV.z})`;
+}
+function mapZoom(f, px, py) {
+  const vp = document.getElementById('worldmap'); if (!vp) return;
+  if (px === undefined) { px = vp.clientWidth / 2; py = vp.clientHeight / 2; }
+  const B = mapBase(vp.clientWidth), nz = clamp(MAPV.z * f, 1 / B, 2.2 / B * 1.2), k = nz / MAPV.z;
+  MAPV.x = px - (px - MAPV.x) * k; MAPV.y = py - (py - MAPV.y) * k; MAPV.z = nz;
+  applyMapView();
+}
+function mapInput() {
+  const pos = ev => { const r = document.getElementById('worldmap').getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  document.addEventListener('pointerdown', ev => {
+    if (!ev.target.closest('#worldmap') || ev.target.closest('.mapzoom')) return;
+    MAPV.ptr.set(ev.pointerId, pos(ev)); if (MAPV.ptr.size === 1) MAPV.moved = 0;
+    if (MAPV.ptr.size === 2) { const [a, b] = [...MAPV.ptr.values()]; MAPV.pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); }
+  });
+  window.addEventListener('pointermove', ev => {
+    if (!MAPV.ptr.has(ev.pointerId) || !document.getElementById('worldmap')) return;
+    const old = MAPV.ptr.get(ev.pointerId), now = pos(ev);
+    MAPV.ptr.set(ev.pointerId, now);
+    if (MAPV.ptr.size === 1) { MAPV.x += now[0] - old[0]; MAPV.y += now[1] - old[1]; MAPV.moved += Math.abs(now[0] - old[0]) + Math.abs(now[1] - old[1]); applyMapView(); }
+    else if (MAPV.ptr.size === 2) {
+      const [a, b] = [...MAPV.ptr.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (MAPV.pinch) mapZoom(d / MAPV.pinch, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+      MAPV.pinch = d; MAPV.moved = 99;
+    }
+  });
+  const up = ev => { MAPV.ptr.delete(ev.pointerId); MAPV.pinch = 0; };
+  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  // a drag must not count as a tap on a place
+  document.addEventListener('click', ev => { if (MAPV.moved > 8 && ev.target.closest('#worldmap .mapin')) { ev.stopPropagation(); ev.preventDefault(); } MAPV.moved = 0; }, true);
+  document.addEventListener('wheel', ev => { if (!ev.target.closest('#worldmap')) return; ev.preventDefault(); const [x, y] = pos(ev); mapZoom(ev.deltaY < 0 ? 1.15 : 1 / 1.15, x, y); }, { passive: false });
+}
 function drawMap() {
   const cv = document.getElementById('mapcv');
   if (!cv) return;
-  const box = cv.parentElement.getBoundingClientRect();
-  const w = Math.round(box.width), h = Math.round(box.height);
+  applyMapView();
+  const w = cv.parentElement.offsetWidth, h = cv.parentElement.offsetHeight;
   if (!w || !h) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   if (!mapCache || mapCache.w !== w || mapCache.h !== h) mapCache = { w, h, img: paintMap(w, h, dpr) };
@@ -5707,12 +5761,12 @@ function htmlActivity() {
   const acts = ACT_ORDER.filter(a => locHas(mapSel, a));
   const hunting = S.activity === 'combat' && S.ctarget === 'pvp';
   if (!acts.includes(mapAct) || actLock(mapAct)) mapAct = mapSel === S.zone && hunting ? 'pvp' : mapSel === S.zone && acts.includes(S.activity) && !actLock(S.activity) ? S.activity : (acts.find(a => !actLock(a)) || acts[0]);
-  let h = '<div class="map" id="worldmap"><canvas id="mapcv"></canvas>' + ZONES.map((z, i) => {
+  let h = '<div class="map" id="worldmap"><div class="mapin" id="mapin"><canvas id="mapcv"></canvas>' + ZONES.map((z, i) => {
     const locked = !locOpen(i);
     const cls = ['loc', i === mapSel ? 'sel' : '', locked ? 'locked' : ''].join(' ');
     return `<button class="${cls}" style="left:${z.x * 100}%;top:${z.y * 100}%" data-a="loc" data-id="${i}" aria-label="${z.name}">
       <span class="pin">${locked ? '🔒' : z.icon}${i === S.zone ? '<i class="me">🧍</i>' : ''}</span><span class="nm">${z.name}</span></button>`;
-  }).join('') + '</div>';
+  }).join('') + '</div><div class="mapzoom"><button data-a="mapz" data-id="1" aria-label="Zoom in">＋</button><button data-a="mapz" data-id="-1" aria-label="Zoom out">－</button><button data-a="mapz" data-id="0" aria-label="Find my hero">🧍</button></div></div>';
   const z = ZONES[mapSel];
   const kind = z.home ? 'Your home' : z.wboss ? '👹 World boss · combat 40+ · online' : z.town ? 'Town' : z.wild ? `☠️ Wilderness · combat ${z.req}+` : z.slayer ? `💀 Slayer area · Slayer ${z.slayer}` : `Region ${mapSel + 1} · combat ${z.req}+`;
   h += `<div class="info locpanel"><div class="row" style="justify-content:space-between"><b class="locname">${z.icon} ${z.name}</b><span class="tag">${kind}</span></div>
@@ -6320,6 +6374,7 @@ document.addEventListener('click', ev => {
     case 'gecollect': geCall('ge_collect_all', {}, d => log(`📦 Collected from the Grand Exchange: ${Object.entries(d.got || {}).map(([k, n]) => `${geItemName(k)} ×${fmt(n)}`).join(', ') || 'nothing'}.`, 'lg-gold')); break;
     case 'georefresh': GE.msg = ''; geLoad(); break;
     case 'logtab': logTab(id); break;
+    case 'mapz': if (+id) mapZoom(+id > 0 ? 1.35 : 1 / 1.35); else { MAPV.x = null; applyMapView(); } break;
     case 'recovery': makeRecovery(); break;
     case 'forgot': forgotModal(); break;
     case 'pwreset': doReset(); break;
@@ -6503,6 +6558,7 @@ function frame(now) {
 function init() {
   resizeCanvas();
   window.addEventListener('resize', () => { resizeCanvas(); drawMap(); });
+  mapInput();
   load();
   const away = (Date.now() - (S.last || Date.now())) / 1000;
   if (away > 60) catchUp(away);
