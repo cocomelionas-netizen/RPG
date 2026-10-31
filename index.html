@@ -389,6 +389,11 @@ const SKILLS = {
   runecrafting: { name: 'Runecrafting', icon: '🔮' },
   thieving:     { name: 'Thieving',     icon: '🥷' },
   firemaking:   { name: 'Firemaking',   icon: '🔥' },
+  agility:      { name: 'Agility',      icon: '🏃' },
+  farming:      { name: 'Farming',      icon: '🌱' },
+  herblore:     { name: 'Herblore',     icon: '🧪' },
+  construction: { name: 'Construction', icon: '🏠' },
+  summoning:    { name: 'Summoning',    icon: '🐺' },
 };
 
 // RuneScape/Melvor style XP curve
@@ -787,6 +792,12 @@ const LOC = [
   { icon: '☠️', x: .42, y: .16, desc: 'Deep in the Wilderness. Revenants guard ancient treasure – and other adventurers hunt anyone carrying it.' },
 ];
 LOC.forEach((l, i) => Object.assign(ZONES[i], l));
+// your own plot of land: rooms, patches and stations depend on what you have built
+ZONES.push({ name: 'My Home', home: true, tier: 0, enemies: [], icon: '🏡', x: .07, y: .47,
+  desc: 'Your own plot of land. Build rooms, grow crops, herbs and trees, brew potions and train on your own course.',
+  th: { sky: ['#8fd0ff', '#eaf7ff'], far: '#b8d8c8', mid: '#8ccf6b', near: '#5aa04a', ground: '#6aae4a', dirt: '#9a7a50', sun: '#fff3a0', decor: 'home' } });
+const HOME = ZONES.length - 1;
+Object.defineProperty(ZONES[HOME], 'stations', { get: () => homeStations() });
 [[0, ['man', 'farmer']], [1, ['golbin']], [2, ['miner']], [3, ['wizard']], [TOWN, ['man', 'merchant', 'guard', 'lord']]].forEach(([i, n]) => { ZONES[i].npcs = n; });
 const GATHERING = ['woodcutting', 'mining', 'fishing'];
 
@@ -837,6 +848,11 @@ const QUESTS = [
 const BOSS_PETS = { kingslime: ['slimey', 1 / 30], gobchief: ['chieflet', 1 / 40], bonelord: ['skully', 1 / 50], frosttroll: ['frosty', 1 / 50],
   dragon: ['drake', 1 / 40], bogmother: ['bogsy', 1 / 40], warden: ['shard', 1 / 50], overlord: ['voidling', 1 / 60] };
 const BOSSES = ZONES.map((z, i) => z.boss && { id: z.boss, zone: i, quest: QUESTS.find(q => q.rew.boss === z.boss).id }).filter(Boolean);
+QUESTS.push(
+  { id: 'q20', name: 'A Place to Call Home', req: 'q1', desc: 'Every adventurer needs somewhere to rest. Saw some planks and build a garden at your new home.', obj: [{ t: 'room', id: 'garden', n: 1 }], rew: { gold: 300, items: { seed_potato: 10, seed_guam: 5, plank0: 10 } } },
+  { id: 'q21', name: 'Green Fingers', req: 'q20', desc: 'Plant seeds and bring in a harvest.', obj: [{ t: 'plant', n: 15 }, { t: 'harvest', n: 40 }], rew: { xp: { farming: 800 }, items: { seed_tarromin: 5, seed_tomato: 5 } } },
+  { id: 'q22', name: 'Herbal Remedies', req: 'q21', desc: 'The Riverbend apothecary wants proof you can brew.', obj: [{ t: 'brew', n: 20 }], rew: { gold: 1500, xp: { herblore: 1500 }, items: { pot_att: 5, pot_str: 5 } } },
+);
 const QUEST_V = 2;   // entry quests replaced the old 'defeat the boss' quests
 
 /* ================= STATE ================= */
@@ -845,7 +861,8 @@ const SAVE_KEY = 'begalinis-kelias-v1';
 const BOSS_ACH = ['Slime Royalty', 'Chief Toppler', 'Bone Breaker', 'Frostbite', 'Dragonslayer', 'Bog Drainer', 'Crystal Shatterer', 'Abyss Walker'];
 const SKILL_ACH = { attack: 'Duelist', strength: 'Brute', defence: 'Bulwark', hitpoints: 'Iron Body', ranged: 'Marksman',
   magic: 'Archmage', prayer: 'Devout', slayer: 'Hunter', woodcutting: 'Lumberjack', mining: 'Prospector', fishing: 'Angler',
-  smithing: 'Blacksmith', cooking: 'Chef', fletching: 'Fletcher', runecrafting: 'Runesmith', thieving: 'Pickpocket', firemaking: 'Pyromancer' };
+  smithing: 'Blacksmith', cooking: 'Chef', fletching: 'Fletcher', runecrafting: 'Runesmith', thieving: 'Pickpocket', firemaking: 'Pyromancer',
+  agility: 'Acrobat', farming: 'Green Thumb', herblore: 'Alchemist', construction: 'Architect', summoning: 'Beastmaster' };
 // bonus: [type, percent] – xp: all XP, gold: gold from enemies and chests, gather: gathering speed
 const ACH = [
   { id: 'pk1', name: 'Wilderness Warrior', desc: 'Defeat a player killer', bonus: ['gold', 2], test: () => S.wild.pks >= 1 },
@@ -904,11 +921,11 @@ function newState() {
     inv: { bread: 5 }, equip: { weapon: null, shield: null, helm: null, body: null, legs: null, amulet: null, cape: null, hands: null, feet: null, ring: null }, tools: { axe: 0, pick: 0, rod: 0 },
     activity: 'combat', zone: 0, hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
     styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: 'auto', prayer: null, pp: 0, autoBury: true,
-    zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0 }, cookSel: -1, tipEvent: false,
-    ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, g: {} }, renown: 0, journeys: 0,
+    zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0, herblore: 0, construction: 0, summoning: 0 }, cookSel: -1, tipEvent: false,
+    ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, brewed: 0, planks: 0, built: 0, planted: 0, harvested: 0, tended: 0, laps: 0, pouches: 0, clues: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
-    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, unlocked: {}, geSeq: 0, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
+    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, unlocked: {}, home: { rooms: {}, p: {}, ft: 0, sel: {} }, buffs: {}, autoPot: {}, geSeq: 0, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -969,6 +986,9 @@ function applySave(data) {
     // heroes from before soft locks keep everything they could already use
     S.unlocked = data.unlocked ? Object.assign({}, data.unlocked) : Object.fromEntries(UNLOCKS.map(u => [u.id, true]));
     S.wild = Object.assign(def.wild, data.wild);
+    S.home = Object.assign(def.home, data.home);
+    for (const k of ['rooms', 'p', 'sel']) S.home[k] = Object.assign({}, S.home[k]);
+    S.buffs = Object.assign({}, data.buffs); S.autoPot = Object.assign({}, data.autoPot);
     // one kind of rune became eight: old runes turn into air and mind runes plus some catalysts
     if (S.inv.rune) { const n = S.inv.rune; delete S.inv.rune; give('r_air', n); give('r_mind', n); give('r_chaos', Math.floor(n / 3)); give('r_death', Math.floor(n / 6)); }
     if (typeof S.spell !== 'string') S.spell = 'auto';
@@ -1003,7 +1023,7 @@ function take(id, n = 1) {
 function has(id) { return S.inv[id] || 0; }
 
 function addXp(skill, amt) {
-  amt *= (MASTERY_SKILLS.includes(skill) ? mXpMult(skill) : 1) * xpMult() * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1);
+  amt *= (MASTERY_SKILLS.includes(skill) ? mXpMult(skill) : 1) * xpMult() * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1) * roomXp(skill) * (1 + potB('wis'));
   const before = LV[skill];
   S.skills[skill] += amt;
   LV[skill] = levelFromXp(S.skills[skill]);
@@ -1021,12 +1041,13 @@ function addXp(skill, amt) {
 // story zones open once the previous boss is beaten and combat level is high enough; Slayer areas need Slayer level
 function zoneOpen(i) {
   const z = ZONES[i];
+  if (z.home) return false;
   if (z.slayer) return LV.slayer >= z.slayer;
   if (z.wild) return combatLevel() >= z.req;
   return i === 0 || (S.bosses[i - 1] && combatLevel() >= z.req);
 }
 // Slayer areas need Slayer level for everything; other places can always be visited to gather and craft
-function locOpen(i) { const z = ZONES[i]; return !z.slayer || LV.slayer >= z.slayer; }
+function locOpen(i) { const z = ZONES[i]; return z.home ? isOpen('home') : !z.slayer || LV.slayer >= z.slayer; }
 function locTiers(skill, z = S.zone) { return (ZONES[z].res && ZONES[z].res[skill]) || []; }
 function locHas(i, act) {
   const z = ZONES[i];
@@ -1034,6 +1055,7 @@ function locHas(i, act) {
   if (act === 'thieving') return !!(z.npcs && z.npcs.length);
   if (act === 'firemaking') return !z.wild;
   if (act === 'pvp') return !!z.wild;
+  if (act === 'farming') return !!z.home;
   if (CRAFTING.has(act)) return (z.stations || []).includes(act);
   return locTiers(act, i).length > 0 || (act === 'mining' && !!z.ess);
 }
@@ -1093,7 +1115,7 @@ function playerMaxHit() {
   const base = m === 'ranged' ? 4 + (LV.ranged + (S.styles.ranged === 'accurate' ? 8 : 0)) * 0.7 + p * 0.8 + (noAmmo() ? 12 : ITEMS[bestArrow()].power)
     : m === 'magic' ? curSpell().max + LV.magic * 0.35 + p
     : 4 + (LV.strength + (S.styles.melee === 'strength' ? 8 : 0)) * 0.7 + p;
-  return Math.floor(base * (1 + amu('dmg') + pray('dmg') + petB('dmg')));
+  return Math.floor(base * (1 + amu('dmg') + pray('dmg') + petB('dmg') + potB('dmg') + trophyPct()));
 }
 function accuracyLevel() {
   const m = attackMode();
@@ -1111,9 +1133,9 @@ function triangle(e) { const p = combatType(), t = etype(e); return BEATS[p] ===
 function onTask(e) { return !!(S.task && e.id === S.task.id); }
 // ranged styles: Accurate aims better and hits harder, Rapid trades some accuracy for speed
 function rangedStyleAcc() { return attackMode() === 'ranged' && S.styles.ranged === 'accurate' ? 0.08 : 0; }
-function playerHitChance(e) { return clamp(0.6 + (accuracyLevel() - e.def) * 0.03 + amu('acc') + pray('acc') + petB('acc') + rangedStyleAcc(), 0.1, 0.97) * (attackMode() === 'ranged' && S.styles.ranged === 'rapid' ? 0.92 : 1); }
+function playerHitChance(e) { return clamp(0.6 + (accuracyLevel() - e.def) * 0.03 + amu('acc') + pray('acc') + petB('acc') + potB('acc') + rangedStyleAcc(), 0.1, 0.97) * (attackMode() === 'ranged' && S.styles.ranged === 'rapid' ? 0.92 : 1); }
 function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue()) * 0.02, 0.15, 0.95); }
-function damageReduction() { return Math.min(0.6, armorValue() * 0.012 + LV.defence * 0.002 + amu('dr') + pray('dr') + petB('dr')); }
+function damageReduction() { return Math.min(0.6, armorValue() * 0.012 + LV.defence * 0.002 + amu('dr') + potB('dr') + pray('dr') + petB('dr')); }
 
 function tierReq(skill, t) { return skill === 'mining' ? ORES[t].lvl : GATHER_REQ[t]; }
 function tierXp(skill, t) { return skill === 'mining' ? ORES[t].xp : GATHER_XP[t]; }
@@ -1136,14 +1158,14 @@ function chosenTier(skill) {
 function gatherKey(skill, tier) { return skill === 'mining' ? ORES[tier].id : 't' + tier; }
 function gatherTime(skill, tier) {
   const base = skill === 'mining' ? ORES[tier].time : GATHER_TIME[tier];
-  return base * (1 - 0.12 * S.tools[TOOL_OF[skill]]) / (1 + BON.gather / 100) * mSpeed(skill, gatherKey(skill, tier));
+  return base * (1 - 0.12 * S.tools[TOOL_OF[skill]]) / (1 + BON.gather / 100 + potB('gather')) * mSpeed(skill, gatherKey(skill, tier));
 }
-function nodeTime(e) { return e.ess ? ESSENCE_TIME * (1 - 0.12 * S.tools.pick) / (1 + BON.gather / 100) * mSpeed('mining', 'ess') : gatherTime(e.skill, e.tier); }
+function nodeTime(e) { return e.ess ? ESSENCE_TIME * (1 - 0.12 * S.tools.pick) / (1 + BON.gather / 100 + potB('gather')) * mSpeed('mining', 'ess') : gatherTime(e.skill, e.tier); }
 function craftRecipe(skill) { return CRAFT[skill].recipes[S.csel[skill]]; }
 function stationKey(skill) { return skill === 'firemaking' ? 'log' + fmTarget() : skill === 'cooking' ? 'fish' + cookTarget() : craftRecipe(skill).out; }
 function stationTime(e) {
   const base = e.skill === 'firemaking' ? BURN_TIME : e.skill === 'cooking' ? COOK_TIME : craftRecipe(e.skill).time || CRAFT[e.skill].time;
-  return base * mSpeed(e.skill, stationKey(e.skill));
+  return base * mSpeed(e.skill, stationKey(e.skill)) * (1 - potB('craft')) * (['smithing', 'fletching'].includes(e.skill) ? [1, 1, 0.95, 0.9][room('workshop')] : 1);
 }
 
 /* ===== Achievements, Renown and permanent bonuses ===== */
@@ -1153,7 +1175,7 @@ function recalcBonuses() {
   for (const a of ACH) if (S.ach[a.id]) BON[a.bonus[0]] += a.bonus[1];
 }
 function xpMult() { return 1 + BON.xp / 100 + 0.15 * S.rup.wisdom; }
-function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune + petB('gold') / 100; }
+function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune + petB('gold') / 100 + [0, 0.03, 0.06, 0.1][room('treasury')]; }
 function petFor(skill) { return PETS.some(p => p.skill === skill && S.pets[p.id]); }
 function rollPet(id, chance) {
   if (S.pets[id] || Math.random() >= chance) return;
@@ -1165,7 +1187,7 @@ function rollPet(id, chance) {
   uiDirty = true;
 }
 function rollSkillPet(skill) { const p = PETS.find(x => x.skill === skill); if (p) rollPet(p.id, PET_CHANCE); }
-function walkSpeed() { return WALK * (1 + 0.05 * S.rup.boots); }
+function walkSpeed() { return WALK * (1 + 0.05 * S.rup.boots + [0, 0.05, 0.1, 0.15][room('portal')] + potB('walk')); }
 function offlineCap() { return (12 + 2 * S.rup.patience) * 3600; }
 function totalLevel() { return Object.values(LV).reduce((a, l) => a + l, 0); }
 function achDesc(a) { return typeof a.desc === 'function' ? a.desc() : a.desc; }
@@ -1179,6 +1201,8 @@ const UNLOCKS = [
   { id: 'thieving', icon: '🥷', name: 'Thieving', act: 'thieving', need: 'Finish the quest "First Steps"', test: () => qDone('q1') },
   { id: 'slayer', icon: '💀', name: 'Slayer', tab: 'slayer', need: 'Combat level 10', test: () => combatLevel() >= 10 },
   { id: 'runecrafting', icon: '🔮', name: 'Runecrafting & magic', sub: ['craft', 'runecrafting'], act: 'runecrafting', need: 'Finish the quest "Forged in Bronze"', test: () => qDone('q2') },
+  { id: 'home', icon: '🏡', name: 'My Home: Construction & Farming', acts: ['farming', 'construction'], sub: ['craft', 'construction'], need: 'Total level 35', test: () => totalLevel() >= 35 },
+  { id: 'herblore', icon: '🧪', name: 'Herblore & potions', act: 'herblore', sub: ['craft', 'herblore'], need: 'Farming level 3', test: () => LV.farming >= 3 },
   { id: 'mastery', icon: '🎓', name: 'Mastery', need: 'Any gathering or crafting skill at level 15', test: () => MASTERY_SKILLS.some(k => LV[k] >= 15) },
   { id: 'progress', icon: '🏆', name: 'Achievements, Journeys & Hiscores', tab: 'progress', need: 'Total level 50', test: () => totalLevel() >= 50 },
   { id: 'ge', icon: '📈', name: 'Grand Exchange', sub: ['inventory', 'ge'], need: 'Total level 100', test: () => totalLevel() >= 100 },
@@ -1190,7 +1214,7 @@ function lockFor(tab, sub) {
   const u = UNLOCKS.find(u => (u.tab && u.tab === tab) || (u.sub && u.sub[0] === tab && u.sub[1] === sub));
   return u && !S.unlocked[u.id] ? u : null;
 }
-const actLock = a => { const u = UNLOCKS.find(u => u.act === a); return u && !S.unlocked[u.id] ? u : null; };
+const actLock = a => { const u = UNLOCKS.find(u => u.act === a || (u.acts && u.acts.includes(a))); return u && !S.unlocked[u.id] ? u : null; };
 function lockedMsg(u) { showBanner(`🔒 ${u.name}: ${u.need}`); }
 const freshTabs = new Set();
 function checkUnlocks() {
@@ -1231,7 +1255,7 @@ function newJourney() {
   if (!S.bosses[4]) return;
   const gain = renownGain();
   // keep achievements, lifetime stats and Renown; everything else starts over
-  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet, unlocked: S.unlocked,
+  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet, unlocked: S.unlocked, home: S.home, autoPot: S.autoPot,
     renown: S.renown + gain, journeys: S.journeys + 1, tipEvent: true };
   S = Object.assign(newState(), keep);
   const hs = S.rup.headstart;
@@ -1269,8 +1293,11 @@ function spawnEntity() {
     const list = (ZONES[S.zone].npcs || []).filter(id => LV.thieving >= NPCS[id].lvl);
     const id = S.tsel && list.includes(S.tsel) ? S.tsel : list[Math.floor(Math.random() * list.length)] || 'man';
     R.ent = { kind: 'npc', skill: 'thieving', id, d: NPCS[id], tries: randi(4, 7), t: 0, stun: 0, x, stop: 48, hit: 0 };
+  } else if (act === 'farming') {
+    const pk = farmTarget();
+    R.ent = { kind: 'patch', skill: 'farming', pk, acts: 3, t: 0, x, stop: 70, hit: 0, swung: false, blocked: false };
   } else if (CRAFTING.has(act)) {
-    const kind = act === 'smithing' ? craftRecipe('smithing').station : { cooking: 'fire', fletching: 'bench', runecrafting: 'altar', firemaking: 'pyre' }[act];
+    const kind = act === 'smithing' ? craftRecipe('smithing').station : { cooking: 'fire', fletching: 'bench', runecrafting: 'altar', firemaking: 'pyre', herblore: 'cauldron', construction: 'sawbench', summoning: 'obelisk' }[act];
     R.ent = { kind, skill: act, crafts: STATION_CRAFTS, t: 0, x, stop: 62, hit: 0, swung: false, blocked: false };
   } else {
     const ess = act === 'mining' && S.gsel.mining === -2 && !!ZONES[S.zone].ess;
@@ -1330,6 +1357,7 @@ function startAct() {
 
 function tick(dt) {
   time += dt;
+  homeTick(dt);
   if (inWild() && !S.wild.in) { S.wild.in = true; log('☠️ You enter the Revenant Caves. Loot stays in your looting bag until you leave – die here and you lose it, and most of your gear.', 'lg-bad'); }
   else if (!inWild() && S.wild.in) bankWild('You left the caves');
   if (R.phase === 'walk') {
@@ -1349,7 +1377,7 @@ function tick(dt) {
   } else if (R.phase === 'act' && !R.ent) R.phase = 'walk';
   else if (R.phase === 'act') {
     const k = R.ent.kind;
-    if (k === 'enemy') { if (R.ent.replay) replayTick(dt); else combatTick(dt); } else if (k === 'npc') thieveTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
+    if (k === 'enemy') { if (R.ent.replay) replayTick(dt); else combatTick(dt); } else if (k === 'npc') thieveTick(dt); else if (k === 'patch') farmTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
   } else if (R.phase === 'dead') {
     R.deadT -= dt;
     if (R.deadT <= 0) {
@@ -1452,6 +1480,7 @@ function enemyHit(e) {
   const tri = triangle(e);
   const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
   let mult = (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === etype(e) ? 0.5 : 1);
+  if (etype(e) === 'magic') mult *= 1 - potB('ward');
   if (inWild() && e.d.ghost && S.equip.hands === 'bracelet' && has('ether')) { take('ether'); mult *= 0.5; }
   const dmg = Math.max(1, Math.round(raw * mult));
   S.hp -= dmg;
@@ -1597,7 +1626,8 @@ function setActivity(a) {
 function fitZone() {
   const a = S.activity;
   if (a === 'combat') { if (!locHas(S.zone, 'combat') || !zoneOpen(S.zone)) S.zone = bestZone(); }
-  else if (CRAFTING.has(a)) { if (!locHas(S.zone, a) || !locOpen(S.zone)) S.zone = TOWN; }
+  else if (a === 'farming') S.zone = HOME;
+  else if (CRAFTING.has(a)) { if (!locHas(S.zone, a) || !locOpen(S.zone)) S.zone = locHas(TOWN, a) ? TOWN : HOME; }
   else if (!locOpen(S.zone) || !locHas(S.zone, a)) S.zone = bestLocFor(a);
 }
 // used by the world map: go to a place and start an activity there
@@ -1693,7 +1723,7 @@ function craftOnce(skill, i) {
   if (ITEMS[r.out].slot && isUpgrade(r.out)) { equip(r.out); showBanner(`⬆️ Equipped ${ITEMS[r.out].name}`); }
   return [r.out, n];
 }
-function burnChance(t) { return Math.max(0, 0.35 - (LV.cooking - GATHER_REQ[t]) * 0.02) * (1 - mLv('cooking', 'fish' + t) / 99); }
+function burnChance(t) { return Math.max(0, 0.35 - (LV.cooking - GATHER_REQ[t]) * 0.02) * (1 - mLv('cooking', 'fish' + t) / 99) * (room('kitchen') >= 2 ? 0.75 : 1); }
 function cookTarget() {
   const ok = t => has('fish' + t) && LV.cooking >= GATHER_REQ[t];
   if (S.cookSel >= 0) return ok(S.cookSel) ? S.cookSel : -1;
@@ -1732,7 +1762,7 @@ function poolCap(skill) { return 150000 + 5000 * masteryItems(skill).length; }
 function poolPct(skill) { return S.mastery[skill] ? S.mastery[skill].pool / poolCap(skill) : 0; }
 function mXpMult(skill) { const p = poolPct(skill); return (p >= 0.1 ? 1.05 : 1) * (p >= 0.95 ? 1.05 : 1); }
 function mSpeed(skill, key) { return (1 - mLv(skill, key) * 0.001) * (poolPct(skill) >= 0.25 ? 0.95 : 1); }
-function mDouble(skill, key) { return mLv(skill, key) * 0.002 + (poolPct(skill) >= 0.5 ? 0.05 : 0); }
+function mDouble(skill, key) { return mLv(skill, key) * 0.002 + (poolPct(skill) >= 0.5 ? 0.05 : 0) + potB('dbl'); }
 function masteryName(skill, key) { const m = masteryItems(skill).find(x => x.key === key); return m ? m.name || ITEMS[m.item].name : key; }
 function addMastery(skill, key, time) {
   const m = mState(skill), before = mLv(skill, key);
@@ -1930,7 +1960,7 @@ function bury(id, n, quiet) {
   if (!quiet) take(id, n);
   // offering bones by hand at the Riverbend altar is worth 3.5x the XP
   const altar = !quiet && S.zone === TOWN;
-  addXp('prayer', ITEMS[id].bury * n * (altar ? 3.5 : 1));
+  addXp('prayer', ITEMS[id].bury * n * (altar ? 3.5 : 1) * [1, 1.25, 1.5, 2][room('chapel')]);
   S.pp = Math.min(9999, S.pp + ITEMS[id].pp * n);
   S.stats.buried += n;
   if (!quiet) log(`🙏 ${altar ? 'Offered' : 'Buried'} ${n}× ${ITEMS[id].name}${altar ? ' at the Riverbend altar (3.5× Prayer XP)' : ''}`, 'lg-good');
@@ -1994,10 +2024,14 @@ function objVal(o) {
     case 'boss': return S.bosses[o.z] ? 1 : 0;
     case 'level': return LV[o.skill];
     case 'bring': return has(o.id);
+    case 'room': return room(o.id);
+    case 'plant': return S.stats.planted;
+    case 'harvest': return S.stats.harvested;
+    case 'brew': return S.stats.brewed;
   }
   return 0;
 }
-const ABSOLUTE_OBJ = new Set(['boss', 'level', 'bring']);
+const ABSOLUTE_OBJ = new Set(['boss', 'level', 'bring', 'room']);
 function objNeed(o) { return o.t === 'boss' ? 1 : o.n; }
 function objProgress(q, k) {
   const o = q.obj[k], v = objVal(o);
@@ -2018,6 +2052,10 @@ function objText(o) {
     case 'boss': return `Defeat ${ENEMIES[ZONES[o.z].boss].name}`;
     case 'level': return `Reach ${SKILLS[o.skill].name} level`;
     case 'bring': return `Bring ${ITEMS[o.id].icon} ${ITEMS[o.id].name}`;
+    case 'room': return `Build a ${ROOM[o.id].icon} ${ROOM[o.id].name} at home`;
+    case 'plant': return 'Plant seeds';
+    case 'harvest': return 'Harvest crops';
+    case 'brew': return 'Brew potions';
   }
 }
 function bossOf(id) { return BOSSES.find(b => b.id === id); }
@@ -2055,6 +2093,244 @@ function rewardText(w) {
   for (const [sk, xp] of Object.entries(w.xp || {})) parts.push(`${fmt(xp)} ${SKILLS[sk].name} XP`);
   if (w.boss) parts.push(`👑 access to ${ENEMIES[w.boss].name}'s lair`);
   return parts.join(', ');
+}
+
+/* ===== My Home: Construction, Farming and Herblore ===== */
+// --- farming: herbs, allotment crops and trees grow on game time (also while you are away) ---
+const SEEDS = [], SEED_BY = {};
+function defSeed(o) {
+  SEEDS.push(o); SEED_BY[o.id] = o;
+  defItem(o.id, { name: o.sname, icon: o.kind === 'tree' ? '🌱' : '🫘', color: o.color, value: o.sv, type: 'Seeds', note: `Farming ${o.lvl} · ${{ herb: 'herb', allot: 'allotment', tree: 'tree' }[o.kind]} patch` });
+}
+[['guam', 'Guam', 3, '#7fbf4a'], ['marrentill', 'Marrentill', 8, '#5aa83a'], ['tarromin', 'Tarromin', 13, '#a8c84a'], ['harralander', 'Harralander', 21, '#8ab03a'],
+ ['ranarr', 'Ranarr', 32, '#3a9a6a'], ['irit', 'Irit', 44, '#9ac84a'], ['kwuarm', 'Kwuarm', 56, '#6a8a2a'], ['snapdragon', 'Snapdragon', 62, '#c8d84a'],
+ ['cadantine', 'Cadantine', 67, '#4a7a3a'], ['dwarfweed', 'Dwarf Weed', 79, '#7ab84a'], ['torstol', 'Torstol', 85, '#b8a83a']].forEach(([k, n, lvl, color], i) => {
+  defItem('herb_' + k, { name: n, icon: '🌿', color, tier: i, value: Math.round(6 + lvl * 1.4), type: 'Herbs', note: 'Herblore ingredient' });
+  defSeed({ id: 'seed_' + k, sname: n + ' Seed', kind: 'herb', lvl, time: 900 + i * 180, out: 'herb_' + k, n: [3, 6], px: Math.round(8 + lvl * 1.1), hx: Math.round(6 + lvl), color, sv: Math.round(4 + lvl * 0.9) });
+});
+[['potato', 'Potato', '🥔', 1, '#c8a060', 10], ['onion', 'Onion', '🧅', 5, '#e8c890', 14], ['cabbage', 'Cabbage', '🥬', 9, '#7ac85a', 18], ['tomato', 'Tomato', '🍅', 15, '#e04a3a', 25],
+ ['sweetcorn', 'Sweetcorn', '🌽', 25, '#f2d24a', 35], ['strawberry', 'Strawberry', '🍓', 35, '#e83a5a', 50], ['watermelon', 'Watermelon', '🍉', 50, '#3a9a4a', 75], ['snape', 'Snape Grass', '🌾', 61, '#9ad86a', 0]].forEach(([k, n, icon, lvl, color, heal], i) => {
+  defItem('crop_' + k, Object.assign({ name: n, icon, color, tier: i, value: Math.round(2 + lvl * 0.35) }, heal ? { heal, type: 'Food' } : { type: 'Herbs', note: 'Herblore ingredient' }));
+  defSeed({ id: 'seed_' + k, sname: n + ' Seed', kind: 'allot', lvl, time: 300 + i * 150, out: 'crop_' + k, n: [6, 12], px: Math.round(5 + lvl * 0.8), hx: Math.round(2 + lvl * 0.45), color, sv: Math.round(2 + lvl * 0.5) });
+});
+[['oak', 'Oak', 15, 2400, 'log1', 15, '#3f8f3a'], ['maple', 'Maple', 35, 4800, 'log2', 20, '#d0702f'], ['yew', 'Yew', 60, 9000, 'log3', 25, '#2f6b45'], ['magic', 'Magic', 80, 14400, 'log4', 30, '#b06be0']].forEach(([k, n, lvl, time, out, c, color], i) => {
+  defSeed({ id: 'sapling_' + k, sname: n + ' Sapling', kind: 'tree', lvl, time, out, n: [c, c + 10], px: Math.round(20 + lvl * 3), check: Math.round(150 + lvl * lvl * 0.7), color, sv: [60, 200, 600, 1500][i] });
+});
+for (const id of SEEDS.filter(s => s.kind === 'allot' && ITEMS[s.out].heal).map(s => s.out)) FOOD_ORDER.push(id);
+FOOD_ORDER.sort((a, b) => ITEMS[b].heal - ITEMS[a].heal);
+// seeds drop from monsters of every area, rarer ones in harder places
+{
+  const herbs = SEEDS.filter(s => s.kind === 'herb'), allots = SEEDS.filter(s => s.kind === 'allot'), trees = SEEDS.filter(s => s.kind === 'tree');
+  const done = new Set();
+  ZONES.forEach(z => (z.enemies || []).forEach(id => {
+    const d = ENEMIES[id], t = z.tier || 0;
+    if (done.has(id) || !d) return; done.add(id);
+    if (d.boss) { d.drops.push([trees[Math.min(3, t)].id, 0.15, 1, 1]); return; }
+    for (let k = t * 2; k <= Math.min(herbs.length - 1, t * 2 + 2); k++) d.drops.push([herbs[k].id, 0.02, 1, 2]);
+    for (let k = Math.floor(t * 1.5); k <= Math.min(allots.length - 1, Math.floor(t * 1.5) + 2); k++) d.drops.push([allots[k].id, 0.03, 1, 3]);
+    d.drops.push([trees[Math.min(3, t)].id, 0.003, 1, 1]);
+  }));
+}
+NPCS.farmer.drops.push(['seed_potato', .2, 1, 3], ['seed_onion', .12, 1, 2], ['seed_guam', .1, 1, 1], ['seed_marrentill', .06, 1, 1]);
+NPCS.mfarmer = { id: 'mfarmer', name: 'Master Farmer', lvl: 38, xp: 43, perception: 200, gold: [5, 15], maxHit: 8, skin: '#e8b88a', body: '#4a6a2a',
+  drops: [['seed_tarromin', .12, 1, 2], ['seed_harralander', .08, 1, 1], ['seed_ranarr', .04, 1, 1], ['seed_irit', .03, 1, 1], ['seed_kwuarm', .02, 1, 1],
+    ['seed_snapdragon', .012, 1, 1], ['seed_cadantine', .01, 1, 1], ['seed_dwarfweed', .006, 1, 1], ['seed_torstol', .004, 1, 1], ['seed_tomato', .15, 1, 3], ['seed_sweetcorn', .1, 1, 2], ['seed_strawberry', .06, 1, 2], ['seed_watermelon', .03, 1, 1], ['seed_snape', .02, 1, 1]] };
+ZONES[TOWN].npcs.push('mfarmer');
+SHOP.push({ id: 'seed_potato', n: 5, cost: 25 }, { id: 'seed_onion', n: 5, cost: 40 }, { id: 'seed_guam', n: 3, cost: 45 }, { id: 'seed_marrentill', n: 3, cost: 70 },
+  { id: 'sapling_oak', n: 1, cost: 250 }, { id: 'nails', n: 50, cost: 100 }, { id: 'plank0', n: 10, cost: 120 });
+
+// --- herblore: herb + secondary ingredient = potion; potions last 10 minutes of game time ---
+const POTIONS = [
+  { id: 'pot_att',    name: 'Attack Potion',      icon: '🧪', color: '#4a8aff', herb: 'guam',       sec: 'bones',           lvl: 3,  rxp: 25,  acc: 0.08, desc: '+8% hit chance' },
+  { id: 'pot_def',    name: 'Defence Potion',     icon: '🧪', color: '#4ad0a0', herb: 'marrentill', sec: 'crop_onion',      lvl: 8,  rxp: 35,  dr: 0.06, desc: '−6% damage taken' },
+  { id: 'pot_str',    name: 'Strength Potion',    icon: '🧪', color: '#e0a03a', herb: 'tarromin',   sec: 'crop_cabbage',    lvl: 12, rxp: 50,  dmg: 0.08, desc: '+8% max hit' },
+  { id: 'pot_gather', name: "Gatherer's Brew",    icon: '🧪', color: '#8ad04a', herb: 'harralander', sec: 'crop_tomato',    lvl: 22, rxp: 63,  gather: 0.15, desc: '+15% gathering and farming speed' },
+  { id: 'pot_pray',   name: 'Prayer Potion',      icon: '🧪', color: '#3ad0c0', herb: 'ranarr',     sec: 'bigbones',        lvl: 35, rxp: 88,  pp: 40, desc: 'restores 40+ prayer points' },
+  { id: 'pot_craft',  name: "Artisan's Draught",  icon: '🧪', color: '#c88a4a', herb: 'irit',       sec: 'crop_sweetcorn',  lvl: 42, rxp: 100, craft: 0.15, desc: '+15% crafting speed' },
+  { id: 'pot_agi',    name: 'Stamina Potion',     icon: '🧪', color: '#c8a070', herb: 'kwuarm',     sec: 'crop_strawberry', lvl: 52, rxp: 120, walk: 0.15, desc: '+15% walking and agility speed' },
+  { id: 'pot_wis',    name: 'Wisdom Potion',      icon: '🧪', color: '#b06bff', herb: 'snapdragon', sec: 'gem',             lvl: 60, rxp: 142, wis: 0.08, desc: '+8% XP in every skill' },
+  { id: 'pot_ward',   name: 'Antifire Potion',    icon: '🧪', color: '#ff7a3a', herb: 'cadantine',  sec: 'scale',           lvl: 66, rxp: 158, ward: 0.3, desc: '−30% magic and dragonfire damage taken' },
+  { id: 'pot_luck',   name: 'Lucky Potion',       icon: '🧪', color: '#3ae07a', herb: 'dwarfweed',  sec: 'crop_watermelon', lvl: 74, rxp: 172, dbl: 0.06, desc: '+6% chance to double resources and save materials' },
+  { id: 'pot_super',  name: 'Super Combat Potion', icon: '🧪', color: '#3a8a3a', herb: 'torstol',   sec: 'crop_snape',      lvl: 86, rxp: 210, acc: 0.1, dmg: 0.1, dr: 0.08, desc: '+10% hit chance, +10% max hit, −8% damage taken' },
+];
+const POT = {};
+const HERBLORE = POTIONS.map(p => {
+  POT[p.id] = p;
+  defItem(p.id, { name: p.name, icon: p.icon, color: p.color, tier: POTIONS.indexOf(p), value: Math.round((ITEMS['herb_' + p.herb].value + ITEMS[p.sec].value) * 1.3 + 5), type: 'Potions', note: p.desc, potion: true });
+  return { out: p.id, req: p.lvl, xp: p.rxp, mats: { ['herb_' + p.herb]: 1, [p.sec]: 1 } };
+});
+
+// --- construction: saw planks and make nails, then build rooms at home ---
+defItem('nails', { name: 'Nails', icon: '📌', color: '#9aa0a8', value: 1, type: 'Resources', note: 'for building' });
+const CONSTRUCT = [];
+WOOD.forEach((w, t) => {
+  defItem('plank' + t, { name: w + ' Plank', icon: '🟫', color: ['#d8b07a', '#b08850', '#c87a40', '#8a5a30', '#9a6ad0'][t], tier: t, value: Math.round(ITEMS['log' + t].value * 1.5 + 2), type: 'Resources', note: 'for building' });
+  CONSTRUCT.push({ out: 'plank' + t, req: GATHER_REQ[t], xp: [10, 22, 38, 60, 90][t], mats: { ['log' + t]: 1 } });
+});
+[[0, 10, 1, 8], [1, 15, 20, 15], [2, 25, 40, 25], [3, 40, 60, 35]].forEach(([m, n, req, xp]) => CONSTRUCT.push({ out: 'nails', n, req, xp, mats: { ['bar' + m]: 1 } }));
+Object.assign(CRAFT, {
+  herblore:     { recipes: HERBLORE,  time: 2.0, verb: 'Brew', stat: 'brewed', spark: '#7fe07f', place: 'herb labs' },
+  construction: { recipes: CONSTRUCT, time: 2.4, verb: 'Make', stat: 'planks', spark: '#d8b07a', place: 'sawbenches' },
+});
+CRAFTING.add('herblore'); CRAFTING.add('construction');
+ZONES[TOWN].stations.push('herblore');
+ZONES[TOWN].desc = 'A quiet river town with a forge, a campfire, a fletcher\'s bench, an apothecary and a rune altar.';
+
+const ROOMS = [
+  { id: 'garden',   name: 'Garden',            icon: '🌱', lv: [1, 25, 50],  d: ['2 herb and 2 allotment patches', '+1 herb, +1 allotment and a tree patch', '+1 herb, +1 allotment and a second tree patch'] },
+  { id: 'kitchen',  name: 'Kitchen',           icon: '🍳', lv: [5, 30, 55],  d: ['A range: cook at home', 'Burn 25% less food', '+10% Cooking XP'] },
+  { id: 'lab',      name: 'Herb Lab',          icon: '🧪', lv: [8, 38, 62],  d: ['A cauldron: brew potions at home', 'Potions last 25% longer', 'Potions last 50% longer'] },
+  { id: 'workshop', name: 'Workshop',          icon: '🔨', lv: [12, 35, 60], d: ['Furnace, anvil and fletching bench at home', 'Smithing and Fletching 5% faster', 'Smithing and Fletching 10% faster'] },
+  { id: 'chapel',   name: 'Chapel',            icon: '⛪', lv: [15, 40, 65], d: ['+25% Prayer XP from bones', '+50% Prayer XP from bones', '+100% Prayer XP from bones'] },
+  { id: 'shed',     name: "Gardener's Shed",   icon: '🧑‍🌾', lv: [18, 42, 68], d: ['A gardener harvests and replants ready patches for you (with your seeds)', '+1 crop from every harvest', 'Crops grow 15% faster'] },
+  { id: 'yard',     name: 'Training Yard',     icon: '🎯', lv: [20, 45, 75], d: ['+3% combat XP', '+6% combat XP', '+10% combat XP'] },
+  { id: 'course',   name: 'Backyard Course',   icon: '🏃', lv: [22, 48, 72], d: ['An agility course at home', 'Harder obstacles: +25% Agility XP there', 'Pro course: +50% Agility XP there'] },
+  { id: 'obelisk',  name: 'Summoning Obelisk', icon: '🔷', lv: [25, 50, 78], d: ['Infuse summoning pouches at home', 'Familiars stay 25% longer', 'Familiars stay 50% longer'] },
+  { id: 'treasury', name: 'Treasury',          icon: '💰', lv: [30, 55, 80], d: ['+3% gold from monsters', '+6% gold from monsters', '+10% gold from monsters'] },
+  { id: 'portal',   name: 'Portal Chamber',    icon: '🌀', lv: [35, 60, 85], d: ['+5% walking speed', '+10% walking speed', '+15% walking speed'] },
+  { id: 'trophy',   name: 'Trophy Hall',       icon: '🏆', lv: [40, 65, 90], d: ['+0.5% max hit for every boss you have beaten', '+1% max hit per boss', '+1.5% max hit per boss'] },
+];
+const ROOM = Object.fromEntries(ROOMS.map(r => [r.id, r]));
+function room(id) { return (S && S.home && S.home.rooms[id]) || 0; }
+function roomCost(r, t) {
+  const lvl = r.lv[t], w = lvl < 15 ? 0 : lvl < 30 ? 1 : lvl < 50 ? 2 : lvl < 70 ? 3 : 4;
+  return { mats: { ['plank' + w]: 6 + Math.floor(lvl / 4), nails: 10 + lvl }, gold: 100 + lvl * lvl * 12 };
+}
+function canBuild(id) {
+  const r = ROOM[id], t = room(id);
+  if (!r || t >= 3 || LV.construction < r.lv[t]) return false;
+  const c = roomCost(r, t);
+  return S.gold >= c.gold && maxCraft(c.mats) > 0;
+}
+function buildRoom(id) {
+  if (!canBuild(id)) return;
+  const r = ROOM[id], t = room(id), c = roomCost(r, t);
+  for (const [it, n] of Object.entries(c.mats)) take(it, n);
+  S.gold -= c.gold; S.home.rooms[id] = t + 1; S.stats.built++;
+  addXp('construction', r.lv[t] * 25 + 40);
+  log(`🏠 Built ${r.icon} ${r.name}${t ? ' (level ' + (t + 1) + ')' : ''}: ${r.d[t]}`, 'lg-xp');
+  showBanner(`🏠 ${r.name} ${['built!', 'upgraded!', 'fully upgraded!'][t]}`); sfx('level');
+  if (id === 'garden') patchKeys().forEach(k => patch(k));
+  uiDirty = true;
+}
+function homeStations() {
+  return ['construction', ...(room('kitchen') ? ['cooking'] : []), ...(room('lab') ? ['herblore'] : []), ...(room('workshop') ? ['smithing', 'fletching'] : []), ...(room('obelisk') ? ['summoning'] : [])];
+}
+const COMBAT_SKILLS = ['attack', 'strength', 'defence', 'hitpoints', 'ranged', 'magic'];
+function roomXp(skill) {
+  return (skill === 'cooking' && room('kitchen') >= 3 ? 1.1 : 1) * (COMBAT_SKILLS.includes(skill) ? [1, 1.03, 1.06, 1.1][room('yard')] : 1);
+}
+function trophyPct() { return [0, 0.005, 0.01, 0.015][room('trophy')] * BOSSES.filter(bossBeaten).length; }
+
+// --- patches ---
+const PATCH_N = [null, { allot: 2, herb: 2, tree: 0 }, { allot: 3, herb: 3, tree: 1 }, { allot: 4, herb: 4, tree: 2 }];
+const PATCH_NAME = { allot: 'Allotment', herb: 'Herb patch', tree: 'Tree patch' };
+function patchKeys() {
+  const n = PATCH_N[room('garden')], out = [];
+  if (n) for (const k of ['herb', 'allot', 'tree']) for (let i = 0; i < n[k]; i++) out.push(k + i);
+  return out;
+}
+function patch(k) { return S.home.p[k] || (S.home.p[k] = { s: null, t: 0 }); }
+const patchKind = k => k.replace(/\d+$/, '');
+function growTime(sd) { return sd.time * (room('shed') >= 3 ? 0.85 : 1); }
+function growFrac(p) { return p.s ? clamp((S.home.ft - p.t) / growTime(SEED_BY[p.s]), 0, 1) : 0; }
+function growLeft(p) { return p.s ? Math.max(0, growTime(SEED_BY[p.s]) - (S.home.ft - p.t)) : 0; }
+function bestSeed(kind) {
+  const sel = S.home.sel[kind], ok = id => has(id) && SEED_BY[id] && SEED_BY[id].kind === kind && LV.farming >= SEED_BY[id].lvl;
+  if (sel && ok(sel)) return sel;
+  const list = SEEDS.filter(s => ok(s.id));
+  return list.length ? list[list.length - 1].id : null;
+}
+function plant(k, id) {
+  const sd = SEED_BY[id];
+  if (!sd || sd.kind !== patchKind(k) || LV.farming < sd.lvl || patch(k).s || !take(id)) return false;
+  Object.assign(patch(k), { s: id, t: S.home.ft });
+  addXp('farming', sd.px); S.stats.planted++;
+ 
+  return true;
+}
+function harvest(k) {
+  const p = patch(k), sd = SEED_BY[p.s];
+  if (!sd || growFrac(p) < 1) return null;
+  const n = randi(sd.n[0], sd.n[1]) + Math.floor(LV.farming / 25) + (room('shed') >= 2 ? 1 : 0);
+  give(sd.out, n);
+  addXp('farming', sd.kind === 'tree' ? sd.check : sd.hx * n);
+  if (Math.random() < 0.15) give(sd.id);
+  S.stats.harvested += n; p.s = null;
+  rollSkillPet('farming');
+ 
+  return [sd.out, n];
+}
+// which patch the hero walks to next: ready ones, then empty ones with seeds, then tend the growing ones
+function farmTarget() {
+  const ks = patchKeys();
+  let k = ks.find(k => patch(k).s && growFrac(patch(k)) >= 1) || ks.find(k => !patch(k).s && bestSeed(patchKind(k)));
+  if (!k) { const g = ks.filter(k => patch(k).s); if (g.length) k = g[(R.farmI = (R.farmI || 0) + 1) % g.length]; }
+  return k || null;
+}
+function farmTick(dt) {
+  const e = R.ent;
+  if (!e.pk) {
+    if (!e.blocked) log('⚠️ No patches to work: build a 🌱 Garden at home and get seeds.', 'lg-bad');
+    e.blocked = true; e.reason = 'No patches';
+    if ((e.blockT = (e.blockT || 0) + dt) > 3) { log('↩️ Nothing to farm – back to what you were doing.'); setActivity(S.prevAct && S.prevAct !== 'farming' ? S.prevAct : 'combat'); }
+    return;
+  }
+  const need = 2.4 / (1 + potB('gather'));
+  e.t += dt;
+  if (!e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; }
+  if (e.t < need) return;
+  e.t -= need; e.swung = false; R.swing = 1; e.hit = 1;
+  const p = patch(e.pk), ex = entScreenX(e);
+  if (p.s && growFrac(p) >= 1) {
+    const [out, n] = harvest(e.pk);
+    floatText(ex, GY - 100, `+${n} ${ITEMS[out].icon}`, '#ffffff'); sfx('gather');
+    e.acts = Math.min(e.acts, 2);
+  } else if (!p.s) {
+    const s = bestSeed(patchKind(e.pk));
+    if (s && plant(e.pk, s)) floatText(ex, GY - 100, `🌱 ${ITEMS[s].name}`, '#bfffa0'); else e.acts = 0;
+  } else {
+    p.t -= 20; addXp('farming', 3 + LV.farming * 0.35); S.stats.tended++;
+    floatText(ex, GY - 100, '💧 Tended', '#9fd8ff');
+  }
+  if (!SIM) burst(ex, GY - 14, '#8a6a3a', 5);
+  if (--e.acts <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
+}
+
+// --- potions ---
+function potB(k) { let v = 0; for (const id in S.buffs) { const p = POT[id]; if (p && (p[k] || 0) > v) v = p[k]; } return v; }
+function potTime() { return 600 * [1, 1, 1.25, 1.5][room('lab')]; }
+function drink(id, auto) {
+  const p = POT[id];
+  if (!p || !take(id)) return;
+  if (p.pp) S.pp = Math.min(9999, S.pp + p.pp + Math.floor(LV.herblore / 5));
+  else S.buffs[id] = potTime();
+  if (!auto) { showBanner(`🧪 ${p.name}: ${p.desc}`); log(`🧪 You drink a ${p.name} (${p.desc}).`, 'lg-good'); }
+  uiDirty = true;
+}
+// runs every tick, also while away: crops grow, potions wear off, the gardener works
+function homeTick(dt) {
+  S.home.ft += dt;
+  for (const id in S.buffs) {
+    if ((S.buffs[id] -= dt) > 0) continue;
+    delete S.buffs[id]; uiDirty = true;
+    if (S.autoPot[id] && has(id)) drink(id, true);
+    else log(`🧪 Your ${POT[id] ? POT[id].name : 'potion'} wore off.`);
+  }
+  if (S.prayer && S.pp < 5 && S.autoPot.pot_pray && has('pot_pray')) drink('pot_pray', true);
+  if ((R.gardT = (R.gardT || 0) - dt) > 0) return;
+  R.gardT = 10;
+  if (!room('shed')) return;
+  for (const k of patchKeys()) {
+    const p = patch(k);
+    if (S.activity === 'farming' && R.ent && R.ent.pk === k) continue;
+    if (p.s && growFrac(p) >= 1) { const r = harvest(k); if (r) log(`🧑‍🌾 Your gardener harvested ${r[1]}× ${ITEMS[r[0]].name}.`, 'lg-good'); }
+    if (!p.s) { const s = bestSeed(patchKind(k)); if (s) plant(k, s); }
+  }
+}
+function potionLine() {
+  const ids = Object.keys(S.buffs);
+  return ids.length ? ids.map(id => `<span title="${POT[id].name}: ${POT[id].desc}" style="color:${POT[id].color}">🧪${Math.ceil(S.buffs[id] / 60)}m</span>`).join(' ') : '—';
 }
 
 /* ================= OFFLINE ================= */
@@ -2190,7 +2466,7 @@ function ridge(f, color, base, amp, freq, seed, peaky) {
 }
 
 function drawBackground(z) {
-  const th = z.th;
+  const th = z.home ? Object.assign({}, z.th, { decor: 'house' }) : z.th;
   const g = ctx.createLinearGradient(0, 0, 0, GY);
   g.addColorStop(0, th.sky[0]); g.addColorStop(1, th.sky[1]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -2606,6 +2882,11 @@ function drawNpc(e) {
   ctx.restore();
 }
 
+function drawPatch2D(e) {
+  const x = entScreenX(e), p = e.pk ? patch(e.pk) : null, sd = p && p.s && SEED_BY[p.s], f = p ? growFrac(p) : 0;
+  rr(x - 40, GY - 8, 80, 12, 3, '#5a3e24');
+  if (sd) for (let k = 0; k < 5; k++) { const hx = x - 32 + k * 16, hh = 8 + 26 * f; poly([hx - 5, GY - 6, hx + 5, GY - 6, hx, GY - 6 - hh], f >= 1 ? sd.color : '#5ab04a'); }
+}
 function drawStation(e) {
   const x = entScreenX(e);
   const fade = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
@@ -2924,6 +3205,13 @@ function drawHud() {
       outlined(`${e.d.name} · ${Math.round(stealChance(e.d) * 100)}%`, ex, top - 10 * FS, '#fff');
       bar(ex - 30, top, 60, 6, e.stun > 0 ? e.stun / STUN_TIME : e.t / pickTime(e.id), e.stun > 0 ? '#e85a5a' : '#c58bff');
       ctx.textAlign = 'left';
+    } else if (e.kind === 'patch') {
+      const p = e.pk ? patch(e.pk) : null, sd = p && p.s && SEED_BY[p.s], f = p ? growFrac(p) : 0, top = GY - 70;
+      bar(ex - 30, top, 60, 6, e.blocked ? 1 : e.t / (2.4 / (1 + potB('gather'))), e.blocked ? '#e85a5a' : '#7fd06a');
+      font(e.blocked ? 700 : 400, 11); ctx.textAlign = 'center'; ctx.fillStyle = e.blocked ? '#ff9a9a' : '#fff';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      const txt = e.blocked ? e.reason : sd ? `${ITEMS[sd.out].name} · ${f >= 1 ? 'ready!' : Math.floor(f * 100) + '%'}` : 'Empty patch';
+      ctx.strokeText(txt, ex, top - 9 * FS); ctx.fillText(txt, ex, top - 9 * FS); ctx.textAlign = 'left';
     } else {
       const craft = CRAFTING.has(e.skill);
       const top = e.kind === 'tree' ? GY - 150 : e.kind === 'rock' ? GY - 72 : e.kind === 'altar' ? GY - 92 : e.kind === 'furnace' ? GY - 112 : craft ? GY - 84 : GY - 40;
@@ -2959,7 +3247,7 @@ function draw() {
     drawBackground(z);
     if (R.ent) {
       const k = R.ent.kind;
-      if (k === 'enemy') drawEnemy(R.ent); else if (k === 'npc') drawNpc(R.ent); else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
+      if (k === 'enemy') drawEnemy(R.ent); else if (k === 'npc') drawNpc(R.ent); else if (k === 'patch') drawPatch2D(R.ent); else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
     }
     drawEvents();
     drawHero();
@@ -3602,11 +3890,12 @@ const G3 = (() => {
         quad(a, [[x, cy, tz], [x, cy, tz + 1], [x + 1, cy, tz + 1], [x + 1, cy, tz]], mix(th.near, '#000000', 0.2 + hash(k) * 0.2), true);
       }
     }
+    if (z.home) buildHome(a, g, x0);
     // scenery: deterministic per chunk so it is the same every time you pass
-    const n = th.decor === 'house' ? 26 : 46;
+    const n = th.decor === 'house' ? 26 : z.home ? 18 : 46;
     for (let i = 0; i < n; i++) {
       const s0 = ci * 977 + i * 13;
-      const x = x0 + hash(s0) * CH, zz = -3.2 - Math.pow(hash(s0 + 1), 0.8) * (BACK - 5), y = hgt(x, zz), s = 0.7 + hash(s0 + 2) * 0.7;
+      const x = x0 + hash(s0) * CH, zz = z.home ? -10 - hash(s0 + 1) * (BACK - 11) : -3.2 - Math.pow(hash(s0 + 1), 0.8) * (BACK - 5), y = hgt(x, zz), s = 0.7 + hash(s0 + 2) * 0.7;
       decor(a, g, th, pal, x, y, zz, s, s0);
     }
     // small things in front of the road (low enough never to hide the hero)
@@ -3629,6 +3918,115 @@ const G3 = (() => {
     return grp;
   }
 
+  /* --- My Home: the rooms you built and your patches, repeating along the road --- */
+  const HOME_W = { garden: 12, yard: 7, course: 8 };
+  const HOME_COL = { kitchen: ['#c8b896', '#a5452e', '#ffd970'], lab: ['#9cb8a0', '#3a5a4a', '#7fff7a'], workshop: ['#a89880', '#5a4a3a', '#ffb060'],
+    chapel: ['#d8d4cc', '#5a5a7a', '#ffe8a0'], shed: ['#8a6a44', '#5f6a3a', '#ffd970'], obelisk: ['#3a3a4a', '#2a2a3a', '#6af0ff'],
+    treasury: ['#d8c8a0', '#c9a43a', '#ffe14a'], portal: ['#8a8496', '#4a3a6a', '#c070ff'], trophy: ['#b8a888', '#8a1a2a', '#ffd970'] };
+  function homeSig() {
+    if (!S.home) return '';
+    return JSON.stringify(S.home.rooms) + patchKeys().map(k => { const p = patch(k); return p.s ? p.s + Math.floor(growFrac(p) * 4) : '-'; }).join(',');
+  }
+  function plot(a, cx, w, y) {
+    for (let x = -w / 2 + 0.3; x <= w / 2 - 0.2; x += 0.9) { put(a, new T.BoxGeometry(0.1, 0.6, 0.1), '#6b4a2a', cx + x, y + 0.3, -3.3); put(a, new T.BoxGeometry(0.1, 0.6, 0.1), '#6b4a2a', cx + x, y + 0.3, -8.6); }
+    put(a, new T.BoxGeometry(w - 0.4, 0.06, 0.06), '#7a5a32', cx, y + 0.45, -3.3);
+    put(a, new T.BoxGeometry(0.1, 1.1, 0.1), '#6b4a2a', cx - w / 2 + 0.8, y + 0.55, -3.6);
+    put(a, new T.BoxGeometry(0.9, 0.5, 0.06), '#c8a878', cx - w / 2 + 0.8, y + 1.05, -3.55);
+  }
+  function house(a, g, cx, y, t, col, w = 4.6, h0 = 2.0) {
+    const h = h0 + 0.4 * t, d = 3, z = -6.6;
+    put(a, new T.BoxGeometry(w, h, d), col[0], cx, y + h / 2, z);
+    put(a, new T.ConeGeometry(0.78, 1.2, 4).rotateY(Math.PI / 4), col[1], cx, y + h + 0.6, z, 0, w, 1, d);
+    put(a, new T.BoxGeometry(0.6, 1.0, 0.05), '#4a2e1a', cx, y + 0.5, z + d / 2 + 0.02);
+    for (const sx of [-1, 1]) put(g, new T.BoxGeometry(0.55, 0.45, 0.05), col[2], cx + sx * w * 0.3, y + h * 0.58, z + d / 2 + 0.02);
+    if (t >= 2) for (const sx of [-1, 1]) put(g, new T.BoxGeometry(0.4, 0.35, 0.05), col[2], cx + sx * w * 0.3, y + h * 0.88, z + d / 2 + 0.02);
+    if (t >= 3) { put(a, new T.BoxGeometry(0.06, 1.2, 0.06), '#5a4a3a', cx, y + h + 1.6, z); put(a, new T.BoxGeometry(0.6, 0.35, 0.03), col[2], cx + 0.32, y + h + 2.0, z); }
+    return h;
+  }
+  function homeModule(a, g, id, cx, w, y) {
+    const t = room(id);
+    if (!t) { plot(a, cx, w, y); return; }
+    const col = HOME_COL[id];
+    switch (id) {
+      case 'garden': {
+        const ks = patchKeys(), n = ks.length, step = (w - 1) / n;
+        for (let x = -w / 2 + 0.2; x <= w / 2; x += 0.8) put(a, new T.BoxGeometry(0.08, 0.5, 0.08), '#8a6a44', cx + x, y + 0.25, -2.9);
+        ks.forEach((k, j) => {
+          const px = cx - w / 2 + 0.5 + step * (j + 0.5), pz = -4.4, p = patch(k), sd = p.s && SEED_BY[p.s], f = growFrac(p), kind = patchKind(k);
+          put(a, new T.BoxGeometry(step * 0.85, 0.16, 1.6), '#5a3e24', px, y + 0.08, pz);
+          for (let r = -1; r <= 1; r++) put(a, new T.BoxGeometry(step * 0.8, 0.05, 0.08), '#4a3018', px, y + 0.17, pz + r * 0.45);
+          if (!sd) return;
+          if (kind === 'tree') { tree(a, px, y + 0.1, pz, 0.25 + 0.75 * f, f >= 1 ? sd.color : '#5aa04a', '#3f7a35'); return; }
+          for (let r = -1; r <= 1; r++) for (let c = -1; c <= 1; c += 2) {
+            const qx = px + c * step * 0.2, qz = pz + r * 0.45;
+            if (kind === 'herb') put(a, new T.ConeGeometry(0.12, 0.2 + 0.6 * f, 5), f >= 1 ? sd.color : '#5ab04a', qx, y + 0.2 + 0.3 * f, qz, r + c);
+            else {
+              put(a, new T.IcosahedronGeometry(0.1 + 0.08 * f, 0), '#5ab04a', qx, y + 0.25, qz, r);
+              if (f >= 0.5) put(a, new T.IcosahedronGeometry(0.06 + 0.12 * f, 0), f >= 1 ? sd.color : '#8ac860', qx + 0.08, y + 0.3 + 0.1 * f, qz + 0.05);
+            }
+          }
+          if (f >= 1) put(g, new T.OctahedronGeometry(0.1, 0), '#fff1a8', px, y + 1.2, pz);
+        });
+        break;
+      }
+      case 'yard':
+        for (let x = -w / 2 + 0.3; x <= w / 2; x += 0.9) put(a, new T.BoxGeometry(0.1, 0.7, 0.1), '#6b4a2a', cx + x, y + 0.35, -3.5);
+        put(a, new T.BoxGeometry(w - 0.4, 0.06, 0.06), '#7a5a32', cx, y + 0.6, -3.5);
+        for (let k = 0; k < t + 1; k++) {
+          const dx = cx - w / 2 + 1.2 + k * 1.5;
+          put(a, new T.CylinderGeometry(0.06, 0.06, 1.1, 5), '#6b4a2a', dx, y + 0.55, -5.5);
+          put(a, new T.CylinderGeometry(0.28, 0.25, 0.8, 7), '#c8a060', dx, y + 1.3, -5.5);
+          put(a, new T.IcosahedronGeometry(0.2, 0), '#d8b878', dx, y + 1.9, -5.5);
+        }
+        for (const [r, c] of [[0.8, '#f4f4f4'], [0.6, '#e04a3a'], [0.4, '#f4f4f4'], [0.2, '#e04a3a']])
+          put(a, new T.CylinderGeometry(r, r, 0.08 + (0.8 - r) * 0.1, 16), c, cx + w / 2 - 1.2, y + 1.2, -6, 0, 1, 1, 1, Math.PI / 2);
+        put(a, new T.BoxGeometry(0.1, 1.2, 0.1), '#6b4a2a', cx + w / 2 - 1.2, y + 0.4, -6.2);
+        break;
+      case 'course': {
+        put(a, new T.CylinderGeometry(0.16, 0.16, 3, 8), '#8a5a32', cx - 2, y + 0.6, -5, 0, 1, 1, 1, 0, Math.PI / 2);
+        for (const sx of [-3.3, -0.7]) put(a, new T.BoxGeometry(0.2, 0.6, 0.2), '#6b4a2a', cx + sx, y + 0.3, -5);
+        put(a, new T.BoxGeometry(1.4, 1.6 + 0.3 * t, 0.5), '#9a8a7a', cx + 1, y + 0.8 + 0.15 * t, -5.5);
+        if (t >= 2) { for (const sx of [2.4, 3.6]) put(a, new T.BoxGeometry(0.12, 2.4, 0.12), '#6b4a2a', cx + sx, y + 1.2, -5.2); put(a, new T.BoxGeometry(1.3, 0.1, 0.1), '#6b4a2a', cx + 3, y + 2.4, -5.2); put(a, new T.BoxGeometry(0.03, 1.2, 0.03), '#d8c8a0', cx + 3, y + 1.8, -5.2); }
+        if (t >= 3) for (let k = 0; k < 4; k++) put(a, new T.CylinderGeometry(0.3, 0.35, 0.3 + k * 0.25, 7), '#8a8a90', cx - 3 + k * 0.9, y + 0.15 + k * 0.12, -7);
+        break;
+      }
+      case 'obelisk':
+        put(a, new T.BoxGeometry(1.6, 0.3, 1.6), '#5a5a6a', cx, y + 0.15, -6);
+        put(a, new T.BoxGeometry(0.7, 2.6 + t * 0.4, 0.7), col[0], cx, y + 1.5 + t * 0.2, -6, 0.3);
+        put(g, new T.OctahedronGeometry(0.4, 0), col[2], cx, y + 3.3 + t * 0.4, -6);
+        for (let k = 0; k < t * 2; k++) put(g, new T.OctahedronGeometry(0.12, 0), col[2], cx + Math.cos(k) * 1.2, y + 0.4, -6 + Math.sin(k) * 0.8);
+        break;
+      case 'portal':
+        house(a, g, cx - 0.4, y, t, col, 2.4, 1.8);
+        put(a, new T.TorusGeometry(1.0, 0.18, 6, 14), col[0], cx + 1.7, y + 1.25, -5.2);
+        put(g, new T.CircleGeometry(0.85, 14), col[2], cx + 1.7, y + 1.25, -5.18);
+        break;
+      default: {
+        const h = house(a, g, cx, y, t, col, id === 'shed' ? 3.2 : 4.6, id === 'shed' ? 1.6 : 2.0);
+        const z = -6.6;
+        if (id === 'kitchen') put(a, new T.BoxGeometry(0.4, 1.1, 0.4), '#7a746c', cx + 1.2, y + h + 0.7, z - 0.4);
+        if (id === 'lab') { put(a, new T.CylinderGeometry(0.45, 0.35, 0.55, 8), '#2a2a30', cx + 2.6, y + 0.3, -4.8); put(g, new T.CircleGeometry(0.4, 10), '#7fff7a', cx + 2.6, y + 0.58, -4.8, 0, 1, 1, 1, -Math.PI / 2); }
+        if (id === 'workshop') { put(a, new T.BoxGeometry(0.8, 0.5, 0.4), '#41454d', cx + 2.7, y + 0.5, -4.8); put(a, new T.CylinderGeometry(0.2, 0.25, 0.4, 6), '#6b4426', cx + 2.7, y + 0.2, -4.8); }
+        if (id === 'chapel') { put(a, new T.ConeGeometry(0.6, 2.2, 4), col[1], cx, y + h + 1.6, z, Math.PI / 4); put(g, new T.CircleGeometry(0.35, 10), col[2], cx, y + h * 0.75, z + 1.53); }
+        if (id === 'shed') {
+          put(a, new T.BoxGeometry(0.08, 1.6, 0.08), '#6b4a2a', cx + 2.2, y + 0.8, -4.6); put(a, new T.BoxGeometry(1, 0.08, 0.08), '#6b4a2a', cx + 2.2, y + 1.2, -4.6);
+          put(a, new T.BoxGeometry(0.4, 0.5, 0.25), '#a85a3a', cx + 2.2, y + 1.1, -4.6); put(a, new T.ConeGeometry(0.3, 0.35, 6), '#d8b060', cx + 2.2, y + 1.75, -4.6);
+        }
+        if (id === 'treasury') { put(a, new T.SphereGeometry(1.0, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), col[1], cx, y + h + 0.1, z); for (let k = 0; k < 3 + t * 2; k++) put(a, new T.CylinderGeometry(0.16, 0.16, 0.06, 8), '#f2c94c', cx + 2.6 + (k % 3) * 0.2, y + 0.04 + Math.floor(k / 3) * 0.07, -4.8 + (k % 2) * 0.15); }
+        if (id === 'trophy') for (let k = 0; k < 2 + t; k++) put(a, new T.BoxGeometry(0.4, 0.9, 0.04), ['#c0392b', '#3a6ad8', '#f2c94c', '#4a9a5a', '#b46bff'][k], cx - 1.6 + k * 0.8, y + h * 0.55, z + 1.54);
+      }
+    }
+  }
+  function buildHome(a, g, x0) {
+    const mods = ROOMS.map(r => [r.id, HOME_W[r.id] || 6.5]), P = mods.reduce((s, m) => s + m[1], 0);
+    for (let k = Math.floor((x0 - 14) / P); k <= Math.floor((x0 + CH) / P); k++) {
+      let off = k * P;
+      for (const [id, w] of mods) {
+        if (off >= x0 && off < x0 + CH) homeModule(a, g, id, off + w / 2, w, hgt(off + w / 2, -5));
+        off += w;
+      }
+    }
+  }
   function tree(a, x, y, z, s, leaf, leaf2, pine) {
     put(a, new T.CylinderGeometry(0.12 * s, 0.2 * s, 1.3 * s, 6), '#5e3c22', x, y + 0.65 * s, z);
     if (pine) {
@@ -3646,6 +4044,10 @@ const G3 = (() => {
         if (r < 0.6) tree(a, x, y, z, s * 1.1, mix(pal.leaf, '#2f6a28', hash(k) * 0.5), pal.leaf2);
         else if (r < 0.85) put(a, new T.IcosahedronGeometry(0.45 * s, 0), pal.leaf2, x, y + 0.3 * s, z, k, 1.3, 0.8, 1);
         else put(a, new T.DodecahedronGeometry(0.4 * s, 0), '#8a8a90', x, y + 0.15, z, k, 1.2, 0.7, 1);
+        break;
+      case 'home':
+        if (r < 0.7) tree(a, x, y, z, s * 1.1, mix(pal.leaf, '#2f6a28', hash(k) * 0.5), pal.leaf2);
+        else put(a, new T.IcosahedronGeometry(0.45 * s, 0), pal.leaf2, x, y + 0.3 * s, z, k, 1.3, 0.8, 1);
         break;
       case 'pine':
         if (r < 0.75) tree(a, x, y, z, s * 1.15, pal.leaf, mix(pal.leaf, '#1d3b20', 0.5), true);
@@ -3739,9 +4141,11 @@ const G3 = (() => {
     ceiling = !!th.cave;
   }
 
+  let homeKey = '';
   function syncChunks() {
     const z = ZONES[S.zone];
     if (S.zone !== zoneKey) setZone(S.zone);
+    if (z.home) { const k = homeSig(); if (k !== homeKey) { homeKey = k; for (const c of chunks.values()) { scene.remove(c); dispose(c); } chunks.clear(); } }
     const cx = R.worldX / U3, spread = (D + BACK) / D, half = W / 2 / U3;
     const mid = cx + (W / 2 - HX) / U3;
     const lo = Math.floor((mid - half * spread - 2) / CH), hi = Math.floor((mid + half * spread + 2) / CH);
@@ -4054,6 +4458,20 @@ const G3 = (() => {
       g.add(box(1.3, 0.2, 1.0, '#5e5a6e', 0, 0.1, 0), box(1.0, 0.7, 0.75, '#7a768c', 0, 0.55, 0), box(1.2, 0.17, 0.9, '#8f8aa3', 0, 0.98, 0));
       P.gem = mk(new T.OctahedronGeometry(0.25, 0), unlit('#d6b8ff'), 0, 1.45, 0); g.add(P.gem);
       P.halo = at(glow('#be82ff', 2.4, 0.5), 0, 1.4, 0.2); g.add(P.halo);
+    } else if (e.kind === 'cauldron') {
+      for (const [lx, lz] of [[-0.35, 0.25], [0.35, 0.25], [0, -0.35]]) g.add(box(0.08, 0.4, 0.08, '#2a2a30', lx, 0.2, lz));
+      g.add(mk(new T.CylinderGeometry(0.55, 0.4, 0.7, 10), '#2a2a30', 0, 0.65, 0));
+      P.gem = mk(new T.CircleGeometry(0.5, 12), unlit('#7fff7a'), 0, 1.0, 0); P.gem.rotation.x = -Math.PI / 2; g.add(P.gem);
+      P.halo = at(glow('#7fff7a', 1.8, 0.5), 0, 1.1, 0.3); g.add(P.halo);
+      P.fl = flames(3, 0.6); P.fl.position.y = 0; g.add(P.fl);
+    } else if (e.kind === 'sawbench') {
+      for (const sx of [-0.55, 0.55]) { const l1 = box(0.08, 0.8, 0.08, '#6b4426', sx, 0.38, 0.15); l1.rotation.x = 0.3; const l2 = box(0.08, 0.8, 0.08, '#6b4426', sx, 0.38, -0.15); l2.rotation.x = -0.3; g.add(l1, l2, box(0.12, 0.08, 0.5, '#7a4e2a', sx, 0.75, 0)); }
+      g.add(box(1.8, 0.1, 0.4, '#d8b07a', 0.1, 0.84, 0));
+      P.saw = box(0.6, 0.18, 0.02, '#c8ccd4', 0.4, 1.05, 0.15); g.add(P.saw);
+    } else if (e.kind === 'obelisk') {
+      g.add(box(1.0, 0.2, 1.0, '#5a5a6a', 0, 0.1, 0), box(0.5, 1.8, 0.5, '#3a3a4a', 0, 1.1, 0));
+      P.gem = mk(new T.OctahedronGeometry(0.28, 0), unlit('#6af0ff'), 0, 2.3, 0); g.add(P.gem);
+      P.halo = at(glow('#6af0ff', 2.2, 0.5), 0, 2.2, 0.2); g.add(P.halo);
     } else if (e.kind === 'pyre') {
       logs(g, '#6b4426', '#7a4e2a'); const top = mk(new T.CylinderGeometry(0.09, 0.09, 0.9, 6), '#5a3a22', 0, 0.28, 0); top.rotation.z = Math.PI / 2; g.add(top);
       P.fl = flames(4, 1.3); P.fl.position.y = 0.3; g.add(P.fl);
@@ -4087,10 +4505,30 @@ const G3 = (() => {
 
   /* --- per-frame sync of the current target --- */
   let entObj = null, entRef = null;
-  function buildEnt(e) { return e.kind === 'enemy' ? buildEnemy(e) : e.kind === 'npc' ? buildNpc(e) : CRAFTING.has(e.skill) ? buildStation(e) : buildNode(e); }
+  function buildPatch(e) {
+    const g = new T.Group(), P = {}, p = e.pk ? patch(e.pk) : { s: null }, sd = p.s && SEED_BY[p.s], kind = e.pk ? patchKind(e.pk) : 'herb';
+    g.add(box(1.8, 0.16, 1.4, '#5a3e24', 0, 0.08, 0));
+    for (let r = -1; r <= 1; r++) g.add(box(1.7, 0.05, 0.1, '#4a3018', 0, 0.17, r * 0.42));
+    P.pl = new T.Group(); g.add(P.pl);
+    if (sd) {
+      if (kind === 'tree') {
+        P.pl.add(box(0.14, 1.2, 0.14, '#5e3c22', 0, 0.6, 0));
+        P.pl.add(mk(new T.IcosahedronGeometry(0.6, 0), sd.color, 0, 1.5, 0));
+      } else for (let r = -1; r <= 1; r++) for (let c = -2; c <= 2; c += 2) {
+        const o = kind === 'herb' ? mk(new T.ConeGeometry(0.12, 0.7, 5), '#5ab04a', c * 0.3, 0.45, r * 0.42) : mk(new T.IcosahedronGeometry(0.16, 0), sd.color, c * 0.3, 0.35, r * 0.42);
+        P.pl.add(o);
+      }
+    }
+    e.seedShown = p.s;
+    g.add(shadow(1.0));
+    g.userData.P = P; g.userData.mats = mats(g);
+    return g;
+  }
+  function buildEnt(e) { return e.kind === 'enemy' ? buildEnemy(e) : e.kind === 'npc' ? buildNpc(e) : e.kind === 'patch' ? buildPatch(e) : CRAFTING.has(e.skill) ? buildStation(e) : buildNode(e); }
   function dropEnt() { if (!entObj) return; scene.remove(entObj); if (entObj.userData.line) { scene.remove(entObj.userData.line); dispose(entObj.userData.line); } dispose(entObj); entObj = null; }
   function syncEnt() {
     const e = R.ent;
+    if (e && e.kind === 'patch' && e.pk && patch(e.pk).s !== e.seedShown) entRef = null;
     if (e !== entRef) { dropEnt(); entRef = e; if (e) { entObj = buildEnt(e); scene.add(entObj); } }
     fireLight.intensity = 0;
     if (!e) return;
@@ -4121,6 +4559,10 @@ const G3 = (() => {
     } else if (e.kind === 'rock') {
       x += Math.sin(time * 70) * e.hit * 3;
       P.r.scale.setScalar(0.55 + 0.45 * (e.yields / e.maxYields));
+    } else if (e.kind === 'patch') {
+      const f = e.pk ? growFrac(patch(e.pk)) : 0;
+      P.pl.scale.set(1, 0.25 + 0.75 * f, 1);
+      x += Math.sin(time * 60) * e.hit * 1.5;
     } else if (e.kind === 'pond') {
       P.rip.forEach((r, k) => { const p = (time * 0.6 + k * 0.5) % 1; r.scale.set(0.15 + p * 0.9, 0.06 + p * 0.25, 1); r.material.opacity = 0.5 * (1 - p) * dying; });
       P.fish.visible = e.hit > 0.2;
@@ -4149,6 +4591,7 @@ const G3 = (() => {
       if (P.glow) { const fl = working ? 0.7 + 0.3 * Math.sin(time * 9) : 0.35; P.glow.material.color.setRGB(1, 0.5 + 0.3 * fl, 0.15); P.halo.material.opacity = 0.6 * fl; if (working) fireLight.intensity = 0.8 * fl; if (working && Math.random() < 0.3) particles.push({ wx: e.x - 12, y: GY - 112, vx: rand(-8, 8), vy: rand(-40, -20), life: 0.8, color: 'rgba(120,120,120,0.6)' }); }
       if (P.bar) { P.bar.visible = working; P.halo.visible = working; }
       if (P.gem) { P.gem.rotation.y = time * (working ? 2 : 0.5); P.gem.position.y = 1.45 + Math.sin(time * 2) * 0.05; P.halo.material.opacity = working ? 0.6 : 0.3; }
+      if (P.saw) P.saw.position.x = 0.4 + (working ? Math.sin(time * 14) * 0.25 : 0);
       if (e.kind === 'bench' && working && e.hit > 0.3) burst(e.x - R.worldX + HX, GY - 40, '#d8b888', 1);
     }
     g.position.set(x / U3, 0, 0);
@@ -4239,7 +4682,7 @@ function mapSpots(s, n, seed) {
 }
 function mapTri(m, x, y, w, h, c) { m.fillStyle = c; m.beginPath(); m.moveTo(x - w / 2, y); m.lineTo(x, y - h); m.lineTo(x + w / 2, y); m.closePath(); m.fill(); }
 function mapDecor(m, s) {
-  const z = s.z, d = z.th.decor, r = s.r, U = r / 0.1;
+  const z = s.z, d = z.th.decor === 'home' ? 'house' : z.th.decor, r = s.r, U = r / 0.1;
   if (d === 'tree' || d === 'house') {
     for (const [x, y, q] of mapSpots(s, d === 'house' ? 6 : 10, s.i)) {
       if (q < 0.35) { m.fillStyle = '#d9c46a'; m.fillRect(x - r * .1, y - r * .04, r * .2, r * .08); continue; }
@@ -4391,8 +4834,8 @@ function htmlCombatPanel() {
   return h;
 }
 
-const ACT_ORDER = ['combat', 'pvp', 'thieving', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting', 'firemaking'];
-const STATION_NAME = { smithing: '🔥 Furnace and 🔨 Anvil', cooking: '🔥 Campfire', fletching: '🪶 Fletching bench', runecrafting: '🔮 Rune altar', firemaking: '🔥 Campsite' };
+const ACT_ORDER = ['combat', 'pvp', 'farming', 'construction', 'thieving', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting', 'herblore', 'summoning', 'firemaking'];
+const STATION_NAME = { smithing: '🔥 Furnace and 🔨 Anvil', cooking: '🔥 Campfire', fletching: '🪶 Fletching bench', runecrafting: '🔮 Rune altar', firemaking: '🔥 Campsite' , herblore: '🧪 Herb lab and apothecary', construction: '🪚 Sawbench', summoning: '🔷 Summoning obelisk' };
 let mapSel = null, mapAct = null;
 function actIcon(a) { return a === 'combat' ? '⚔️' : a === 'pvp' ? '☠️' : SKILLS[a].icon; }
 function enemyLevel(d) { return Math.round((d.atk + d.def) / 2); }
@@ -4410,10 +4853,10 @@ function htmlActivity() {
       <span class="pin">${locked ? '🔒' : z.icon}${i === S.zone ? '<i class="me">🧍</i>' : ''}</span><span class="nm">${z.name}</span></button>`;
   }).join('') + '</div>';
   const z = ZONES[mapSel];
-  const kind = z.town ? 'Town' : z.wild ? `☠️ Wilderness · combat ${z.req}+` : z.slayer ? `💀 Slayer area · Slayer ${z.slayer}` : `Region ${mapSel + 1} · combat ${z.req}+`;
+  const kind = z.home ? 'Your home' : z.town ? 'Town' : z.wild ? `☠️ Wilderness · combat ${z.req}+` : z.slayer ? `💀 Slayer area · Slayer ${z.slayer}` : `Region ${mapSel + 1} · combat ${z.req}+`;
   h += `<div class="info locpanel"><div class="row" style="justify-content:space-between"><b class="locname">${z.icon} ${z.name}</b><span class="tag">${kind}</span></div>
     <p class="muted">${z.desc}${mapSel === S.zone ? ' <b>Your hero is here.</b>' : ''}</p>`;
-  if (!locOpen(mapSel)) return h + `<p class="need">Reach Slayer level ${z.slayer} to enter (you are ${LV.slayer}).</p></div>`;
+  if (!locOpen(mapSel)) return h + `<p class="need">${z.home ? `🔒 ${UNLOCK.home.need} to get your own home.` : `Reach Slayer level ${z.slayer} to enter (you are ${LV.slayer}).`}</p></div>`;
   const doing = a => S.zone === mapSel && (a === 'pvp' ? hunting : S.activity === a && !(a === 'combat' && hunting));
   h += '<div class="acticons">' + acts.map(a => actLock(a) ? `<button class="lockd" data-a="locked" data-id="${actLock(a).id}"><span class="big">🔒</span>${SKILLS[a].name}<small>locked</small></button>` : `<button class="${a === mapAct ? 'sel' : ''} ${doing(a) ? 'doing' : ''}" data-a="mapact" data-id="${a}">
     <span class="big">${actIcon(a)}</span>${a === 'combat' ? 'Combat' : a === 'pvp' ? 'PvP' : SKILLS[a].name}<small>${a === 'combat' ? 'Combat ' + combatLevel() : a === 'pvp' ? `${fmt(S.wild.pks)} PKs` : 'Level ' + LV[a]}</small></button>`).join('') + '</div>';
@@ -4463,6 +4906,8 @@ function bossCard(b, fromMap) {
 
 function htmlLocAct(i, a) {
   const z = ZONES[i], here = S.zone === i && S.activity === a;
+  if (a === 'construction') return htmlRooms(i);
+  if (a === 'farming') return htmlFarm(i);
   if (a === 'pvp') {
     if (!zoneOpen(i)) return `<p class="need">Reach combat level ${z.req} to enter the Wilderness (you are ${combatLevel()}).</p>`;
     const on = S.zone === i && S.activity === 'combat' && S.ctarget === 'pvp';
@@ -4541,6 +4986,48 @@ function htmlLocAct(i, a) {
     <button data-tab="${a}">${a === 'cooking' ? 'Choose fish' : 'Choose recipe'}</button></div></div>`;
 }
 
+/* --- My Home panels --- */
+function costHtml(c) { return matsHtml(c.mats) + `, <span class="${S.gold >= c.gold ? 'have' : 'need'}">${fmt(c.gold)} gold</span>`; }
+function htmlRooms(i) {
+  const here = S.zone === i && S.activity === 'construction';
+  const r0 = craftRecipe('construction');
+  let h = `<p class="muted">Saw planks and make nails at your sawbench, then build rooms. Every room shows up behind the road when you are home. Construction level: <b>${LV.construction}</b></p>
+    <div class="grid"><div class="item ${here ? 'on' : ''}"><div class="top"><span class="ic">🪚</span><span class="nm"><b>Sawbench</b><br>
+      <small>Recipe: ${recipeCount(r0) > 1 ? recipeCount(r0) + '× ' : ''}${itemLabel(r0.out)} · ${matsHtml(r0.mats)}</small></span></div>
+      <div class="btns">${here ? '<button class="sel" disabled>🪚 Working…</button>' : `<button data-a="station" data-z="${i}" data-id="construction">🪚 Work here</button>`}
+      <button data-tab="construction">Choose recipe</button></div></div></div><h3>Rooms</h3><div class="grid">`;
+  h += ROOMS.map(r => {
+    const t = room(r.id), max = t >= 3, c = max ? null : roomCost(r, t), lock = !max && LV.construction < r.lv[t];
+    return `<div class="item ${t ? 'on' : ''}"><div class="top"><span class="ic">${r.icon}</span><span class="nm"><b>${r.name}</b> <span class="tag">${t ? 'Level ' + t + ' / 3' : 'Not built'}</span><br>
+      ${r.d.slice(0, t).map(d => `<small class="have">✔ ${d}</small><br>`).join('')}
+      ${max ? '<small class="muted">Fully built</small>' : `<small>${lock ? '🔒 ' : 'Next: '}${r.d[t]} · Construction ${r.lv[t]}</small><br><small>${costHtml(c)}</small>`}</span></div>
+      ${max ? '' : `<div class="btns"><button data-a="build" data-id="${r.id}" ${canBuild(r.id) ? '' : 'disabled'}>🔨 ${t ? 'Upgrade' : 'Build'}</button></div>`}</div>`;
+  }).join('');
+  return h + '</div>';
+}
+function fmtTime(s) { s = Math.ceil(s); return s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m` : `${s}s`; }
+function htmlFarm(i) {
+  const ks = patchKeys(), here = S.zone === i && S.activity === 'farming';
+  let h = `<p class="muted">Plant seeds in your patches. They grow on their own – also while you are away. Tending the garden waters and weeds the patches (Farming XP, faster growth) and plants or harvests whatever is ready. Farming level: <b>${LV.farming}</b>${room('shed') ? ' · 🧑‍🌾 Your gardener harvests and replants for you.' : ''}</p>`;
+  if (!ks.length) return h + '<p class="need">Build a 🌱 Garden first (🏠 Construction on this map spot).</p>';
+  h += `<div class="btns">${here ? '<button class="sel" disabled>🌱 Tending…</button>' : `<button data-a="station" data-z="${i}" data-id="farming">🌱 Tend the garden</button>`}</div>`;
+  for (const kind of ['herb', 'allot', 'tree']) {
+    if (!ks.some(k => patchKind(k) === kind)) continue;
+    const have = SEEDS.filter(s => s.kind === kind && has(s.id)), sel = S.home.sel[kind];
+    h += `<h3>${PATCH_NAME[kind]}es</h3><div class="chips"><button class="${!sel ? 'sel' : ''}" data-a="fsel" data-skill="${kind}" data-id="">✨ Best seed</button>` +
+      have.map(s => `<button class="${sel === s.id ? 'sel' : ''}" data-a="fsel" data-skill="${kind}" data-id="${s.id}" ${LV.farming < s.lvl ? 'disabled' : ''}>${ITEMS[s.out].icon} ${ITEMS[s.id].name} ×${fmt(has(s.id))}${LV.farming < s.lvl ? ' 🔒' + s.lvl : ''}</button>`).join('') + '</div><div class="grid">';
+    h += ks.filter(k => patchKind(k) === kind).map(k => {
+      const p = patch(k), sd = p.s && SEED_BY[p.s], f = growFrac(p);
+      return `<div class="item ${sd && f >= 1 ? 'on' : ''}"><div class="top"><span class="ic">${sd ? (f >= 1 ? ITEMS[sd.out].icon : '🌱') : '🟫'}</span><span class="nm"><b>${sd ? ITEMS[sd.out].name : 'Empty ' + PATCH_NAME[kind].toLowerCase()}</b><br>
+        <small>${sd ? (f >= 1 ? '✅ Ready to harvest' : `Growing ${Math.floor(f * 100)}% · ${fmtTime(growLeft(p))} left`) : bestSeed(kind) ? 'Ready to plant' : 'No seeds for this patch'}</small>
+        ${sd ? `<div class="bar"><i style="width:${(f * 100).toFixed(1)}%"></i></div>` : ''}</span></div>
+        <div class="btns">${sd && f >= 1 ? `<button data-a="harv" data-id="${k}">🧺 Harvest</button>` : !sd ? `<button data-a="plant" data-id="${k}" ${bestSeed(kind) ? '' : 'disabled'}>🌱 Plant${bestSeed(kind) ? ' ' + ITEMS[bestSeed(kind)].name.replace(/ (Seed|Sapling)$/, '') : ''}</button>` : ''}</div></div>`;
+    }).join('') + '</div>';
+  }
+  const known = SEEDS.filter(s => LV.farming >= s.lvl).length;
+  h += `<p class="muted">Seeds drop from monsters everywhere (better ones in harder areas), from Farmers and the Master Farmer in Riverbend, and the Shop sells a few. You can plant ${known} of ${SEEDS.length} kinds.</p>`;
+  return h;
+}
 function htmlSkills() {
   return htmlSoon() + '<div class="grid">' + Object.entries(SKILLS).map(([k, sk]) => {
     const l = LV[k], xp = S.skills[k];
@@ -4600,7 +5087,7 @@ function eqStatsHtml() {
   if (bon.length) rows.push(['Item bonuses', bon.join(', ')]);
   return '<div class="eqstats">' + rows.map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join('') + '</div>';
 }
-const INV_ORDER = ['Equipment', 'Ammo', 'Runes', 'Food', 'Bars', 'Ores', 'Resources', 'Misc'];
+const INV_ORDER = ['Equipment', 'Ammo', 'Runes', 'Potions', 'Food', 'Herbs', 'Seeds', 'Bars', 'Ores', 'Resources', 'Misc'];
 function invIds() {
   const ord = id => { const k = INV_ORDER.indexOf(ITEMS[id].type); return k < 0 ? 99 : k; };
   return Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0).sort((a, b) => ord(a) - ord(b) || (ITEMS[a].tier || 0) - (ITEMS[b].tier || 0) || a.localeCompare(b));
@@ -4617,6 +5104,7 @@ function itemMenu(id) {
     <div class="opts">
       ${it.slot ? `<button data-a="equip" data-id="${id}" data-close="1" ${canEquip(id) ? '' : 'disabled'}>${it.slot === 'weapon' ? '🗡️ Wield' : '🧥 Wear'}</button>` : ''}
       ${it.bury ? `<button data-a="bury" data-id="${id}" data-close="1">🦴 Bury all</button>` : ''}
+      ${it.potion ? `<button data-a="drink" data-id="${id}" data-close="1">🧪 Drink${S.buffs[id] ? ` (${fmtTime(S.buffs[id])} left)` : ''}</button><button data-a="autopot" data-id="${id}" data-close="1">${S.autoPot[id] ? '✅ Auto-drink is on' : '⬜ Auto-drink when it wears off'}</button>` : ''}
       <button data-a="sell" data-id="${id}" data-n="1" data-close="1">🪙 Sell 1 (${fmt(it.value)} gold)</button>
       ${n > 1 ? `<button data-a="sell" data-id="${id}" data-n="999999" data-close="1">🪙 Sell all (${fmt(it.value * n)} gold)</button>` : ''}
       <button data-a="close">Cancel</button></div></div>`);
@@ -4659,7 +5147,7 @@ function matsHtml(mats) {
 
 function htmlCraft() {
   if (lockFor('craft', craftSub)) craftSub = 'smithing';
-  let h = subNav('craftsub', craftSub, [['smithing', '🔨 Smithing'], ['cooking', '🍳 Cooking'], ['fletching', '🪶 Fletching'], ['runecrafting', '🔮 Runecrafting'], ['firemaking', '🔥 Firemaking']]);
+  let h = subNav('craftsub', craftSub, [['smithing', '🔨 Smithing'], ['cooking', '🍳 Cooking'], ['fletching', '🪶 Fletching'], ['runecrafting', '🔮 Runecrafting'], ['herblore', '🧪 Herblore'], ['construction', '🪚 Construction'], ['firemaking', '🔥 Firemaking']]);
   if (craftSub === 'cooking') return h + htmlCooking();
   if (craftSub === 'firemaking') return h + htmlFiremaking();
   const sk = craftSub, c = CRAFT[sk];
@@ -4845,6 +5333,7 @@ function renderHero() {
     <div class="eq"><span class="muted">💥 Max hit · 🛡️ Armour</span><span>${playerMaxHit()} · ${armorValue()}</span></div>
     ${ammo ? `<div class="eq"><span class="muted">Ammo</span><span>${ammo}</span></div>` : ''}
     <div class="eq"><span class="muted">🍽️ Food</span><span>${foodCount()}</span></div>
+    <div class="eq"><span class="muted">🧪 Potions</span><span>${potionLine()}</span></div>
     <div class="eq"><span class="muted">🙏 Prayer</span><span>${pr ? pr.icon + ' ' + pr.name + ' · ' : ''}${fmt(S.pp)} pts</span></div>
     <div class="eq"><span class="muted">💀 Task</span><span>${S.task ? `${ENEMIES[S.task.id].name} ${S.task.left} left` : '—'}</span></div>`;
   if (html !== lastHero) { $('#hero').innerHTML = html; lastHero = html; }
@@ -4866,6 +5355,7 @@ function nextGoal() {
   }
   if (R.ent && R.ent.blocked) {
     if (S.activity === 'firemaking') return { t: 'No logs to burn – go 🪓 Woodcutting', tab: 'activity' };
+    if (S.activity === 'farming') return { t: 'Build a 🌱 Garden at home and get seeds', tab: 'activity' };
     return S.activity === 'cooking' ? { t: 'No fish to cook – go 🎣 Fishing', tab: 'activity' }
       : { t: `Out of materials for ${ITEMS[CRAFT[S.activity].recipes[S.csel[S.activity]].out].name} – gather more or pick another recipe`, tab: S.activity };
   }
@@ -4918,7 +5408,7 @@ function renderGoal() {
   });
 }
 // old tab names (used by goals and buttons) map to a tab plus its sub-view
-const TAB_ALIAS = { firemaking: ['craft', 'firemaking'], smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], shop: ['inventory', 'shop'] };
+const TAB_ALIAS = { firemaking: ['craft', 'firemaking'], smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], herblore: ['craft', 'herblore'], construction: ['craft', 'construction'], summoning: ['craft', 'summoning'], shop: ['inventory', 'shop'] };
 function openTab(name, scroll) {
   const al = TAB_ALIAS[name];
   const lk = al ? lockFor(al[0], al[1]) || lockFor(al[0]) : lockFor(name);
@@ -5012,6 +5502,12 @@ document.addEventListener('click', ev => {
     case 'pet': if (S.pets[id]) S.pet = id; break;
     case 'loc': mapSel = +id; mapAct = null; break;
     case 'mapact': mapAct = id; break;
+    case 'build': buildRoom(id); break;
+    case 'plant': { const sd = bestSeed(patchKind(id)); if (sd && plant(id, sd)) log(`🌱 Planted ${ITEMS[sd].name}.`, 'lg-good'); break; }
+    case 'harv': { const r = harvest(id); if (r) { log(`🧺 Harvested ${r[1]}× ${ITEMS[r[0]].name}.`, 'lg-good'); sfx('gather'); } break; }
+    case 'fsel': S.home.sel[b.dataset.skill] = id || null; break;
+    case 'drink': drink(id); break;
+    case 'autopot': S.autoPot[id] = !S.autoPot[id]; if (S.autoPot[id] && !S.buffs[id] && !POT[id].pp) drink(id); break;
     case 'locked': lockedMsg(UNLOCK[id]); break;
     case 'fight': S.ctarget = id === 'mix' ? null : id; travel(+b.dataset.z, 'combat'); resetEncounter(); break;
     case 'gather': S.gsel[b.dataset.skill] = +id; travel(+b.dataset.z, b.dataset.skill); resetEncounter(); break;
