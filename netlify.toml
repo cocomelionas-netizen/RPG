@@ -1,0 +1,4 @@
+# The game is hosted on GitHub Pages now. Netlify skips every build so it uses no credits;
+# the last Netlify deploy only tells players the new address.
+[build]
+  ignore = "exit 0"
