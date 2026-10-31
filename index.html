@@ -925,7 +925,7 @@ function newState() {
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, brewed: 0, planks: 0, built: 0, planted: 0, harvested: 0, tended: 0, laps: 0, pouches: 0, clues: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
-    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, unlocked: {}, home: { rooms: {}, p: {}, ft: 0, sel: {} }, buffs: {}, autoPot: {}, geSeq: 0, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
+    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, unlocked: {}, home: { rooms: {}, p: {}, ft: 0, sel: {} }, agiLaps: {}, buffs: {}, autoPot: {}, geSeq: 0, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -988,6 +988,7 @@ function applySave(data) {
     S.wild = Object.assign(def.wild, data.wild);
     S.home = Object.assign(def.home, data.home);
     for (const k of ['rooms', 'p', 'sel']) S.home[k] = Object.assign({}, S.home[k]);
+    S.agiLaps = Object.assign({}, data.agiLaps);
     S.buffs = Object.assign({}, data.buffs); S.autoPot = Object.assign({}, data.autoPot);
     // one kind of rune became eight: old runes turn into air and mind runes plus some catalysts
     if (S.inv.rune) { const n = S.inv.rune; delete S.inv.rune; give('r_air', n); give('r_mind', n); give('r_chaos', Math.floor(n / 3)); give('r_death', Math.floor(n / 6)); }
@@ -1056,6 +1057,7 @@ function locHas(i, act) {
   if (act === 'firemaking') return !z.wild;
   if (act === 'pvp') return !!z.wild;
   if (act === 'farming') return !!z.home;
+  if (act === 'agility') return !!z.course && (!z.course.home || room('course') > 0);
   if (CRAFTING.has(act)) return (z.stations || []).includes(act);
   return locTiers(act, i).length > 0 || (act === 'mining' && !!z.ess);
 }
@@ -1187,7 +1189,7 @@ function rollPet(id, chance) {
   uiDirty = true;
 }
 function rollSkillPet(skill) { const p = PETS.find(x => x.skill === skill); if (p) rollPet(p.id, PET_CHANCE); }
-function walkSpeed() { return WALK * (1 + 0.05 * S.rup.boots + [0, 0.05, 0.1, 0.15][room('portal')] + potB('walk')); }
+function walkSpeed() { return WALK * (1 + 0.05 * S.rup.boots + [0, 0.05, 0.1, 0.15][room('portal')] + potB('walk') + amu('walk') + LV.agility * 0.002); }
 function offlineCap() { return (12 + 2 * S.rup.patience) * 3600; }
 function totalLevel() { return Object.values(LV).reduce((a, l) => a + l, 0); }
 function achDesc(a) { return typeof a.desc === 'function' ? a.desc() : a.desc; }
@@ -1202,6 +1204,7 @@ const UNLOCKS = [
   { id: 'slayer', icon: '💀', name: 'Slayer', tab: 'slayer', need: 'Combat level 10', test: () => combatLevel() >= 10 },
   { id: 'runecrafting', icon: '🔮', name: 'Runecrafting & magic', sub: ['craft', 'runecrafting'], act: 'runecrafting', need: 'Finish the quest "Forged in Bronze"', test: () => qDone('q2') },
   { id: 'home', icon: '🏡', name: 'My Home: Construction & Farming', acts: ['farming', 'construction'], sub: ['craft', 'construction'], need: 'Total level 35', test: () => totalLevel() >= 35 },
+  { id: 'agility', icon: '🏃', name: 'Agility courses', act: 'agility', need: 'Total level 30', test: () => totalLevel() >= 30 },
   { id: 'herblore', icon: '🧪', name: 'Herblore & potions', act: 'herblore', sub: ['craft', 'herblore'], need: 'Farming level 3', test: () => LV.farming >= 3 },
   { id: 'mastery', icon: '🎓', name: 'Mastery', need: 'Any gathering or crafting skill at level 15', test: () => MASTERY_SKILLS.some(k => LV[k] >= 15) },
   { id: 'progress', icon: '🏆', name: 'Achievements, Journeys & Hiscores', tab: 'progress', need: 'Total level 50', test: () => totalLevel() >= 50 },
@@ -1255,7 +1258,7 @@ function newJourney() {
   if (!S.bosses[4]) return;
   const gain = renownGain();
   // keep achievements, lifetime stats and Renown; everything else starts over
-  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet, unlocked: S.unlocked, home: S.home, autoPot: S.autoPot,
+  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet, unlocked: S.unlocked, home: S.home, autoPot: S.autoPot, agiLaps: S.agiLaps,
     renown: S.renown + gain, journeys: S.journeys + 1, tipEvent: true };
   S = Object.assign(newState(), keep);
   const hs = S.rup.headstart;
@@ -1293,6 +1296,9 @@ function spawnEntity() {
     const list = (ZONES[S.zone].npcs || []).filter(id => LV.thieving >= NPCS[id].lvl);
     const id = S.tsel && list.includes(S.tsel) ? S.tsel : list[Math.floor(Math.random() * list.length)] || 'man';
     R.ent = { kind: 'npc', skill: 'thieving', id, d: NPCS[id], tries: randi(4, 7), t: 0, stun: 0, x, stop: 48, hit: 0 };
+  } else if (act === 'agility') {
+    if (!ZONES[S.zone].course || !courseOpen(ZONES[S.zone].course)) S.zone = bestCourse().zone;
+    spawnObstacle(x);
   } else if (act === 'farming') {
     const pk = farmTarget();
     R.ent = { kind: 'patch', skill: 'farming', pk, acts: 3, t: 0, x, stop: 70, hit: 0, swung: false, blocked: false };
@@ -1361,7 +1367,7 @@ function tick(dt) {
   if (inWild() && !S.wild.in) { S.wild.in = true; log('☠️ You enter the Revenant Caves. Loot stays in your looting bag until you leave – die here and you lose it, and most of your gear.', 'lg-bad'); }
   else if (!inWild() && S.wild.in) bankWild('You left the caves');
   if (R.phase === 'walk') {
-    const w = walkSpeed();
+    const w = walkSpeed() * (S.activity === 'agility' ? 1.6 : 1);
     R.worldX += w * dt;
     S.dist += w * dt / 40;
     S.hp = Math.min(maxHp(), S.hp + maxHp() * 0.005 * dt);
@@ -1377,7 +1383,7 @@ function tick(dt) {
   } else if (R.phase === 'act' && !R.ent) R.phase = 'walk';
   else if (R.phase === 'act') {
     const k = R.ent.kind;
-    if (k === 'enemy') { if (R.ent.replay) replayTick(dt); else combatTick(dt); } else if (k === 'npc') thieveTick(dt); else if (k === 'patch') farmTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
+    if (k === 'enemy') { if (R.ent.replay) replayTick(dt); else combatTick(dt); } else if (k === 'npc') thieveTick(dt); else if (k === 'patch') farmTick(dt); else if (k === 'obstacle') agiTick(dt); else if (CRAFTING.has(R.ent.skill)) craftTick(dt); else gatherTick(dt);
   } else if (R.phase === 'dead') {
     R.deadT -= dt;
     if (R.deadT <= 0) {
@@ -1627,6 +1633,7 @@ function fitZone() {
   const a = S.activity;
   if (a === 'combat') { if (!locHas(S.zone, 'combat') || !zoneOpen(S.zone)) S.zone = bestZone(); }
   else if (a === 'farming') S.zone = HOME;
+  else if (a === 'agility') { if (!locHas(S.zone, 'agility') || !courseOpen(ZONES[S.zone].course)) S.zone = bestCourse().zone; }
   else if (CRAFTING.has(a)) { if (!locHas(S.zone, a) || !locOpen(S.zone)) S.zone = locHas(TOWN, a) ? TOWN : HOME; }
   else if (!locOpen(S.zone) || !locHas(S.zone, a)) S.zone = bestLocFor(a);
 }
@@ -1701,6 +1708,7 @@ function makePker() {
 }
 
 function resetEncounter() {
+  R.heroLift = 0; R.agiPose = null;
   if (R.phase !== 'dead') { R.phase = 'walk'; R.ent = null; }
   uiDirty = true;
 }
@@ -1814,7 +1822,7 @@ function thieveTick(dt) {
   } else {
     // caught: stunned and slapped, but never knocked out by it
     const dmg = Math.min(Math.max(0, Math.ceil(S.hp) - 1), randi(1, n.maxHit));
-    S.hp -= dmg; e.stun = STUN_TIME; e.hit = 1; R.heroHit = 1;
+    S.hp -= dmg; e.stun = STUN_TIME * (1 - LV.agility / 300); e.hit = 1; R.heroHit = 1;
     floatText(HX, GY - 108, dmg ? `Stunned! -${dmg}` : 'Stunned!', '#ffb0a0', 1.4, 1, true); sfx('hurt');
   }
   if (--e.tries <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
@@ -2333,6 +2341,116 @@ function potionLine() {
   return ids.length ? ids.map(id => `<span title="${POT[id].name}: ${POT[id].desc}" style="color:${POT[id].color}">🧪${Math.ceil(S.buffs[id] / 60)}m</span>`).join(' ') : '—';
 }
 
+/* ===== Agility: courses all over the world, each with its own obstacles ===== */
+// L: how far the hero moves over it (px), d: seconds, lift(u): height above the ground (px), pose: how the hero holds itself
+const OBS = {
+  hurdles: { name: 'Hurdles',          L: 200, d: 2.0, lift: u => 26 * Math.abs(Math.sin(u * Math.PI * 3)), pose: 'jump' },
+  log:     { name: 'Balance log',      L: 160, d: 3.0, lift: u => 14 * Math.sin(Math.min(1, u * 6) * Math.PI / 2) * Math.sin(Math.min(1, (1 - u) * 6) * Math.PI / 2), pose: 'balance' },
+  wall:    { name: 'Climbing wall',    L: 120, d: 2.6, lift: u => u < 0.55 ? 66 * u / 0.55 : 66 * Math.max(0, 1 - (u - 0.55) / 0.3), pose: 'climb', fx: u => u < 0.45 ? u * 0.4 : 0.18 + (u - 0.45) / 0.55 * 0.82 },
+  gap:     { name: 'Gap jump',         L: 140, d: 1.4, lift: u => 50 * Math.sin(u * Math.PI), pose: 'jump' },
+  rope:    { name: 'Rope swing',       L: 200, d: 2.2, lift: u => 30 + 26 * Math.sin(u * Math.PI) - 30 * Math.pow(Math.abs(u - 0.5) * 2, 6), pose: 'swing' },
+  net:     { name: 'Cargo net',        L: 140, d: 3.2, lift: u => 88 * (1 - Math.abs(u - 0.5) * 2), pose: 'climb' },
+  bars:    { name: 'Monkey bars',      L: 180, d: 3.0, lift: u => 46 * Math.min(1, u * 8, (1 - u) * 8), pose: 'hang' },
+  stones:  { name: 'Stepping stones',  L: 200, d: 2.6, lift: u => 20 * Math.abs(Math.sin(u * Math.PI * 4)), pose: 'jump' },
+  zip:     { name: 'Zipline',          L: 260, d: 1.8, lift: u => u < 0.12 ? 100 * u / 0.12 : 100 * (1 - (u - 0.12) / 0.88), pose: 'hang', fx: u => u < 0.12 ? 0 : (u - 0.12) / 0.88 },
+  ledge:   { name: 'Narrow ledge',     L: 160, d: 3.2, lift: u => 24 * Math.min(1, u * 6, (1 - u) * 6), pose: 'balance' },
+  tight:   { name: 'Tightrope',        L: 200, d: 3.4, lift: u => 80 * Math.min(1, u * 6, (1 - u) * 6), pose: 'balance' },
+  slide:   { name: 'Ice slide',        L: 220, d: 1.6, lift: u => 40 * (1 - u), pose: 'crouch' },
+  pipe:    { name: 'Squeeze pipe',     L: 160, d: 2.8, lift: () => 0, pose: 'crouch' },
+  lava:    { name: 'Lava stones',      L: 200, d: 2.6, lift: u => 22 * Math.abs(Math.sin(u * Math.PI * 4)), pose: 'jump' },
+  crystal: { name: 'Crystal bridge',   L: 160, d: 3.0, lift: u => 18 * Math.min(1, u * 6, (1 - u) * 6), pose: 'balance' },
+  portal:  { name: 'Rift hop',         L: 220, d: 1.6, lift: u => 10 * Math.sin(u * Math.PI), pose: 'blink' },
+};
+const COURSES = [
+  { id: 'meadow',  zone: 0,     lvl: 1,  name: 'Meadow Fence Run',   obs: ['hurdles', 'log', 'hurdles', 'net', 'gap'] },
+  { id: 'roofs',   zone: TOWN,  lvl: 10, name: 'Riverbend Rooftops', obs: ['wall', 'gap', 'tight', 'gap', 'ledge', 'zip'] },
+  { id: 'home',    zone: HOME,  lvl: 1,  name: 'Backyard Course',    obs: ['hurdles', 'log', 'wall', 'bars'], home: true },
+  { id: 'canopy',  zone: 1,     lvl: 20, name: 'Forest Canopy',      obs: ['net', 'rope', 'log', 'bars', 'zip'] },
+  { id: 'crawl',   zone: 2,     lvl: 30, name: 'Shadow Cave Crawl',  obs: ['pipe', 'ledge', 'stones', 'rope', 'pipe', 'wall'] },
+  { id: 'bog',     zone: 5,     lvl: 40, name: 'Swamp Stepping',     obs: ['stones', 'log', 'rope', 'stones', 'net'] },
+  { id: 'peaks',   zone: 3,     lvl: 52, name: 'Frozen Peaks',       obs: ['slide', 'wall', 'tight', 'gap', 'slide', 'zip'] },
+  { id: 'wildy',   zone: WILD,  lvl: 55, name: 'Wilderness Course',  obs: ['pipe', 'rope', 'stones', 'log', 'wall'], marks: 2 },
+  { id: 'prism',   zone: 6,     lvl: 62, name: 'Crystal Prism Run',  obs: ['crystal', 'bars', 'gap', 'crystal', 'zip'] },
+  { id: 'lava',    zone: 4,     lvl: 72, name: 'Lava Leap',          obs: ['lava', 'rope', 'gap', 'lava', 'wall', 'zip'] },
+  { id: 'rift',    zone: 7,     lvl: 85, name: 'Abyssal Rift Run',   obs: ['portal', 'tight', 'portal', 'bars', 'portal', 'zip'] },
+];
+for (const c of COURSES) { c.xp = Math.round((3 + c.lvl * 0.22) * 2.6); c.lap = Math.round(c.xp * c.obs.length * 0.4); ZONES[c.zone].course = c; }
+const COURSE = Object.fromEntries(COURSES.map(c => [c.id, c]));
+function courseOpen(c) { return locOpen(c.zone) && LV.agility >= c.lvl && (!c.home || room('course') > 0); }
+function courseXp(c) { return (c.home ? [1, 1, 1.25, 1.5][room('course')] : 1) * (graceSet() ? 1.1 : 1); }
+function courseObs(c) { return c.home ? c.obs.concat(room('course') >= 2 ? ['rope'] : [], room('course') >= 3 ? ['tight', 'zip'] : []) : c.obs; }
+function bestCourse() { let b = COURSES[0]; for (const c of COURSES) if (courseOpen(c) && c.lvl >= b.lvl && !c.marks) b = c; return b; }
+function failChance(c) { return clamp(0.25 - (LV.agility - c.lvl) * 0.012, 0.02, 0.25); }
+
+// Marks of Grace buy the Graceful outfit
+defItem('mark', { name: 'Mark of Grace', icon: '🪶', color: '#7fd0a0', value: 0, type: 'Misc', note: 'trade for Graceful clothing at any agility course' });
+const GRACE = [['helm', 'Graceful Hood', '⛑️', 35], ['body', 'Graceful Top', '🥋', 55], ['legs', 'Graceful Legs', '👖', 50], ['hands', 'Graceful Gloves', '🧤', 30], ['feet', 'Graceful Boots', '🥾', 40], ['cape', 'Graceful Cape', '🧣', 40]];
+for (const [sl, name, icon, cost] of GRACE) defItem('grace_' + sl, { name, icon, color: '#3fa86a', slot: sl, armor: 1, walk: 0.03, value: cost * 3, marks: cost, type: 'Equipment', note: '+3% walking and agility speed · full set +10% Agility XP' });
+function graceSet() { return GRACE.every(([sl]) => S.equip[sl] === 'grace_' + sl); }
+function buyGrace(sl) {
+  const it = ITEMS['grace_' + sl];
+  if (!it || has('mark') < it.marks) return;
+  take('mark', it.marks); give('grace_' + sl);
+  log(`🪶 Traded ${it.marks} Marks of Grace for ${it.name}.`, 'lg-good');
+}
+function agiSpeed() { return 1 + potB('walk') + amu('walk') + LV.agility * 0.002; }
+
+function spawnObstacle(x) {
+  const c = ZONES[S.zone].course, obs = courseObs(c);
+  if (!R.agi || R.agi.c !== c.id || R.agi.i >= obs.length) R.agi = { c: c.id, i: 0 };
+  const ob = obs[R.agi.i];
+  R.ent = { kind: 'obstacle', skill: 'agility', ob, c: c.id, i: R.agi.i, n: obs.length, x, stop: 18, t: 0, hit: 0, fail: Math.random() < failChance(c) };
+}
+function agiTick(dt) {
+  const e = R.ent, o = OBS[e.ob], c = COURSE[e.c];
+  if (e.x0 === undefined) e.x0 = R.worldX;
+  e.t += dt * agiSpeed();
+  let u = Math.min(1, e.t / o.d);
+  const fell = e.fail && u > 0.5;
+  R.worldX = e.x0 + o.L * (o.fx ? o.fx(u) : u);
+  R.heroLift = fell ? Math.max(0, (R.heroLift || 0) - dt * 400) : o.lift(u);
+  R.agiPose = fell ? 'fall' : o.pose; R.agiU = u;
+  if (fell && !e.fellT) {
+    e.fellT = 1;
+    const dmg = Math.max(1, Math.round(2 + c.lvl * 0.12));
+    S.hp = Math.max(1, S.hp - dmg); R.heroHit = 1;
+    hitsplat(HX, GY - 42, dmg, 'hit', true); sfx('hurt');
+    floatText(HX + 10, GY - 120, 'You slipped!', '#ff9a8a', 1.2, 1, true);
+  }
+  if (u < 1 && !(fell && u >= 0.8)) return;
+  R.worldX = e.x0 + o.L; R.heroLift = 0; R.agiPose = null;
+  if (!e.fail) {
+    addXp('agility', c.xp * courseXp(c));
+    if (!SIM) floatText(HX + 10, GY - 120, `✔ ${o.name}`, '#bfffa0', 1, 0.9, true);
+  }
+  R.agi.i = e.i + 1;
+  if (R.agi.i >= e.n) {
+    R.agi.i = 0; S.stats.laps++;
+    S.agiLaps[c.id] = (S.agiLaps[c.id] || 0) + 1;
+    addXp('agility', c.lap * courseXp(c));
+    const marks = Math.random() < 0.12 + c.lvl * 0.002 ? (c.marks || 1) : 0;
+    if (marks) give('mark', marks);
+    if (!SIM) { floatText(HX + 10, GY - 150, `🏁 Lap ${fmt(S.agiLaps[c.id])}${marks ? ` · +${marks} 🪶` : ''}`, '#ffe14a', 1.6, 1.2, true); sfx(marks ? 'chest' : 'level'); }
+    rollSkillPet('agility');
+  }
+  R.phase = 'done'; R.doneT = 0.35; e.dying = true;
+}
+function htmlAgility(i) {
+  const c = ZONES[i].course, here = S.zone === i && S.activity === 'agility', obs = courseObs(c), open = courseOpen(c);
+  let h = `<p class="muted">Run the course lap after lap – also while you are away. Every obstacle gives Agility XP, a full lap gives a bonus and sometimes a Mark of Grace. Higher Agility means fewer slips and faster walking everywhere. Agility level: <b>${LV.agility}</b></p>
+    <div class="grid"><div class="item ${here ? 'on' : ''}"><div class="top"><span class="ic">🏃</span><span class="nm"><b>${c.name}</b> <span class="tag">Agility ${c.lvl}</span>${c.marks ? ' <span class="tag bad">☠️ double marks</span>' : ''}<br>
+      <small>${obs.map(o => OBS[o].name).join(' → ')}</small><br>
+      <small>${fmt(c.xp * courseXp(c))} XP per obstacle · +${fmt(c.lap * courseXp(c))} per lap · ${Math.round(failChance(c) * 100)}% slip chance · laps done: ${fmt(S.agiLaps[c.id] || 0)}</small></span></div>
+      <div class="btns">${here ? '<button class="sel" disabled>🏃 Running…</button>' : `<button data-a="station" data-z="${i}" data-id="agility" ${open ? '' : 'disabled'}>${open ? '🏃 Run this course' : c.home && !room('course') ? '🔒 Build a Backyard Course' : `🔒 Agility ${c.lvl}`}</button>`}</div></div></div>`;
+  h += `<h3>🪶 Graceful outfit <small class="muted">· you have ${fmt(has('mark'))} Marks of Grace</small></h3><div class="grid">` + GRACE.map(([sl, name, icon, cost]) => {
+    const id = 'grace_' + sl, own = has(id) || S.equip[sl] === id;
+    return `<div class="item"><div class="top"><span class="ic">${icon}</span><span class="nm"><b>${name}</b><br><small>${ITEMS[id].note.split(' · ')[0]} · ${cost} 🪶${own ? ' · owned' : ''}</small></span></div>
+      <div class="btns"><button data-a="grace" data-id="${sl}" ${has('mark') >= cost ? '' : 'disabled'}>Buy</button></div></div>`;
+  }).join('') + '</div>';
+  const list = COURSES.map(k => `<div>${courseOpen(k) ? '✅' : '🔒'} <b>${k.name}</b> <span class="muted">– ${ZONES[k.zone].name}, Agility ${k.lvl}${k.home ? ', Backyard Course room' : ''}</span></div>`).join('');
+  return h + `<h3>All courses</h3><div class="info">${list}</div>`;
+}
+
 /* ================= OFFLINE ================= */
 
 function snapshot() {
@@ -2682,7 +2800,7 @@ function drawHero() {
   const dead = R.phase === 'dead';
   ellipse(HX, GY + 2, 18, 4, 'rgba(0,0,0,0.25)');
   drawHumanoid({
-    x: (dead ? HX - 30 : HX) - R.heroHit * 5, y: GY + bob - (dead ? 6 : 0), s: 1, face: 1,
+    x: (dead ? HX - 30 : HX) - R.heroHit * 5, y: GY + bob - (dead ? 6 : 0) - (R.phase === 'act' && R.ent && R.ent.kind === 'obstacle' ? R.heroLift || 0 : 0), s: 1, face: 1,
     rot: dead ? -Math.PI / 2 : 0,
     walk: walking ? Math.sin(time * 13) * 0.6 : 0,
     arm: heroArmAngle(), body: R.heroHit > 0.5 ? '#d84a4a' : body, leg: legs ? shade(legs.color, -0.08) : '#3b3550', skin: R.heroHit > 0.5 ? '#ff9a8a' : '#f1c27d',
@@ -3205,6 +3323,12 @@ function drawHud() {
       outlined(`${e.d.name} · ${Math.round(stealChance(e.d) * 100)}%`, ex, top - 10 * FS, '#fff');
       bar(ex - 30, top, 60, 6, e.stun > 0 ? e.stun / STUN_TIME : e.t / pickTime(e.id), e.stun > 0 ? '#e85a5a' : '#c58bff');
       ctx.textAlign = 'left';
+    } else if (e.kind === 'obstacle') {
+      const c = COURSE[e.c], top = GY - 175;
+      bar(ex - 30, top, 60, 6, (e.i + (R.ent === e && R.phase === 'act' ? R.agiU || 0 : 0)) / e.n, '#ffd27a');
+      font(400, 11); ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      const txt = `${OBS[e.ob].name} · ${e.i + 1}/${e.n}`;
+      ctx.strokeText(txt, ex, top - 9 * FS); ctx.fillText(txt, ex, top - 9 * FS); ctx.textAlign = 'left';
     } else if (e.kind === 'patch') {
       const p = e.pk ? patch(e.pk) : null, sd = p && p.s && SEED_BY[p.s], f = p ? growFrac(p) : 0, top = GY - 70;
       bar(ex - 30, top, 60, 6, e.blocked ? 1 : e.t / (2.4 / (1 + potB('gather'))), e.blocked ? '#e85a5a' : '#7fd06a');
@@ -3247,7 +3371,7 @@ function draw() {
     drawBackground(z);
     if (R.ent) {
       const k = R.ent.kind;
-      if (k === 'enemy') drawEnemy(R.ent); else if (k === 'npc') drawNpc(R.ent); else if (k === 'patch') drawPatch2D(R.ent); else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
+      if (k === 'enemy') drawEnemy(R.ent); else if (k === 'npc') drawNpc(R.ent); else if (k === 'patch') drawPatch2D(R.ent); else if (k === 'obstacle') { const ox = entScreenX(R.ent) - R.ent.stop; rr(ox, GY - 6, OBS[R.ent.ob].L, 8, 3, '#7a5a3a'); } else if (CRAFTING.has(R.ent.skill)) drawStation(R.ent); else drawNode(R.ent);
     }
     drawEvents();
     drawHero();
@@ -4224,6 +4348,10 @@ const G3 = (() => {
     else if (a === 'firemaking') t.add(box(0.18, 0.12, 0.12, '#7a6a5a', 0, y0 - 0.06, 0));
     else if (a === 'fletching') t.add(box(0.04, 0.12, 0.04, '#5a3a22', 0, y0 - 0.06, 0), box(0.02, 0.3, 0.05, '#cfd4dc', 0, y0 - 0.26, 0));
     else if (a === 'runecrafting') t.add(at(glow('#d2a0ff', 0.6, 0.9), 0, y0 - 0.1, 0));
+    else if (a === 'farming') { t.add(handle(0.5), box(0.14, 0.22, 0.04, '#9aa0a8', 0, y0 - 0.4, 0)); }
+    else if (a === 'herblore') { t.add(mk(new T.CylinderGeometry(0.08, 0.1, 0.22, 6), '#cfe8d8', 0, y0 - 0.1, 0), at(glow('#7fff7a', 0.5, 0.8), 0, y0 - 0.1, 0)); }
+    else if (a === 'construction') { t.add(handle(0.6), box(0.2, 0.1, 0.1, '#5b5f68', 0, y0 - 0.45, 0)); }
+    else if (a === 'summoning') t.add(at(glow('#6af0ff', 0.6, 0.9), 0, y0 - 0.1, 0));
     else return null;
     return t;
   }
@@ -4256,6 +4384,21 @@ const G3 = (() => {
     P.legF.rotation.z = sw; P.legB.rotation.z = -sw;
     P.armF.rotation.z = -heroArmAngle();
     P.armB.rotation.z = walking ? -sw * 0.8 : S.activity === 'combat' && wtype() === 'ranged' ? 1.3 : 0.1;
+    // agility: lift the hero over the obstacle and pose it
+    const pose = R.phase === 'act' && R.ent && R.ent.kind === 'obstacle' ? R.agiPose : null;
+    heroObj.visible = !(pose === 'blink' && R.agiU > 0.3 && R.agiU < 0.7);
+    if (pose) heroObj.position.y += (R.heroLift || 0) / U3;
+    p.scale.y = pose === 'crouch' ? 0.62 : 1; p.rotation.x = 0;
+    P.armF.rotation.x = 0; P.armB.rotation.x = 0;
+    if (pose) {
+      const m = Math.sin(time * 9) * 0.5;
+      if (pose === 'balance') { P.armF.rotation.x = -1.3; P.armB.rotation.x = 1.3; P.armF.rotation.z = 0; P.armB.rotation.z = 0; p.rotation.x = Math.sin(time * 5) * 0.08; P.legF.rotation.z = m; P.legB.rotation.z = -m; }
+      else if (pose === 'climb') { P.armF.rotation.z = -2.6 + m; P.armB.rotation.z = -2.6 - m; P.legF.rotation.z = 0.6 + m; P.legB.rotation.z = 0.6 - m; }
+      else if (pose === 'hang' || pose === 'swing') { P.armF.rotation.z = -3.0; P.armB.rotation.z = -3.0; P.legF.rotation.z = 0.2 + m * 0.3; P.legB.rotation.z = 0.2 - m * 0.3; if (pose === 'swing') p.rotation.z = (0.5 - (R.agiU || 0)) * 0.8; }
+      else if (pose === 'jump' || pose === 'blink') { P.legF.rotation.z = 0.7; P.legB.rotation.z = -0.5; P.armF.rotation.z = -1.2; P.armB.rotation.z = 1.0; }
+      else if (pose === 'crouch') { P.legF.rotation.z = m; P.legB.rotation.z = -m; P.armF.rotation.z = -0.8; }
+      else if (pose === 'fall') p.rotation.z = 1.2;
+    }
     const tool = P.armF.children[2];
     if (tool && tool.userData.arrow) { const drawn = R.swing < 0.5; tool.userData.arrow.visible = drawn; tool.userData.string.position.y = drawn ? -0.2 : -0.37; }
     const h = R.heroHit > 0.5 ? 0.45 : 0; flash(heroObj, h, 0, 0);
@@ -4524,7 +4667,94 @@ const G3 = (() => {
     g.userData.P = P; g.userData.mats = mats(g);
     return g;
   }
-  function buildEnt(e) { return e.kind === 'enemy' ? buildEnemy(e) : e.kind === 'npc' ? buildNpc(e) : e.kind === 'patch' ? buildPatch(e) : CRAFTING.has(e.skill) ? buildStation(e) : buildNode(e); }
+  /* --- agility obstacles: built from where the hero starts to where it lands --- */
+  function pit(g, Lu, x0, x1, c = '#151018') { g.add(mk(new T.BoxGeometry(x1 - x0, 0.05, 1.7), unlit(c), (x0 + x1) / 2, 0.01, 0)); }
+  function post(g, x, h, c = '#6b4a2a', z = 0) { g.add(box(0.14, h, 0.14, c, x, h / 2, z)); }
+  function buildObstacle(e) {
+    const g = new T.Group(), P = {}, Lu = OBS[e.ob].L / U3, zone = ZONES[S.zone].th;
+    switch (e.ob) {
+      case 'hurdles':
+        for (const f of [1 / 6, 3 / 6, 5 / 6]) { const x = Lu * f; post(g, x, 0.6, '#e8e8e8', 0.6); post(g, x, 0.6, '#e8e8e8', -0.6); g.add(box(0.08, 0.1, 1.3, '#d83a3a', x, 0.55, 0), box(0.08, 0.1, 1.3, '#f4f4f4', x, 0.4, 0)); }
+        break;
+      case 'log': case 'crystal': {
+        const cr = e.ob === 'crystal';
+        pit(g, Lu, 0.4, Lu - 0.4, cr ? '#0d2030' : '#2a6ab0');
+        const l = mk(new T.CylinderGeometry(cr ? 0.12 : 0.2, cr ? 0.12 : 0.2, Lu - 0.4, 8), cr ? unlit('#7fe0f0') : '#7a4e2a', Lu / 2, 0.3, 0); l.rotation.z = Math.PI / 2; g.add(l);
+        if (cr) for (let k = 0; k < 5; k++) g.add(mk(new T.ConeGeometry(0.15, 0.8, 4), unlit('#a8f4ff'), 0.6 + k * (Lu - 1.2) / 4, 0.4, k & 1 ? 0.7 : -0.7));
+        else for (const x of [0.3, Lu - 0.3]) g.add(mk(new T.CylinderGeometry(0.3, 0.3, 0.3, 8), '#5e3c22', x, 0.15, 0));
+        break;
+      }
+      case 'wall':
+        g.add(box(0.6, 1.7, 1.8, '#8a8478', Lu * 0.3, 0.85, 0));
+        for (let k = 0; k < 4; k++) g.add(box(0.1, 0.1, 0.25, '#c8a060', Lu * 0.3 - 0.33, 0.3 + k * 0.38, (k & 1 ? 0.3 : -0.3)));
+        break;
+      case 'gap':
+        pit(g, Lu, Lu * 0.2, Lu * 0.8);
+        g.add(box(Lu * 0.2, 0.25, 1.8, '#7a6a5a', Lu * 0.1, 0.12, 0), box(Lu * 0.2, 0.25, 1.8, '#7a6a5a', Lu * 0.9, 0.12, 0));
+        break;
+      case 'rope':
+        pit(g, Lu, Lu * 0.15, Lu * 0.85);
+        post(g, Lu / 2 - 0.8, 3.4); post(g, Lu / 2 + 0.8, 3.4); g.add(box(1.8, 0.14, 0.14, '#6b4a2a', Lu / 2, 3.4, 0));
+        P.rope = new T.Group(); P.rope.position.set(Lu / 2, 3.35, 0.1);
+        P.rope.add(box(0.05, 2.0, 0.05, '#d8c8a0', 0, -1.0, 0)); g.add(P.rope);
+        break;
+      case 'net': {
+        const h = 2.3;
+        for (const s of [-1, 1]) {
+          const side = new T.Group(); side.position.set(Lu / 2 + s * Lu * 0.22, h / 2, 0); side.rotation.z = s * 0.75;
+          for (let k = -3; k <= 3; k++) side.add(box(0.03, h * 1.35, 0.03, '#c8b890', 0, 0, k * 0.25));
+          for (let k = -3; k <= 3; k++) side.add(box(0.03, 0.03, 1.6, '#c8b890', 0, k * 0.4, 0));
+          g.add(side);
+        }
+        post(g, Lu / 2, h + 0.2);
+        break;
+      }
+      case 'bars':
+        for (const x of [0.3, Lu - 0.3]) { post(g, x, 2.4, '#5a5a62', 0.5); post(g, x, 2.4, '#5a5a62', -0.5); }
+        g.add(box(Lu - 0.6, 0.08, 0.08, '#8a8a92', Lu / 2, 2.4, 0.5), box(Lu - 0.6, 0.08, 0.08, '#8a8a92', Lu / 2, 2.4, -0.5));
+        for (let x = 0.6; x < Lu - 0.4; x += 0.4) g.add(box(0.06, 0.06, 1.0, '#b8b8c0', x, 2.4, 0));
+        break;
+      case 'stones': case 'lava': {
+        const lv = e.ob === 'lava';
+        pit(g, Lu, 0.3, Lu - 0.3, lv ? '#e05a1a' : '#2a6ab0');
+        for (let k = 0; k < 4; k++) g.add(mk(new T.CylinderGeometry(0.35, 0.4, 0.2, 7), lv ? '#3a2a24' : '#8a8a90', Lu * (k + 0.5) / 4, 0.1, (k & 1) ? 0.15 : -0.15));
+        if (lv) g.add(at(glow('#ff7a2a', 3, 0.4), Lu / 2, 0.3, 0.5));
+        break;
+      }
+      case 'zip':
+        for (const z of [0.5, -0.5]) post(g, 0.2, 2.6, '#6b4a2a', z);
+        g.add(box(1.0, 0.12, 1.2, '#8a5a32', 0.3, 2.55, 0));
+        post(g, Lu, 0.9);
+        { const len = Math.hypot(Lu, 2.0), c = box(len, 0.04, 0.04, '#2a2a2a', Lu / 2, 1.85, 0.1); c.rotation.z = -Math.atan2(2.0, Lu); g.add(c); }
+        break;
+      case 'ledge':
+        pit(g, Lu, 0.2, Lu - 0.2);
+        g.add(box(Lu, 3.0, 0.4, '#7a7468', Lu / 2, 1.5, -0.7), box(Lu, 0.12, 0.35, '#9a9488', Lu / 2, 0.6, -0.35));
+        break;
+      case 'tight':
+        pit(g, Lu, 0.4, Lu - 0.4);
+        for (const x of [0.2, Lu - 0.2]) post(g, x, 2.2);
+        g.add(box(Lu - 0.4, 0.03, 0.03, '#e8d8b0', Lu / 2, 2.0, 0));
+        break;
+      case 'slide': {
+        const len = Math.hypot(Lu, 1.0), r = box(len, 0.1, 1.4, '#cfe8f8', Lu / 2, 0.5, 0); r.rotation.z = -Math.atan2(1.0, Lu); g.add(r);
+        g.add(box(0.8, 1.0, 1.4, '#eef4fb', 0.2, 0.5, 0));
+        break;
+      }
+      case 'pipe': {
+        const p = mk(new T.CylinderGeometry(0.55, 0.55, Lu * 0.8, 10, 1, true), '#5a5a62', Lu / 2, 0.55, 0); p.rotation.z = Math.PI / 2; g.add(p);
+        for (const x of [Lu * 0.1, Lu * 0.9]) { const r = mk(new T.TorusGeometry(0.55, 0.08, 5, 12), '#7a7a82', x, 0.55, 0); r.rotation.y = Math.PI / 2; g.add(r); }
+        break;
+      }
+      case 'portal':
+        for (const x of [0.4, Lu - 0.4]) { g.add(mk(new T.TorusGeometry(0.8, 0.12, 6, 14), '#4a3a6a', x, 1.0, 0)); g.add(at(glow('#c070ff', 2.4, 0.6), x, 1.0, 0.1)); }
+        break;
+    }
+    g.add(shadow(0.6));
+    g.userData.P = P; g.userData.mats = mats(g);
+    return g;
+  }
+  function buildEnt(e) { return e.kind === 'enemy' ? buildEnemy(e) : e.kind === 'npc' ? buildNpc(e) : e.kind === 'patch' ? buildPatch(e) : e.kind === 'obstacle' ? buildObstacle(e) : CRAFTING.has(e.skill) ? buildStation(e) : buildNode(e); }
   function dropEnt() { if (!entObj) return; scene.remove(entObj); if (entObj.userData.line) { scene.remove(entObj.userData.line); dispose(entObj.userData.line); } dispose(entObj); entObj = null; }
   function syncEnt() {
     const e = R.ent;
@@ -4559,6 +4789,10 @@ const G3 = (() => {
     } else if (e.kind === 'rock') {
       x += Math.sin(time * 70) * e.hit * 3;
       P.r.scale.setScalar(0.55 + 0.45 * (e.yields / e.maxYields));
+    } else if (e.kind === 'obstacle') {
+      x = e.x - e.stop;
+      const act = R.phase === 'act' && R.ent === e;
+      if (P.rope) P.rope.rotation.z = act ? (0.5 - (R.agiU || 0)) * 1.8 : Math.sin(time * 1.5) * 0.15;
     } else if (e.kind === 'patch') {
       const f = e.pk ? growFrac(patch(e.pk)) : 0;
       P.pl.scale.set(1, 0.25 + 0.75 * f, 1);
@@ -4834,7 +5068,7 @@ function htmlCombatPanel() {
   return h;
 }
 
-const ACT_ORDER = ['combat', 'pvp', 'farming', 'construction', 'thieving', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting', 'herblore', 'summoning', 'firemaking'];
+const ACT_ORDER = ['combat', 'pvp', 'farming', 'construction', 'agility', 'thieving', 'woodcutting', 'mining', 'fishing', 'smithing', 'cooking', 'fletching', 'runecrafting', 'herblore', 'summoning', 'firemaking'];
 const STATION_NAME = { smithing: '🔥 Furnace and 🔨 Anvil', cooking: '🔥 Campfire', fletching: '🪶 Fletching bench', runecrafting: '🔮 Rune altar', firemaking: '🔥 Campsite' , herblore: '🧪 Herb lab and apothecary', construction: '🪚 Sawbench', summoning: '🔷 Summoning obelisk' };
 let mapSel = null, mapAct = null;
 function actIcon(a) { return a === 'combat' ? '⚔️' : a === 'pvp' ? '☠️' : SKILLS[a].icon; }
@@ -4908,6 +5142,7 @@ function htmlLocAct(i, a) {
   const z = ZONES[i], here = S.zone === i && S.activity === a;
   if (a === 'construction') return htmlRooms(i);
   if (a === 'farming') return htmlFarm(i);
+  if (a === 'agility') return htmlAgility(i);
   if (a === 'pvp') {
     if (!zoneOpen(i)) return `<p class="need">Reach combat level ${z.req} to enter the Wilderness (you are ${combatLevel()}).</p>`;
     const on = S.zone === i && S.activity === 'combat' && S.ctarget === 'pvp';
@@ -5503,6 +5738,7 @@ document.addEventListener('click', ev => {
     case 'loc': mapSel = +id; mapAct = null; break;
     case 'mapact': mapAct = id; break;
     case 'build': buildRoom(id); break;
+    case 'grace': buyGrace(id); break;
     case 'plant': { const sd = bestSeed(patchKind(id)); if (sd && plant(id, sd)) log(`🌱 Planted ${ITEMS[sd].name}.`, 'lg-good'); break; }
     case 'harv': { const r = harvest(id); if (r) { log(`🧺 Harvested ${r[1]}× ${ITEMS[r[0]].name}.`, 'lg-good'); sfx('gather'); } break; }
     case 'fsel': S.home.sel[b.dataset.skill] = id || null; break;
