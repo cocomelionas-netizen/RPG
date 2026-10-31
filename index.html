@@ -1283,7 +1283,7 @@ function newJourney() {
   if (!S.bosses[4]) return;
   const gain = renownGain();
   // keep achievements, lifetime stats and Renown; everything else starts over
-  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet, unlocked: S.unlocked, home: S.home, autoPot: S.autoPot, agiLaps: S.agiLaps, daily: S.daily,
+  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet, unlocked: S.unlocked, home: S.home, autoPot: S.autoPot, agiLaps: S.agiLaps, daily: S.daily, path: S.path,
     renown: S.renown + gain, journeys: S.journeys + 1, tipEvent: true };
   S = Object.assign(newState(), keep);
   const hs = S.rup.headstart;
@@ -1904,22 +1904,24 @@ function craftTick(dt) {
   }
   const need = stationTime(e), ex = entScreenX(e);
   e.t += dt;
-  if (!cooking && !fm && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; e.splash = 1; if (!G3.on || skill !== 'smithing') burst(ex - 6, GY - 46, CRAFT[skill].spark, 4); }
+  if (!cooking && !fm && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; e.splash = 1; if (!G3.on) burst(ex - 6, GY - 46, CRAFT[skill].spark, 4); }
   if (e.t >= need) {
     e.t -= need; e.swung = false; e.hit = 1;
     if (!SIM && r) { e.splash = 2; e.prod = r.out; }
     if (fm) {
       const t = fmTarget(); burnOnce(t);
+      if (!SIM) { e.splash = 2; e.prod = 'log' + t; }
       burst(ex, GY - 30, '#ffb347', 10);
       floatText(ex, GY - 100, `🔥 ${LOG_N[t]}`, '#ffd27a');
     } else if (cooking) {
       const res = cookOnce(cookTarget()); rollSkillPet('cooking');
+      if (!SIM) { e.splash = 2; e.prod = res; }
       burst(ex, GY - 40, res === 'burnt' ? '#444444' : '#ffb347', 6);
       floatText(ex, GY - 100, res === 'burnt' ? 'Burnt!' : '+1 🍽️', res === 'burnt' ? '#ff8a5a' : '#ffffff');
     } else {
       R.swing = 1;
       const [out, n] = craftOnce(skill, S.csel[skill]); rollSkillPet(skill);
-      burst(ex - 6, GY - 46, CRAFT[skill].spark, 8); sfx(skill === 'runecrafting' ? 'magic' : 'clink');
+      if (!G3.on) burst(ex - 6, GY - 46, CRAFT[skill].spark, 8); sfx(skill === 'runecrafting' ? 'magic' : 'clink');
       floatText(ex, GY - 100, `+${n} ${ITEMS[out].icon}`, '#ffffff');
     }
     if (--e.crafts <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
@@ -2326,10 +2328,11 @@ function farmTick(dt) {
   }
   const need = 2.4 / (1 + potB('gather'));
   e.t += dt;
-  if (!e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; }
+  if (!e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; if (!SIM) e.splash = 1; }
   if (e.t < need) return;
   e.t -= need; e.swung = false; R.swing = 1; e.hit = 1;
   const p = patch(e.pk), ex = entScreenX(e);
+  if (!SIM) { e.splash = 2; e.fk = p.s && growFrac(p) >= 1 ? 'h' : !p.s ? 'p' : 'w'; e.prod = p.s ? SEED_BY[p.s].out : ''; }
   if (p.s && growFrac(p) >= 1) {
     const [out, n] = harvest(e.pk);
     floatText(ex, GY - 100, `+${n} ${ITEMS[out].icon}`, '#ffffff'); sfx('gather');
@@ -2341,7 +2344,7 @@ function farmTick(dt) {
     p.t -= 20; addXp('farming', 3 + LV.farming * 0.35); S.stats.tended++;
     floatText(ex, GY - 100, '💧 Tended', '#9fd8ff');
   }
-  if (!SIM) burst(ex, GY - 14, '#8a6a3a', 5);
+  if (!SIM && !G3.on) burst(ex, GY - 14, '#8a6a3a', 5);
   if (--e.acts <= 0) { R.phase = 'done'; R.doneT = 0.6; e.dying = true; }
 }
 
@@ -2675,6 +2678,58 @@ function htmlQueue() {
   return h + '</div>';
 }
 
+/* ===== Road to Adventure: a 7-day starter path, one chapter opens each day ===== */
+const PATH = [
+  { icon: '🌄', name: 'First Steps on the Road', steps: [{ t: 'gather', skill: 'mining', n: 20 }, { t: 'smith', n: 5 }, { t: 'kill', id: 'rat', n: 15 }, { t: 'level', skill: 'hitpoints', n: 12 }], gold: 300, items: { lamp: 1 } },
+  { icon: '🔥', name: 'Fish and Fire', steps: [{ t: 'gather', skill: 'woodcutting', n: 30 }, { t: 'burn', n: 15 }, { t: 'gather', skill: 'fishing', n: 30 }, { t: 'cook', n: 20 }], gold: 500, items: { lamp: 1, clue_easy: 1 } },
+  { icon: '🗡️', name: 'Sharpen Your Blade', steps: [{ t: 'level', skill: 'attack', n: 15 }, { t: 'level', skill: 'strength', n: 15 }, { t: 'smith', n: 25 }, { t: 'kill', id: 'slime', n: 30 }], gold: 800, items: { lamp: 2 } },
+  { icon: '👑', name: 'The Slime King', steps: [{ t: 'boss', z: 0 }, { t: 'level', skill: 'defence', n: 15 }, { t: 'bury', n: 30 }], gold: 1200, items: { clue_easy: 1, lamp: 2 } },
+  { icon: '🪶', name: 'Craftsman of the Road', steps: [{ t: 'fletch', n: 30 }, { t: 'gather', skill: 'mining', n: 120 }, { t: 'level', skill: 'smithing', n: 20 }, { t: 'cook', n: 60 }], gold: 1500, items: { clue_medium: 1, lamp: 2 } },
+  { icon: '🌲', name: 'Into the Dark Forest', steps: [{ t: 'kill', id: 'goblin', n: 40 }, { t: 'level', skill: 'prayer', n: 10 }, { t: 'level', skill: 'strength', n: 25 }, { t: 'gather', skill: 'fishing', n: 150 }], gold: 2500, items: { clue_medium: 1, lamp: 3 } },
+  { icon: '🏆', name: 'Legend of the Road', steps: [{ t: 'boss', z: 1 }, { t: 'total', n: 150 }, { t: 'kills', n: 500 }], gold: 5000, items: { clue_hard: 1, lamp: 4 } },
+];
+const PATH_ABS = new Set(['level', 'boss', 'bring', 'room', 'total']);
+const midnight = (d = new Date()) => { d = new Date(d); d.setHours(0, 0, 0, 0); return d.getTime(); };
+function pathInit() {
+  if (S.path) return;
+  S.path = { start: midnight(), base: {}, claimed: {} };
+  for (const ch of PATH) for (const o of ch.steps) if (!PATH_ABS.has(o.t)) S.path.base[JSON.stringify(o)] = pVal(o);
+}
+function pVal(o) { return o.t === 'total' ? totalLevel() : o.t === 'kills' ? S.kills : objVal(o); }
+function pNeed(o) { return o.t === 'boss' ? 1 : o.n; }
+function pProg(o) { const v = pVal(o); return Math.max(0, Math.min(pNeed(o), PATH_ABS.has(o.t) ? v : v - (S.path.base[JSON.stringify(o)] || 0))); }
+function pText(o) { return o.t === 'total' ? 'Reach total level' : o.t === 'kills' ? 'Defeat enemies (any)' : o.t === 'boss' ? `Defeat ${ENEMIES[ZONES[o.z].boss].name}` : o.t === 'level' ? `Reach ${SKILLS[o.skill].icon} ${SKILLS[o.skill].name} level` : objText(o); }
+function pathDay() { return clamp(Math.round((midnight() - S.path.start) / 86400000) + 1, 1, 7); }
+const pathDone = k => PATH[k].steps.every(o => pProg(o) >= pNeed(o));
+function pathReady() { pathInit(); const d = pathDay(); for (let k = 0; k < d; k++) if (!S.path.claimed[k] && pathDone(k)) return k; return -1; }
+function pathActive() { pathInit(); return Object.keys(S.path.claimed).length < PATH.length; }
+function pRewardText(ch) { return `${fmt(ch.gold)} gold, ` + Object.entries(ch.items).map(([id, n]) => `${n > 1 ? n + '× ' : ''}${ITEMS[id] ? ITEMS[id].icon + ' ' + ITEMS[id].name : id}`).join(', '); }
+function claimPath(k) {
+  pathInit();
+  const ch = PATH[k];
+  if (!ch || S.path.claimed[k] || k >= pathDay() || !pathDone(k)) return;
+  S.path.claimed[k] = true;
+  S.gold += ch.gold; for (const [id, n] of Object.entries(ch.items)) give(id, n);
+  log(`🛣️ Road to Adventure – day ${k + 1} "${ch.name}" done: ${pRewardText(ch)}`, 'lg-gold');
+  showBanner(`🛣️ Day ${k + 1} complete!`); sfx('chest');
+  if (Object.keys(S.path.claimed).length === PATH.length) { log('🏆 You finished the Road to Adventure! The road is yours now.', 'lg-gold'); setTimeout(() => showBanner('🏆 Road to Adventure complete!'), 1800); }
+}
+function htmlPath() {
+  pathInit();
+  const d = pathDay(), left = PATH.length - Object.keys(S.path.claimed).length;
+  let h = `<div class="info"><b>🛣️ Road to Adventure</b> – day ${d} of 7 <span class="muted">· a new chapter opens every day; finished ones give rewards. ${left ? `${left} to go.` : 'All done – well travelled!'}</span></div><div class="grid">`;
+  PATH.forEach((ch, k) => {
+    const open = k < d, done = pathDone(k), got = S.path.claimed[k];
+    h += `<div class="item quest ${open && done && !got ? 'ready' : ''}" style="${open ? '' : 'opacity:.6'}"><div class="top"><span class="ic">${got ? '✅' : open ? ch.icon : '🔒'}</span><span class="nm"><b>Day ${k + 1}: ${ch.name}</b><br>`;
+    if (open) h += ch.steps.map(o => { const pr = pProg(o), n = pNeed(o); return `<small>${pr >= n ? '✅' : '▫️'} ${pText(o)}${o.t === 'boss' ? '' : ` ${fmt(pr)} / ${fmt(n)}`}</small><div class="bar"><i style="width:${(pr / n * 100).toFixed(1)}%"></i></div>`; }).join('');
+    else h += `<small class="muted">🔒 Opens in ${k + 1 - d} day${k + 1 - d === 1 ? '' : 's'}</small><br>`;
+    h += `<small class="muted">🎁 ${pRewardText(ch)}</small></span></div>`;
+    if (open && !got) h += `<div class="btns"><button data-a="pclaim" data-id="${k}" ${done ? '' : 'disabled'}>🎁 Claim</button></div>`;
+    h += '</div>';
+  });
+  return h + '</div>';
+}
+
 /* ===== Weekly road event: a different skill group gets bonus XP each week ===== */
 const ROAD_EVENTS = [
   { id: 'lumber', icon: '🪓', name: 'Lumber Week', skills: ['woodcutting', 'firemaking', 'fletching'] },
@@ -2834,6 +2889,7 @@ function showOfflineSummary(sec, before) {
     <div style="margin:8px 0"><small>${full ? `⏳ Your hero reached the ${Math.round(cap / 3600)}h limit – time after that was lost. Come back sooner!` : `🎒 Offline time used: ${Math.round(pct)}% of ${Math.round(cap / 3600)}h`}</small>
       <div class="bar"><i style="width:${pct.toFixed(1)}%;${full ? 'background:#e0453a' : ''}"></i></div></div>
     <p><small>${roadEventText()}</small></p>
+    ${pathActive() ? `<p><small>🛣️ <b>Road to Adventure</b> – day ${pathDay()}: ${PATH[pathDay() - 1].name}${pathReady() >= 0 ? ' · 🎁 a reward is waiting!' : ''} <span class="muted">(Quests → Road)</span></small></p>` : ''}
     ${streakBtn}
     <button data-a="close">Continue</button>`);
 }
@@ -3484,7 +3540,7 @@ function chips(e) {
   if (SIM) return;
   const x = entScreenX(e);
   e.splash = e.hit >= 1 ? 2 : 1;   // picked up by the 3D view: splash / chips, and the fish or ore on a full one
-  if (e.kind === 'tree') burst(x - 12, GY - 40, '#c89a5a', 5);
+  if (e.kind === 'tree') { if (!G3.on) burst(x - 12, GY - 40, '#c89a5a', 5); }
   else if (e.kind === 'rock') { if (!G3.on) { burst(x - 20, GY - 25, '#9a9aa5', 5); burst(x - 20, GY - 25, e.ess ? '#b48cff' : ORES[e.tier].color, 2); } }
   else if (!G3.on) burst(x - 12, GY + 6, '#bfe2ff', 6);
 }
@@ -5200,6 +5256,9 @@ const G3 = (() => {
       if (e.tier === 4) { P.spark = group(); for (let k = 0; k < 6; k++) P.spark.add(mk(new T.OctahedronGeometry(0.06, 0), unlit('#f6e3ff'))); t.add(P.spark); }
       g.add(t); P.t = t;
       g.add(shadow(0.9));
+      fxInit(g, P, '#d8a868');
+      P.prod = itemMesh('log' + e.tier); P.prod.visible = false; P.fx.add(P.prod);
+      P.leaves = []; for (let k = 0; k < 10; k++) { const l = box(0.12, 0.02, 0.08, k & 1 ? c : shade(c, -0.1)); l.visible = false; P.leaves.push(l); P.fx.add(l); }
     } else if (e.kind === 'rock') {
       const r = new T.Group();
       r.add(at(mk(new T.DodecahedronGeometry(0.75, 0), lam('#6e6e78')), 0, 0.45, 0)); r.children[0].scale.set(1.3, 0.85, 1);
@@ -5377,9 +5436,61 @@ const G3 = (() => {
     else if (/^(armor|chainbody)/.test(id)) g.add(box(0.34, 0.36, 0.2, c), box(0.46, 0.09, 0.22, lt, 0, 0.15, 0));
     else if (/^platelegs/.test(id)) g.add(box(0.32, 0.1, 0.18, c, 0, 0.12, 0), box(0.12, 0.36, 0.14, c, -0.08, -0.08, 0), box(0.12, 0.36, 0.14, c, 0.08, -0.08, 0));
     else if (/^kiteshield/.test(id)) { const sh = mk(new T.CylinderGeometry(0.24, 0.24, 0.05, 6), c); sh.rotation.x = Math.PI / 2; sh.scale.set(0.8, 1, 1.2); g.add(sh, box(0.05, 0.3, 0.07, lt)); }
-    else for (let k = 0; k < 4; k++) g.add(box(0.14, 0.04, 0.04, lt, (k - 1.5) * 0.06, k * 0.03, 0));
+    else if (/^(nails|tips|arrow)/.test(id)) for (let k = 0; k < 4; k++) g.add(box(0.14, 0.04, 0.04, lt, (k - 1.5) * 0.06, k * 0.03, 0));
+    else return itemMesh(id);
     g.userData.metal = c;
     return g;
+  }
+  function fishMesh(fc) {
+    const f = new T.Group();
+    const body = mk(new T.SphereGeometry(0.2, 8, 6), fc); body.scale.set(1, 0.5, 0.38);
+    const belly = mk(new T.SphereGeometry(0.16, 8, 6), shadeC(fc, 0.35), 0.02, -0.03, 0); belly.scale.set(1, 0.4, 0.4);
+    const tail = mk(new T.ConeGeometry(0.09, 0.13, 4), fc, -0.25, 0, 0); tail.rotation.z = -Math.PI / 2; tail.scale.z = 0.3;
+    f.add(body, belly, tail, mk(new T.SphereGeometry(0.025, 5, 4), '#111111', 0.13, 0.03, 0.06));
+    return f;
+  }
+  // a crop or herb as it looks when picked
+  function cropMesh(id) {
+    const g = new T.Group(), c = (ITEMS[id] && ITEMS[id].color) || '#7ac050', k = id.replace(/^crop_|^herb_/, '');
+    if (/^herb_/.test(id)) { for (let i = 0; i < 4; i++) { const l = mk(new T.ConeGeometry(0.05, 0.3, 4), i & 1 ? c : shadeC(c, -0.15), Math.sin(i * 1.6) * 0.05, 0.12, Math.cos(i * 1.6) * 0.05); l.rotation.set(Math.cos(i * 1.6) * 0.5, 0, -Math.sin(i * 1.6) * 0.5); g.add(l); } g.add(box(0.03, 0.12, 0.03, '#5a8a3a')); }
+    else if (k === 'sweetcorn') { const cb = mk(new T.CylinderGeometry(0.06, 0.05, 0.3, 6), '#f2d04a'); g.add(cb); for (const sx of [-1, 1]) { const lf = mk(new T.ConeGeometry(0.05, 0.32, 3), '#6ab04a', sx * 0.05, -0.03, 0); lf.rotation.z = sx * 0.3; g.add(lf); } }
+    else if (k === 'strawberry') { const b = mk(new T.ConeGeometry(0.09, 0.16, 6), c); b.rotation.z = Math.PI; g.add(b, mk(new T.ConeGeometry(0.06, 0.04, 5), '#4a9a3a', 0, 0.09, 0)); }
+    else if (k === 'watermelon') { const w = mk(new T.SphereGeometry(0.2, 8, 6), '#3a8a3a'); w.scale.set(1.3, 0.9, 0.9); g.add(w); }
+    else if (k === 'cabbage') { g.add(mk(new T.IcosahedronGeometry(0.15, 1), c)); for (let i = 0; i < 3; i++) g.add(at(mk(new T.SphereGeometry(0.1, 6, 4, 0, Math.PI), shadeC(c, 0.15)), Math.cos(i * 2.1) * 0.08, 0, Math.sin(i * 2.1) * 0.08)); }
+    else if (k === 'onion') g.add(mk(new T.SphereGeometry(0.11, 8, 6), c), mk(new T.ConeGeometry(0.03, 0.18, 4), '#6ab04a', 0, 0.15, 0));
+    else if (k === 'potato') { const pt = mk(new T.DodecahedronGeometry(0.12, 0), c); pt.scale.set(1.3, 0.8, 0.9); g.add(pt); }
+    else if (k === 'snape') for (let i = 0; i < 5; i++) { const b = mk(new T.ConeGeometry(0.025, 0.35, 3), c, (i - 2) * 0.03, 0.12, 0); b.rotation.z = (i - 2) * 0.15; g.add(b); }
+    else g.add(mk(new T.SphereGeometry(0.12, 8, 6), c), mk(new T.ConeGeometry(0.04, 0.05, 5), '#4a9a3a', 0, 0.11, 0));
+    return g;
+  }
+  // any other thing you can make or pick, shaped from its id
+  function itemMesh(id) {
+    const g = new T.Group(), it = ITEMS[id] || {}, c = it.color || '#c8a060', d = /(\d)$/.exec(id), t = d ? +d[1] : 0;
+    if (/^log/.test(id)) { const l = mk(new T.CylinderGeometry(0.1, 0.11, 0.48, 7), ['#7a5530', '#8a6038', '#c07030', '#5a3e22', '#7a4aa0'][t] || '#7a5530'); l.rotation.z = Math.PI / 2; g.add(l); for (const sx of [-1, 1]) { const e = mk(new T.CircleGeometry(0.095, 7), '#e0c090', sx * 0.245, 0, 0); e.rotation.y = sx * Math.PI / 2; g.add(e); } }
+    else if (/^plank/.test(id)) g.add(box(0.55, 0.05, 0.16, ['#c89a5a', '#b88848', '#a87838', '#8a6030', '#6a4a2a'][t] || '#c89a5a'), box(0.55, 0.05, 0.16, ['#b88848', '#a87838', '#986828', '#7a5020', '#5a3a1a'][t] || '#b88848', 0.02, 0.05, 0.02));
+    else if (/^fish\d/.test(id)) g.add(fishMesh(TIER_COLORS[t]));
+    else if (/^cooked\d/.test(id)) g.add(fishMesh(mix(TIER_COLORS[t], '#b0682a', 0.65)));
+    else if (id === 'burnt') g.add(fishMesh('#2a2220'));
+    else if (/^l?bow\d/.test(id)) { const arc = mk(new T.TorusGeometry(0.28, 0.025, 4, 10, Math.PI * 0.9), ['#a06a3a', '#8a5a2a', '#c07030', '#5a3e22', '#7a4aa0'][t] || '#a06a3a'); arc.rotation.z = Math.PI * 0.55; g.add(arc, box(0.01, 0.52, 0.01, '#f0f0e0', 0.04, 0, 0)); }
+    else if (/^(arrow|tips|nails)/.test(id)) for (let k = 0; k < 3; k++) { const a = new T.Group(), mc = METAL_COLORS[t] || '#8a8f98'; if (!/^tips/.test(id)) a.add(box(0.42, 0.02, 0.02, /^nails/.test(id) ? mc : '#a07040')); if (!/^nails/.test(id)) { const hd = mk(new T.ConeGeometry(0.035, 0.09, 4), mix(mc, '#ffffff', 0.2), 0.24, 0, 0); hd.rotation.z = -Math.PI / 2; a.add(hd); } if (/^arrow/.test(id)) a.add(box(0.08, 0.05, 0.005, '#f0f0f0', -0.18, 0, 0)); a.position.set(0, (k - 1) * 0.06, (k - 1) * 0.03); g.add(a); }
+    else if (/^r_/.test(id)) { g.add(box(0.24, 0.24, 0.07, '#8a8494')); g.add(at(mk(new T.OctahedronGeometry(0.07, 0), unlit(c)), 0, 0, 0.05)); }
+    else if (/^pot_/.test(id)) { const b = mk(new T.SphereGeometry(0.11, 8, 6), lam(c, { emissive: C(c).multiplyScalar(0.3) })); g.add(b, mk(new T.CylinderGeometry(0.035, 0.04, 0.1, 6), '#d8eef4', 0, 0.13, 0), mk(new T.CylinderGeometry(0.04, 0.035, 0.04, 6), '#8a6a44', 0, 0.2, 0)); }
+    else if (/^(crop|herb)_/.test(id)) g.add(cropMesh(id));
+    else if (/^pouch_/.test(id)) { const pc = mk(new T.SphereGeometry(0.13, 8, 6), '#8a6a44'); pc.scale.y = 0.9; g.add(pc, mk(new T.ConeGeometry(0.07, 0.09, 6), '#7a5a34', 0, 0.14, 0), box(0.12, 0.02, 0.02, '#d8c070', 0, 0.1, 0), at(mk(new T.OctahedronGeometry(0.05, 0), unlit(c)), 0, 0, 0.12)); }
+    else if (/^seed_|^sapling_/.test(id)) for (let i = 0; i < 4; i++) g.add(at(mk(new T.SphereGeometry(0.035, 5, 4), '#6a4a2a'), (i - 1.5) * 0.06, (i & 1) * 0.03, 0));
+    else g.add(box(0.2, 0.2, 0.2, c));
+    return g;
+  }
+  const flyers = [];
+  function fly(id, x, y, z) { const o = itemMesh(id); o.position.set(x, y, z); scene.add(o); flyers.push({ o, t0: time, x, y, z }); }
+  function syncFlyers() {
+    for (let i = flyers.length - 1; i >= 0; i--) {
+      const f = flyers[i], q = (time - f.t0) / 1.1;
+      if (q >= 1 || !heroObj) { scene.remove(f.o); dispose(f.o); flyers.splice(i, 1); continue; }
+      const hx = heroObj.position.x, hz = heroObj.position.z, up = q < 0.35 ? q / 0.35 : 1, m = q < 0.35 ? 0 : (q - 0.35) / 0.65, mm = m * m * (3 - 2 * m);
+      f.o.position.set(f.x + (hx - f.x) * mm, f.y + up * 0.9 + (1.0 - f.y - 0.9) * mm + Math.sin(mm * Math.PI) * 0.6, f.z + (hz - f.z) * mm);
+      f.o.rotation.set(0, time * 3, Math.sin(time * 6) * 0.2); f.o.scale.setScalar(1.6 * (q < 0.8 ? 1 : 1 - (q - 0.8) / 0.2 * 0.85));
+    }
   }
   function fxInit(g, P, color) {
     P.fx = new T.Group(); g.userData.fx = P.fx; scene.add(P.fx);
@@ -5389,6 +5500,18 @@ const G3 = (() => {
   // flying chips / sparks from (x, y, z), local to the node
   function fxBurst(P, x, y, z, n, up, spread = 2.2) {
     for (const d of P.drops) if (n > 0 && !d.visible) { n--; d.visible = true; d.position.set(x + (Math.random() - 0.5) * 0.15, y, z + (Math.random() - 0.5) * 0.15); d.userData.v.set((Math.random() - 0.5) * spread, up * (0.6 + Math.random() * 0.6), (Math.random() - 0.2) * spread * 0.6); }
+  }
+  // a gathering node: chips on every swing; a full one sends the product (ore, log) arcing into the pack
+  function gatherFx(e, P, sx, sy, sz) {
+    fxStep(P);
+    if (e.splash) { const big = e.splash === 2; e.splash = 0; e.leafKick = 1; fxBurst(P, sx, sy, sz, big ? 10 : 5, big ? 3.5 : 2.5); if (big) P.ct = time; }
+    const cp = (time - P.ct) / 0.9, hx = -e.stop / U3;
+    P.prod.visible = cp >= 0 && cp < 1;
+    if (P.prod.visible) {
+      const q = cp, s = q < 0.55 ? 1 : 1 - (q - 0.55) / 0.45 * 0.85;
+      P.prod.position.set(sx + 0.2 + (hx + 0.1 - sx - 0.2) * q, sy + 0.1 + Math.sin(q * Math.PI) * 1.3 + (q > 0.55 ? (q - 0.55) * 0.6 : 0), sz - 0.05 - q * 0.55);
+      P.prod.rotation.set(time * 7, time * 5, 0); P.prod.scale.setScalar(1.3 * s);
+    }
   }
   function fxStep(P) {
     const dt = Math.min(0.1, Math.max(0, time - P.lt)); P.lt = time;
@@ -5442,7 +5565,7 @@ const G3 = (() => {
       P.meat = box(0.32, 0.2, 0.2, '#c9774a', 0, 0.82, 0); g.add(P.meat);
     }
     g.add(shadow(e.kind === 'pyre' || e.kind === 'fire' ? 0.8 : 0.95));
-    if (e.kind === 'furnace' || e.kind === 'anvil') fxInit(g, P, '#ffc040');
+    fxInit(g, P, { furnace: '#ffc040', anvil: '#ffc040', bench: '#e8d0a0', altar: '#d6b8ff', cauldron: '#9fff8a', sawbench: '#e8c890', obelisk: '#8af4ff', pyre: '#ffb347' }[e.kind] || '#ffb347');
     g.userData.P = P; g.userData.mats = mats(g);
     return g;
   }
@@ -5469,16 +5592,26 @@ const G3 = (() => {
     const g = new T.Group(), P = {}, p = e.pk ? patch(e.pk) : { s: null }, sd = p.s && SEED_BY[p.s], kind = e.pk ? patchKind(e.pk) : 'herb';
     g.add(box(1.8, 0.16, 1.4, '#5a3e24', 0, 0.08, 0));
     for (let r = -1; r <= 1; r++) g.add(box(1.7, 0.05, 0.1, '#4a3018', 0, 0.17, r * 0.42));
-    P.pl = new T.Group(); g.add(P.pl);
+    P.pl = new T.Group(); g.add(P.pl); P.stems = []; P.crops = [];
     if (sd) {
       if (kind === 'tree') {
-        P.pl.add(box(0.14, 1.2, 0.14, '#5e3c22', 0, 0.6, 0));
-        P.pl.add(mk(new T.IcosahedronGeometry(0.6, 0), sd.color, 0, 1.5, 0));
+        const tr = new T.Group(); tr.position.y = 0.17;
+        tr.add(box(0.14, 1.2, 0.14, '#5e3c22', 0, 0.6, 0), mk(new T.IcosahedronGeometry(0.6, 0), '#3f8f3a', 0, 1.5, 0), mk(new T.IcosahedronGeometry(0.4, 0), '#4fa04a', 0.35, 1.25, 0.2));
+        P.pl.add(tr); P.stems.push(tr);
+        for (let k = 0; k < 5; k++) { const fr = mk(new T.SphereGeometry(0.08, 6, 4), sd.color, Math.cos(k * 1.3) * 0.5, 1.3 + (k % 3) * 0.2, Math.sin(k * 1.3) * 0.4 + 0.2); tr.add(fr); P.crops.push(fr); }
       } else for (let r = -1; r <= 1; r++) for (let c = -2; c <= 2; c += 2) {
-        const o = kind === 'herb' ? mk(new T.ConeGeometry(0.12, 0.7, 5), '#5ab04a', c * 0.3, 0.45, r * 0.42) : mk(new T.IcosahedronGeometry(0.16, 0), sd.color, c * 0.3, 0.35, r * 0.42);
-        P.pl.add(o);
+        // each plant: a stem with leaves that grows, and the crop that swells on it near the end
+        const pl = new T.Group(); pl.position.set(c * 0.3 + (hash(r * 7 + c) - 0.5) * 0.08, 0.17, r * 0.42);
+        const st = new T.Group();
+        st.add(mk(new T.ConeGeometry(0.035, 0.45, 4), '#4a9a3a', 0, 0.22, 0));
+        for (let k = 0; k < 3; k++) { const lf = mk(new T.ConeGeometry(0.06, 0.26, 3), k & 1 ? '#5ab04a' : '#6ac05a', Math.cos(k * 2.1) * 0.08, 0.16 + k * 0.07, Math.sin(k * 2.1) * 0.08); lf.rotation.set(Math.sin(k * 2.1) * 0.9, 0, -Math.cos(k * 2.1) * 0.9); st.add(lf); }
+        pl.add(st); P.stems.push(st);
+        const cr = cropMesh(sd.out); cr.position.y = kind === 'herb' ? 0.45 : 0.18; pl.add(cr); P.crops.push(cr);
+        P.pl.add(pl);
       }
     }
+    fxInit(g, P, '#8a6a3a');
+    P.wet = []; for (let k = 0; k < 12; k++) { const d = mk(new T.IcosahedronGeometry(0.035, 0), unlit('#8ad0ff', { opacity: 0.9 })); d.visible = false; d.userData.v = new T.Vector3(); P.wet.push(d); P.fx.add(d); }
     e.seedShown = p.s;
     g.add(shadow(1.0));
     g.userData.P = P; g.userData.mats = mats(g);
@@ -5603,27 +5736,37 @@ const G3 = (() => {
       P.t.rotation.z = e.dying ? -(1 - dying) * 1.45 : 0;
       fade(g, e.dying ? Math.min(1, dying * 2) : 1);
       if (P.spark) P.spark.children.forEach((s, k) => s.position.set(Math.sin(time * 2 + k * 1.3) * 0.8, 2.4 + Math.cos(time * 1.7 + k) * 0.6, 0.9));
+      gatherFx(e, P, -0.35, 0.9, 0.35);
+      // leaves shaken loose drift down, swaying
+      if (e.leafKick) { e.leafKick = 0; let n = 4; for (const l of P.leaves) if (n > 0 && !l.visible) { n--; l.visible = true; l.position.set((Math.random() - 0.5) * 1.6, 2.0 + Math.random() * 0.9, 0.3 + Math.random() * 0.5); l.userData.ph = Math.random() * 6; } }
+      for (const l of P.leaves) if (l.visible) { l.position.y -= 0.012 * 60 * Math.min(0.05, 1 / 60); l.position.x += Math.sin(time * 3 + l.userData.ph) * 0.006; l.rotation.set(Math.sin(time * 4 + l.userData.ph) * 0.8, l.userData.ph, Math.cos(time * 3 + l.userData.ph) * 0.6); if (l.position.y < 0.03) l.visible = false; }
     } else if (e.kind === 'rock') {
       x += Math.sin(time * 70) * e.hit * 3;
       P.r.scale.setScalar(0.55 + 0.45 * (e.yields / e.maxYields));
       // each swing knocks chips off; a full one breaks an ore loose that flies into the hero's pack
-      fxStep(P);
-      if (e.splash) { const big = e.splash === 2; e.splash = 0; fxBurst(P, -0.5, 0.7, 0.4, big ? 10 : 5, big ? 3.5 : 2.5); if (big) P.ct = time; }
-      const cp = (time - P.ct) / 0.9, hx = -e.stop / U3;
-      P.prod.visible = cp >= 0 && cp < 1;
-      if (P.prod.visible) {
-        const q = cp, s = q < 0.55 ? 1 : 1 - (q - 0.55) / 0.45 * 0.85;
-        P.prod.position.set(-0.3 + (hx + 0.1 + 0.3) * q, 0.8 + Math.sin(q * Math.PI) * 1.3 + (q > 0.55 ? (q - 0.55) * 0.6 : 0), 0.35 - q * 0.55);
-        P.prod.rotation.set(time * 7, time * 5, 0); P.prod.scale.setScalar(1.3 * s);
-      }
+      gatherFx(e, P, -0.5, 0.7, 0.4);
     } else if (e.kind === 'obstacle') {
       x = e.x - e.stop;
       const act = R.phase === 'act' && R.ent === e;
       if (P.rope) P.rope.rotation.z = act ? (0.5 - (R.agiU || 0)) * 1.8 : Math.sin(time * 1.5) * 0.15;
     } else if (e.kind === 'patch') {
       const f = e.pk ? growFrac(patch(e.pk)) : 0;
-      P.pl.scale.set(1, 0.25 + 0.75 * f, 1);
+      // seedling → leafy plant → crop swelling → ripe (bobbing and glinting)
+      const gs = 0.15 + 0.85 * Math.min(1, f * 1.6), cs = clamp((f - 0.45) / 0.55, 0, 1);
+      P.stems.forEach((st, k) => { st.scale.setScalar(gs); st.rotation.z = Math.sin(time * 1.5 + k) * 0.05; });
+      P.crops.forEach((cr, k) => { cr.visible = cs > 0.02; cr.scale.setScalar(0.25 + 0.95 * cs); if (f >= 1) cr.position.y += Math.sin(time * 3 + k) * 0.0015; });
+      if (f >= 1 && Math.random() < 0.05) fxBurst(P, (Math.random() - 0.5) * 1.4, 0.6, (Math.random() - 0.5) * 0.9, 1, 1.2, 0.3);
       x += Math.sin(time * 60) * e.hit * 1.5;
+      fxStep(P);
+      const dtw = Math.min(0.1, Math.max(0, time - (P.wt || time))); P.wt = time;
+      for (const d of P.wet) if (d.visible) { d.userData.v.y -= 6 * dtw; d.position.addScaledVector(d.userData.v, dtw); if (d.position.y < 0.18) d.visible = false; }
+      if (e.splash) {
+        const fk = e.fk; e.splash = 0; e.fk = '';
+        if (fk === 'h' && e.prod) { for (let k = 0; k < 3; k++) setTimeout(() => fly(e.prod, x / U3 + (k - 1) * 0.4, 0.5, 0), k * 120); fxBurst(P, 0, 0.3, 0.2, 8, 2.2); }
+        else if (fk === 'w') { let n = 12; for (const d of P.wet) if (n-- > 0) { d.visible = true; d.position.set(-0.8 + Math.random() * 0.3, 1.1 + Math.random() * 0.2, (Math.random() - 0.5) * 0.6); d.userData.v.set(1.2 + Math.random() * 1.4, 0.4, (Math.random() - 0.5) * 0.5); } }
+        else if (fk === 'p') fxBurst(P, -0.6, 1.0, 0.2, 8, 1.2, 1.6);
+        else fxBurst(P, -0.3, 0.25, 0.3, 4, 1.8);
+      }
     } else if (e.kind === 'pond') {
       if (wTex) { wTex.offset.x = time * 0.05; wTex.offset.y = Math.sin(time * 0.4) * 0.05; }
       if (P.life) for (const f of P.life) f(time);
@@ -5695,28 +5838,34 @@ const G3 = (() => {
       if (P.bar) { P.bar.visible = working; P.halo.visible = working; }
       if (P.fx) {
         fxStep(P);
-        const anv = e.kind === 'anvil';
+        const anv = e.kind === 'anvil', hotK = anv || e.kind === 'furnace', into = e.kind === 'pyre';
+        const [sx, sy, sz] = { furnace: [0, 0.55, 0.7], anvil: [-0.05, 1.1, 0], bench: [0, 0.98, 0.1], altar: [0, 1.45, 0], cauldron: [0, 1.1, 0], sawbench: [0.1, 0.95, 0], obelisk: [0, 2.3, 0], pyre: [0, 0.55, 0] }[e.kind] || [0, 0.85, 0];
         if (e.splash) {
           const big = e.splash === 2; e.splash = 0;
-          fxBurst(P, anv ? -0.05 : 0, anv ? 1.05 : 0.55, anv ? 0 : 0.6, big ? 12 : 6, big ? 3 : 2.2, 2.6);
+          if (!into || !big) fxBurst(P, sx, sy, sz, big ? 12 : 6, big ? 3 : 2.2, 2.6);
           if (big && e.prod) {
             if (P.prod) { P.fx.remove(P.prod); dispose(P.prod); }
-            P.prod = prodMesh(e.prod); P.prod.visible = false; P.fx.add(P.prod); P.ct = time; e.prod = '';
+            P.prod = hotK ? prodMesh(e.prod) : itemMesh(e.prod); P.prod.visible = false; P.fx.add(P.prod); P.ct = time; e.prod = ''; P.boom = false;
             P.prod.traverse(n => { if (n.material) n.userData.base = n.material.color.clone(); });
           }
         }
-        if (P.prod) {
-          // hot from the forge: glowing orange, cooling to the metal while it is held up, then into the pack
+        if (P.prod && into) {
+          // firemaking: the hero throws the log onto the pyre and it flares up
+          const cp = (time - P.ct) / 0.9, hx = -e.stop / U3;
+          P.prod.visible = cp >= 0 && cp < 0.7;
+          if (P.prod.visible) { const q = cp / 0.7; P.prod.position.set(hx + 0.3 + (sx - hx - 0.3) * q, 1.0 + Math.sin(q * Math.PI) * 0.9 + (sy - 1.0) * q, 0.3 - 0.3 * q); P.prod.rotation.set(0, 0, q * 6); P.prod.scale.setScalar(1.3); }
+          if (cp >= 0.7 && !P.boom) { P.boom = true; fxBurst(P, sx, sy + 0.2, sz, 14, 3.4, 2); }
+        } else if (P.prod) {
+          // fresh off the station: hot metal glows and cools while it is held up, then it goes into the pack
           const cp = (time - P.ct) / 1.6, hx = -e.stop / U3;
           P.prod.visible = cp >= 0 && cp < 1;
           if (P.prod.visible) {
-            const heat = clamp(1 - (cp - 0.2) / 0.45, 0, 1), hot = C('#ffa040');
-            P.prod.traverse(n => { if (n.userData.base) { n.material.color.copy(n.userData.base).lerp(hot, heat); if (n.material.emissive) n.material.emissive.setRGB(0.9 * heat, 0.35 * heat, 0); } });
-            const sx = anv ? -0.05 : 0, sy = anv ? 1.1 : 0.55, sz = anv ? 0 : 0.7;
-            if (cp < 0.3) { const q = cp / 0.3; P.prod.position.set(sx, sy + q * (anv ? 0.1 : 0.5), sz + (anv ? 0 : q * 0.3)); P.prod.rotation.set(0, 0, 0); P.prod.scale.setScalar(1.6); }
+            const heat = hotK ? clamp(1 - (cp - 0.2) / 0.45, 0, 1) : 0, hot = C('#ffa040');
+            if (hotK) P.prod.traverse(n => { if (n.userData.base) { n.material.color.copy(n.userData.base).lerp(hot, heat); if (n.material.emissive) n.material.emissive.setRGB(0.9 * heat, 0.35 * heat, 0); } });
+            if (cp < 0.3) { const q = cp / 0.3; P.prod.position.set(sx, sy + q * (anv ? 0.1 : 0.5), sz + (e.kind === 'furnace' ? q * 0.3 : 0)); P.prod.rotation.set(0, 0, 0); P.prod.scale.setScalar(1.6 * Math.min(1, 0.3 + q)); }
             else if (cp < 0.75) { const q = (cp - 0.3) / 0.45, qq = q * q * (3 - 2 * q); P.prod.position.set(sx + (hx * 0.5 - sx) * qq, sy + (anv ? 0.1 : 0.5) + qq * (1.9 - sy), sz + (0.5 - sz) * qq); P.prod.rotation.set(0, qq * Math.PI * 2, Math.sin(time * 3) * 0.1); P.prod.scale.setScalar(1.6 + qq * 0.3); }
             else { const q = (cp - 0.75) / 0.25; P.prod.position.set(hx * 0.5 + (hx - hx * 0.5) * q, 1.9 - q * 0.9, 0.5 - q * 0.6); P.prod.scale.setScalar(1.9 * (1 - q * 0.85)); }
-            if (cp > 0.2 && cp < 0.55 && Math.random() < 0.15) fxBurst(P, P.prod.position.x, P.prod.position.y, P.prod.position.z, 1, 1.2, 0.6);
+            if (cp > 0.2 && cp < 0.55 && Math.random() < (hotK || e.kind === 'fire' ? 0.15 : 0.06)) fxBurst(P, P.prod.position.x, P.prod.position.y, P.prod.position.z, 1, 1.2, 0.6);
           }
         }
       }
@@ -5778,7 +5927,7 @@ const G3 = (() => {
   };
   api.reset = () => { dropEnt(); entRef = null; heroKey = ''; zoneKey = -1; };
   api.render = (shx, shy) => {
-    syncChunks(); syncHero(); syncEnt(); syncEvents();
+    syncChunks(); syncHero(); syncEnt(); syncFlyers(); syncEvents();
     // centre the camera on the screen and skew nothing: z = 0 maps 1:1 onto the 2D overlay
     const n = 0.5, k = n / D, half = W / 2 / U3;
     camera.position.set(R.worldX / U3 + (W / 2 - HX) / U3 - shx / U3, CAM_Y + shy / U3, D);
@@ -6435,7 +6584,7 @@ function htmlSlayer() {
   return h;
 }
 
-let questSub = 'quests';
+let questSub = 'path';
 function htmlBosses() {
   const uq = Object.values(BOSS_UNIQUES).flat(), got = uq.filter(([it]) => S.clog[it]).length;
   return `<p class="muted">Each boss has its own lair, like in OSRS. Finish the boss's quest to get in, then fight it as often as you like for its uniques and pet.
@@ -6444,7 +6593,8 @@ function htmlBosses() {
 }
 function htmlQuests() {
   if (lockFor('quests', questSub)) questSub = 'quests';
-  const nav = subNav('questsub', questSub, [['quests', '📜 Quests'], ['bosses', '👑 Bosses'], ['clues', '🗺️ Clues'], ['daily', '📅 Daily']]);
+  const nav = subNav('questsub', questSub, [['path', `🛣️ Road${pathReady() >= 0 ? ' 🎁' : ''}`], ['quests', '📜 Quests'], ['bosses', '👑 Bosses'], ['clues', '🗺️ Clues'], ['daily', '📅 Daily']]);
+  if (questSub === 'path') return nav + htmlPath();
   if (questSub === 'bosses') return nav + htmlBosses();
   if (questSub === 'clues') return nav + htmlClues();
   if (questSub === 'daily') return nav + htmlDaily();
@@ -6562,6 +6712,7 @@ function nextGoal() {
     return { t: wtype() === 'ranged' ? 'Out of arrows – fletch or buy more' : 'Out of runes – craft or buy more', tab: wtype() === 'ranged' ? 'fletching' : 'runecrafting' };
   const ready = QUESTS.find(q => questReady(q));
   if (ready) return { t: `Quest "${ready.name}" is complete – claim your reward`, tab: 'quests' };
+  { const pk = pathReady(); if (pk >= 0) return { t: `🛣️ Road to Adventure day ${pk + 1} is done – claim your reward`, tab: 'path' }; }
   if (isOpen('daily')) { dailyCheck(); if (dailyClaimable()) return { t: S.daily.login ? '📅 A daily task is done – claim your reward' : `🔥 Collect your day ${S.daily.streak} login streak reward`, tab: 'daily' }; }
   const upg = Object.keys(S.inv).find(id => ITEMS[id].slot && isUpgrade(id));
   if (upg) return { t: `Equip your ${ITEMS[upg].name}`, tab: 'inventory' };
@@ -6599,7 +6750,7 @@ function renderGoal() {
     inventory: Object.keys(S.inv).some(id => (ITEMS[id].slot && isUpgrade(id)) || (ITEMS[id].bury && has(id) >= 10))
       || ['axe', 'pick', 'rod'].some(t => S.tools[t] < 4 && S.gold >= TOOL_COST[S.tools[t]]),
     slayer: !S.task && combatLevel() >= 5,
-    quests: QUESTS.some(q => questReady(q) || questState(q) === 'open') || (isOpen('daily') && dailyClaimable()),
+    quests: QUESTS.some(q => questReady(q) || questState(q) === 'open') || (isOpen('daily') && dailyClaimable()) || pathReady() >= 0,
     progress: S.bosses[4] || Object.keys(RUP).some(k => S.rup[k] < RUP[k].max && S.renown >= rupCost(k)),
   };
   document.querySelectorAll('nav.tabs [data-tab]').forEach(b => {
@@ -6609,7 +6760,7 @@ function renderGoal() {
   });
 }
 // old tab names (used by goals and buttons) map to a tab plus its sub-view
-const TAB_ALIAS = { firemaking: ['craft', 'firemaking'], smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], herblore: ['craft', 'herblore'], construction: ['craft', 'construction'], summoning: ['craft', 'summoning'], shop: ['inventory', 'shop'], daily: ['quests', 'daily'] };
+const TAB_ALIAS = { firemaking: ['craft', 'firemaking'], smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], herblore: ['craft', 'herblore'], construction: ['craft', 'construction'], summoning: ['craft', 'summoning'], shop: ['inventory', 'shop'], daily: ['quests', 'daily'], path: ['quests', 'path'] };
 function openTab(name, scroll) {
   const al = TAB_ALIAS[name];
   const lk = al ? lockFor(al[0], al[1]) || lockFor(al[0]) : lockFor(name);
@@ -6725,6 +6876,7 @@ document.addEventListener('click', ev => {
     case 'qdel': { const q = S.queue.splice(+id, 1)[0]; if (+id === 0 && S.queue.length) qApply(S.queue[0]); if (q) log(`📋 Removed: ${qName(q)}`); break; }
     case 'dclaim': claimTask(id[0], +id.slice(1)); break;
     case 'dlogin': claimLogin(); break;
+    case 'pclaim': claimPath(+id); break;
     case 'dreroll': { const D = S.daily; if (!D.reroll && D.tasks[+id] && !D.tasks[+id].c) { D.reroll = true; const cur = D.tasks.map(t => JSON.stringify(t.o)); let n = null; for (let k = 0; k < 10 && !n; k++) { const c = taskPool(1)[randi(0, 2)]; if (c && !cur.includes(JSON.stringify(c.o))) n = c; } if (n) D.tasks[+id] = n; } break; }
     case 'lamp': if (has('lamp')) lampModal(); break;
     case 'rub': if (take('lamp')) { const xp = lampXp(id); addXp(id, xp, true); log(`🪔 +${fmt(xp)} ${SKILLS[id].name} XP`, 'lg-xp'); } break;
@@ -6819,6 +6971,8 @@ function catchUp(sec) {
 }
 // once a week: say which skills get the bonus XP this week
 function weekNews() {
+  pathInit();
+  if (pathActive() && S.path.seen !== pathDay()) { const d = pathDay(); if (S.path.seen) setTimeout(() => showBanner(`🛣️ New chapter: day ${d} – ${PATH[d - 1].name}`), 4500); S.path.seen = d; if (d > 1) log(`🛣️ Road to Adventure: day ${d} "${PATH[d - 1].name}" is open (Quests → Road).`, 'lg-xp'); }
   if (S.evWk === weekKey()) return;
   S.evWk = weekKey();
   const ev = roadEvent();
