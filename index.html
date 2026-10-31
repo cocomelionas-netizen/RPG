@@ -4466,6 +4466,13 @@ const G3 = (() => {
 
   function hgt(x, z) {
     if (z > -2.2 && z < 2.2) return 0;
+    // flat, slightly sunken ground under a pond so no hill hides the water
+    let w = 0;
+    for (const [a, b, zb] of clearZ) w = Math.max(w, Math.min(1, (x - a + 1.5) / 1.5, (b + 1.5 - x) / 1.5, (z - zb + 1.5) / 1.5));
+    if (w > 0) return hgt0(x, z) * (1 - w) - 0.03 * w;
+    return hgt0(x, z);
+  }
+  function hgt0(x, z) {
     const n = Math.sin(x * 0.37 + z * 0.21) + Math.sin(x * 0.13 - z * 0.41) * 0.8 + Math.sin(x * 0.71 + z * 0.9) * 0.3;
     const back = Math.max(0, -z - 4);
     return 0.07 * n + Math.pow(back, 1.5) * 0.045 * (1.2 + 0.4 * n);
@@ -4870,7 +4877,7 @@ const G3 = (() => {
     return t;
   }
 
-  let heroObj = null, heroKey = '', petKey = '';
+  let heroObj = null, heroKey = '', petKey = '', heroZ = 0, heroYaw = -0.6;
   function syncHero() {
     const gear = sl => S.equip[sl] ? ITEMS[S.equip[sl]] : null;
     const body = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield');
@@ -4894,9 +4901,15 @@ const G3 = (() => {
     const p = heroObj.userData.p, P = p.userData.P;
     const walking = R.phase === 'walk', dead = R.phase === 'dead';
     const sw = walking ? Math.sin(time * 13) * 0.6 : 0;
-    heroObj.position.set((R.worldX - R.heroHit * 5 - (dead ? 30 : 0)) / U3, walking ? Math.abs(Math.sin(time * 13)) * 0.05 : 0, 0);
+    // fishing: walk down the jetty behind the road and face the water
+    const fishing = R.phase === 'act' && R.ent && R.ent.kind === 'pond';
+    heroZ += ((fishing ? -3.1 : 0) - heroZ) * 0.06; heroYaw += ((fishing ? 1.35 : -0.6) - heroYaw) * 0.08;
+    const stepping = walking || Math.abs(heroZ - (fishing ? -3.1 : 0)) > 0.15;
+    heroObj.position.set((R.worldX - R.heroHit * 5 - (dead ? 30 : 0)) / U3, stepping ? Math.abs(Math.sin(time * 13)) * 0.05 + (fishing && heroZ < -1.4 ? 0.1 : 0) : fishing && heroZ < -1.4 ? 0.1 : 0, heroZ);
+    p.rotation.y = heroYaw;
     p.rotation.z = dead ? Math.PI / 2 : 0; p.position.y = dead ? 0.25 : 0;
-    P.legF.rotation.z = sw; P.legB.rotation.z = -sw;
+    const ls = stepping ? Math.sin(time * 13) * 0.6 : 0;
+    P.legF.rotation.z = ls; P.legB.rotation.z = -ls;
     P.armF.rotation.z = -heroArmAngle();
     P.armB.rotation.z = walking ? -sw * 0.8 : S.activity === 'combat' && wtype() === 'ranged' ? 1.3 : 0.1;
     // agility: lift the hero over the obstacle and pose it
@@ -5071,8 +5084,9 @@ const G3 = (() => {
       const th = ZONES[S.zone].th, sd = hash(e.x * 0.013 + 7.7) * 1000, rnd = k => hash(sd + k * 13.37);
       const rift = th.decor === 'spike' && !th.lava, swamp = th.decor === 'dead', cave = th.cave && !rift, crystal = th.decor === 'crystal';
       // the pond lies just behind the road; the hero casts from the road, next to a jetty
-      const rx = 3.2 + rnd(1) * 2.6, rz = 2.2 + rnd(2) * 1.6, cx = -3.4 + rx * 0.8, cz = -1.75 - rz;
-      const bx = P.bx = -1.6, bz = P.bz = cz + rz * 0.5;
+      // the hero walks down a jetty straight behind them and casts out in front
+      const JX = -e.stop / U3, rx = 3.0 + rnd(1) * 2.4, rz = 2.3 + rnd(2) * 1.4, cx = JX + (rnd(3) - 0.5) * rx * 0.6, cz = -1.85 - rz;
+      const bx = P.bx = JX + (rnd(9) - 0.5) * 0.6, bz = P.bz = -4.6 - rnd(10) * 0.4;
       clearZ.push([e.x / U3 + cx - rx * 1.5, e.x / U3 + cx + rx * 1.5, cz - rz * 1.6]); if (clearZ.length > 4) clearZ.shift();
       for (const [ci, c] of chunks) if ((ci + 1) * CH > e.x / U3 + cx - rx * 1.5 && ci * CH < e.x / U3 + cx + rx * 1.5) { scene.remove(c); dispose(c); chunks.delete(ci); }
       const water = swamp ? ['#3c5a3e', '#56784e'] : rift ? ['#2a1040', '#4a2a6a'] : cave ? ['#16304e', '#24507a'] : th.snow ? ['#3a78a8', '#7fb6d8'] : crystal ? ['#1f6a7a', '#4ab0c0'] : ['#1f5f9a', '#3f8fcf'];
@@ -5089,10 +5103,10 @@ const G3 = (() => {
       g.add(w);
       // a point on the bank (b = 1.05) or out on the water (b < 0.8) at angle t
       const spot = (t, b) => [cx + Math.cos(t) * rx * b, cz + Math.sin(t) * rz * b];
-      const wet = (t, b) => { const [x, z] = spot(t, b); return (x > -2.2 || z < cz - rz * 0.4) && z < -1.75; };   // keep the jetty and the road clear
+      const wet = (t, b) => { const [x, z] = spot(t, b); return (Math.abs(x - JX) > 0.7 || z < -4.0) && z < -1.75; };   // keep the jetty and the road clear
       // jetty the hero fishes from
-      for (let k = 0; k < 7; k++) g.add(box(0.75, 0.06, 0.3, k & 1 ? '#8a6238' : '#7a5530', -2.9, 0.07, -1.45 - k * 0.32));
-      for (const [px, pz] of [[-3.3, -2.3], [-2.5, -2.3], [-3.3, -3.35], [-2.5, -3.35]]) g.add(box(0.09, 0.4, 0.09, '#5a3e22', px, 0.12, pz));
+      for (let k = 0; k < 8; k++) g.add(box(0.8, 0.06, 0.3, k & 1 ? '#8a6238' : '#7a5530', JX, 0.07, -1.5 - k * 0.32));
+      for (const [px, pz] of [[-0.42, -2.4], [0.42, -2.4], [-0.42, -3.7], [0.42, -3.7]]) g.add(box(0.09, 0.42, 0.09, '#5a3e22', JX + px, 0.12, pz));
       // stones on the bank
       for (let k = 0; k < 3 + Math.floor(rnd(4) * 4); k++) { const t = rnd(10 + k) * Math.PI * 2; if (!wet(t, 1.08)) continue; const [x, z] = spot(t, 1.08); g.add(mk(new T.DodecahedronGeometry(0.14 + rnd(20 + k) * 0.14, 0), rift ? '#3a2a48' : '#8a8a90', x, 0.06, z)); }
       P.life = [];
@@ -5431,7 +5445,7 @@ const G3 = (() => {
       if (P.life) for (const f of P.life) f(time);
       P.rip.forEach((r, k) => { const p = (time * 0.6 + k * 0.5) % 1; r.scale.set(0.15 + p * 0.9, 0.06 + p * 0.25, 1); r.material.opacity = 0.5 * (1 - p) * dying; });
       P.fish.visible = e.hit > 0.2;
-      if (P.fish.visible) { const p = 1 - e.hit; P.fish.position.set(P.bx + (-3.1 - P.bx) * p, 0.1 + Math.sin(p * Math.PI) * 1.25, P.bz * (1 - p)); P.fish.rotation.z = 1 - p * 2; }
+      if (P.fish.visible) { const p = 1 - e.hit; P.fish.position.set(P.bx + (-e.stop / U3 - P.bx) * p, 0.1 + Math.sin(p * Math.PI) * 1.25, P.bz + (-3.2 - P.bz) * p); P.fish.rotation.z = 1 - p * 2; }
       const show = S.activity === 'fishing' && R.phase === 'act' && R.ent === e;
       P.bob.visible = P.line.visible = show;
       P.bob.position.set(P.bx + Math.sin(time * 2) * 0.08, 0.06 + Math.sin(time * 4) * 0.03, P.bz);
