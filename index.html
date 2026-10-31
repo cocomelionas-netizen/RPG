@@ -190,6 +190,10 @@
   .uqs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
   .uq { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #2f2a44; color: var(--muted); }
   .uq.got { background: #2e4a2a; color: #c8f0b8; }
+  .ttl { color: #f2c94c; font-style: italic; font-weight: 400; font-size: 0.85em; }
+  .clog { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 10px; }
+  .clog span { width: 34px; height: 34px; display: grid; place-items: center; font-size: 20px; border-radius: 8px; background: #2e4a2a; }
+  .clog span.no { background: #241f36; filter: grayscale(1) brightness(0.45); }
   .item.boss { box-shadow: inset 0 0 0 1px #6b5a24; }
   .tag.m { background: #3a3014; color: #f2c94c; }
   .fld { display: grid; gap: 4px; margin: 8px 0; font-size: 13px; color: var(--muted); }
@@ -4118,7 +4122,7 @@ async function clanLoad() {
     CL.me = cid;
     if (cid) {
       const [info, chat, wk] = await Promise.all([sb.rpc('clan_info', { p_id: cid }),
-        CL.chan ? null : sb.from('clan_chat').select('id,name,body,created_at').eq('clan_id', cid).order('created_at', { ascending: false }).limit(40),
+        CL.chan ? null : sb.from('clan_chat').select('*').eq('clan_id', cid).order('created_at', { ascending: false }).limit(40),
         sb.rpc('clan_week')]);
       CL.info = info.error ? null : info.data;
       CL.week = wk.error || !wk.data || !wk.data.ok || !Array.isArray(wk.data.tiers) ? null : wk.data;
@@ -4205,9 +4209,9 @@ function renderClan() {
       ${c.motd ? `<div class="muted">📌 ${esc(c.motd)}</div>` : ''}
       ${clanWeekHtml()}
       ${owner ? `<div class="chatbar"><input id="cl-motd" maxlength="120" placeholder="Message of the day" value="${esc(c.motd)}" autocomplete="off"><button data-a="clanmotd">📌</button></div>` : ''}
-      <details><summary>Members</summary>${c.members.map(m => `<div class="friend"><span class="nm"><b>${esc(m.name)}</b>${m.id === c.owner ? ' 👑' : ''} <small class="muted">total ${m.total_level || 0} · combat ${m.combat || 3}${m.week ? ` · +${fmt(m.week)} XP this week` : ''}</small></span>
+      <details><summary>Members</summary>${c.members.map(m => `<div class="friend"><span class="nm"><b>${nameT(m.name, m.title)}</b>${m.id === c.owner ? ' 👑' : ''} <small class="muted">total ${m.total_level || 0} · combat ${m.combat || 3}${m.week ? ` · +${fmt(m.week)} XP this week` : ''}</small></span>
         ${owner && m.id !== me.id ? `<button data-a="clankick" data-id="${m.id}" title="Kick">✖</button>` : ''}</div>`).join('')}</details>
-      <div id="cllist" class="msgs">${CL.msgs.map(m => `<div><span class="muted">${new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> <b class="${m.name === me.name ? 'lg-gold' : ''}">${esc(m.name)}:</b> ${esc(m.body)}</div>`).join('') || '<div class="muted">No clan messages yet.</div>'}</div>
+      <div id="cllist" class="msgs">${CL.msgs.map(m => `<div><span class="muted">${new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> <b class="${m.name === me.name ? 'lg-gold' : ''}">${nameT(m.name, m.title)}:</b> ${esc(m.body)}</div>`).join('') || '<div class="muted">No clan messages yet.</div>'}</div>
       ${note}<div class="chatbar"><input id="cl-input" maxlength="200" placeholder="Talk to your clan…" autocomplete="off"><button data-a="clansay">Send</button></div>`;
     const l = document.getElementById('cllist'); l.scrollTop = l.scrollHeight;
     return;
@@ -4432,7 +4436,7 @@ async function chatStart() {
   if (!sb || CHAT.loaded) return;
   CHAT.loaded = true;
   try {
-    const { data } = await sb.from('chat_messages').select('id,name,body,created_at').order('created_at', { ascending: false }).limit(40);
+    const { data } = await sb.from('chat_messages').select('*').order('created_at', { ascending: false }).limit(40);
     CHAT.msgs = (data || []).reverse();
     CHAT.chan = sb.channel('chat-global').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, pl => {
       if (CHAT.msgs.some(m => m.id === pl.new.id)) return;
@@ -4448,7 +4452,7 @@ function renderChat() {
   if (badge) { badge.hidden = !CHAT.unread; badge.textContent = CHAT.unread; }
   if (!el) return;
   if (!sb) { el.innerHTML = '<div class="muted">Chat needs a connection to the server.</div>'; return; }
-  el.innerHTML = CHAT.msgs.map(m => `<div><span class="muted">${new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> <b class="${me && m.name === me.name ? 'lg-gold' : ''}">${esc(m.name)}:</b> ${esc(m.body)}</div>`).join('')
+  el.innerHTML = CHAT.msgs.map(m => `<div><span class="muted">${new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> <b class="${me && m.name === me.name ? 'lg-gold' : ''}">${nameT(m.name, m.title)}:</b> ${esc(m.body)}</div>`).join('')
     || '<div class="muted">No messages yet – say hello!</div>';
   el.scrollTop = el.scrollHeight;
   const inp = document.getElementById('chat-input');
@@ -4482,7 +4486,7 @@ async function loadHiscores() {
       hsRows = error ? { error: /hiscores_week/.test(error.message) ? 'The weekly hiscores start once the new server SQL has been run.' : error.message } : data;
       hsAt = Date.now(); hsKey = hsSkill; hsLoading = false; uiDirty = true; return;
     }
-    let q = sb.from('hiscores').select('name,total_level,total_xp,combat,skills,kills,bosses,pks,imported,rating');
+    let q = sb.from('hiscores').select('*');
     q = hsSkill === 'overall' ? q.order('total_level', { ascending: false }).order('total_xp', { ascending: false })
       : hsSkill === 'pks' ? q.order('pks', { ascending: false }) : hsSkill === 'rating' ? q.order('rating', { ascending: false }) : hsSkill === 'bosses' ? q.order('bosses', { ascending: false })
       : q.order(`skills->${hsSkill}`, { ascending: false, nullsFirst: false });
@@ -4510,7 +4514,7 @@ function htmlHiscores() {
     const x = (r.skills && r.skills[hsSkill]) || 0; return [`${levelFromXp(x)}`, `${fmt(x)} XP`];
   };
   return h + '<table class="hs"><thead><tr><th>#</th><th>Name</th><th>Combat</th><th>' + (hsSkill === 'overall' ? 'Total level' : hsSkill === 'week' ? 'XP gained' : hsSkill === 'rating' ? 'Rating' : hsSkill === 'pks' ? 'PKs' : hsSkill === 'bosses' ? 'Bosses' : 'Level') + '</th><th></th></tr></thead><tbody>'
-    + hsRows.map((r, i) => { const [a, b] = val(r); return `<tr class="${me && r.name === me.name ? 'me' : ''}"><td>${hsSkill === 'week' && i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</td><td>${r.name}${r.imported ? ' <span class="muted" title="progress from before the account">ⓘ</span>' : ''}</td><td>${r.combat}</td><td><b>${a}</b></td><td class="muted">${b}</td></tr>`; }).join('')
+    + hsRows.map((r, i) => { const [a, b] = val(r); return `<tr class="${me && r.name === me.name ? 'me' : ''}"><td>${hsSkill === 'week' && i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</td><td>${nameT(r.name, r.title)}${r.imported ? ' <span class="muted" title="progress from before the account">ⓘ</span>' : ''}</td><td>${r.combat}</td><td><b>${a}</b></td><td class="muted">${b}</td></tr>`; }).join('')
     + '</tbody></table>';
 }
 
@@ -6624,6 +6628,67 @@ function htmlSlayer() {
 }
 
 let questSub = 'path';
+/* ===== Collection log: every item and pet you have ever had; milestones give titles ===== */
+const CLOG_CATS = [
+  ['👑', 'Boss uniques', it => it.unique], ['⚔️', 'Weapons', it => it.slot === 'weapon'], ['🛡️', 'Armour & jewellery', it => !!it.slot],
+  ['⛏️', 'Ores & bars', it => it.type === 'Ores' || it.type === 'Bars'], ['🪵', 'Logs, fish & more', it => it.type === 'Resources'],
+  ['🍖', 'Food', it => it.type === 'Food'], ['🏹', 'Ammo', it => it.type === 'Ammo'], ['🔮', 'Runes', it => it.type === 'Runes'],
+  ['🌿', 'Herbs & seeds', it => it.type === 'Herbs' || it.type === 'Seeds'], ['🧪', 'Potions', it => it.type === 'Potions'], ['📦', 'Other', () => true],
+];
+function clogCats() { const out = CLOG_CATS.map(c => ({ icon: c[0], name: c[1], ids: [] })); for (const id in ITEMS) out[CLOG_CATS.findIndex(c => c[2](ITEMS[id]))].ids.push(id); return out; }
+const clogTotal = () => Object.keys(ITEMS).length + PETS.length;
+const clogHave = () => Object.keys(S.got || {}).filter(id => ITEMS[id]).length + PETS.filter(p => S.pets[p.id]).length;
+const clogPct = () => clogHave() / clogTotal() * 100;
+// the server checks the same rules before it shows a title to anyone else
+const TITLES = [
+  { id: 'hoarder', name: 'the Hoarder', need: 'Collection log 10%', test: () => clogPct() >= 10 },
+  { id: 'collector', name: 'the Collector', need: 'Collection log 25%', test: () => clogPct() >= 25 },
+  { id: 'curator', name: 'the Curator', need: 'Collection log 50%', test: () => clogPct() >= 50 },
+  { id: 'archivist', name: 'the Archivist', need: 'Collection log 75%', test: () => clogPct() >= 75 },
+  { id: 'completionist', name: 'the Completionist', need: 'Collection log 100%', test: () => clogPct() >= 100 },
+  { id: 'beast', name: 'Beastmaster', need: 'Own 5 pets', test: () => PETS.filter(p => S.pets[p.id]).length >= 5 },
+  { id: 'road', name: 'Road Warrior', need: 'Finish the Road to Adventure', test: () => !!S.path && Object.keys(S.path.claimed).length >= 7 },
+  { id: 'dragon', name: 'Dragonslayer', need: 'Defeat the Dragon', test: () => (S.kc.dragon || 0) > 0 },
+  { id: 'skilled', name: 'the Skilled', need: 'Total level 500', test: () => totalLevel() >= 500 },
+  { id: 'master', name: 'the Master', need: 'Total level 1000', test: () => totalLevel() >= 1000 },
+];
+const titleName = id => { const t = TITLES.find(x => x.id === id); return t ? t.name : ''; };
+// name plus the title the server accepted for that player
+const nameT = (n, t) => `${esc(n)}${t ? ` <span class="ttl">${esc(t)}</span>` : ''}`;
+// note new items (whatever way they came in) and new titles; quiet when a lot arrive at once (offline)
+function clogSweep() {
+  if (!S.got) { S.got = {}; for (const id in S.inv) S.got[id] = 1; for (const k in S.equip) if (S.equip[k]) S.got[S.equip[k]] = 1; for (const id in S.clog) S.got[id] = 1; }
+  const fresh = Object.keys(S.inv).filter(id => !S.got[id] && ITEMS[id]);
+  for (const id of fresh) S.got[id] = 1;
+  if (fresh.length) {
+    const n = clogHave(), tot = clogTotal();
+    if (fresh.length <= 3) for (const id of fresh) log(`📖 New collection log item: ${ITEMS[id].icon} ${ITEMS[id].name} (${n} / ${tot})`, 'lg-xp');
+    else log(`📖 ${fresh.length} new collection log items (${n} / ${tot})`, 'lg-xp');
+  }
+  S.titlesSeen = S.titlesSeen || {};
+  for (const t of TITLES) if (!S.titlesSeen[t.id] && t.test()) {
+    S.titlesSeen[t.id] = 1;
+    log(`🏷️ New title unlocked: "${t.name}" – pick it in Progress → 📖 Collection`, 'lg-gold');
+    showBanner(`🏷️ New title: ${t.name}!`);
+  }
+}
+function htmlClog() {
+  clogSweep();
+  const have = clogHave(), tot = clogTotal(), cats = clogCats();
+  let h = `<div class="info"><b>📖 Collection log: ${have} / ${tot}</b> (${(have / tot * 100).toFixed(1)}%) <span class="muted">· every item and pet you have ever had counts, even if you sold it.</span>
+    <div class="bar" style="margin-top:6px"><i style="width:${(have / tot * 100).toFixed(1)}%"></i></div></div>`;
+  h += `<h3>🏷️ Titles</h3><p class="muted">Shown after your name in chat, clans and the hiscores (once the server has checked it).</p><div class="chips">`
+    + `<button class="${!S.title ? 'sel' : ''}" data-a="title" data-id="">No title</button>`
+    + TITLES.map(t => { const ok = t.test(); return `<button class="${S.title === t.id ? 'sel' : ''}" data-a="title" data-id="${t.id}" ${ok ? '' : 'disabled'} title="${t.need}">${ok ? '' : '🔒 '}${t.name}${ok ? '' : ` <small>(${t.need})</small>`}</button>`; }).join('') + '</div>';
+  for (const c of cats) {
+    const got = c.ids.filter(id => S.got[id]).length;
+    h += `<h3>${c.icon} ${c.name} <small class="muted">${got} / ${c.ids.length}</small></h3><div class="clog">`
+      + c.ids.map(id => `<span class="${S.got[id] ? '' : 'no'}" title="${S.got[id] ? ITEMS[id].name : '???'}"${ITEMS[id].color ? ` style="box-shadow:inset 0 -4px 0 ${ITEMS[id].color}"` : ''}>${ITEMS[id].icon}</span>`).join('') + '</div>';
+  }
+  const pg = PETS.filter(p => S.pets[p.id]).length;
+  h += `<h3>🐾 Pets <small class="muted">${pg} / ${PETS.length}</small></h3><div class="clog">` + PETS.map(p => `<span class="${S.pets[p.id] ? '' : 'no'}" title="${S.pets[p.id] ? p.name : '???'}">${p.icon}</span>`).join('') + '</div>';
+  return h;
+}
 function htmlBosses() {
   const uq = Object.values(BOSS_UNIQUES).flat(), got = uq.filter(([it]) => S.clog[it]).length;
   return `<p class="muted">Each boss has its own lair, like in OSRS. Finish the boss's quest to get in, then fight it as often as you like for its uniques and pet.
@@ -6662,8 +6727,9 @@ function htmlQuests() {
 }
 
 function htmlProgress() {
-  const nav = subNav('progsub', progSub, [['progress', '🏆 Progress'], ['hiscores', '📊 Hiscores']]);
+  const nav = subNav('progsub', progSub, [['progress', '🏆 Progress'], ['clog', '📖 Collection'], ['hiscores', '📊 Hiscores']]);
   if (progSub === 'hiscores') return nav + htmlHiscores();
+  if (progSub === 'clog') return nav + htmlClog();
   const pct = m => Math.round((m - 1) * 100);
   let h = nav + `<h3>Permanent bonuses</h3><div class="info bonuses">
     <span>✨ XP <b>+${pct(xpMult())}%</b></span><span>🪙 Gold <b>+${pct(goldMult())}%</b></span>
@@ -6775,8 +6841,10 @@ function nextGoal() {
   return { t: `You beat the Dragon! Start a 🌟 New Journey for ${renownGain()} Renown`, tab: 'progress' };
 }
 let lastGoal = '';
+let clogT = 0;
 function renderGoal() {
   checkAch(); checkUnlocks();
+  if (++clogT % 8 === 0) clogSweep();
   if (isOpen('daily')) dailyCheck();
   const g = nextGoal();
   const html = `<b>🎯 Goal</b><span>${g.t}</span>`;
@@ -6916,6 +6984,7 @@ document.addEventListener('click', ev => {
     case 'dclaim': claimTask(id[0], +id.slice(1)); break;
     case 'dlogin': claimLogin(); break;
     case 'pclaim': claimPath(+id); break;
+    case 'title': { const t = TITLES.find(x => x.id === id); S.title = t && t.test() ? id : ''; log(S.title ? `🏷️ Title set: ${t.name}` : '🏷️ Title removed'); save(); break; }
     case 'clanweek': clanWeekClaim(); break;
     case 'dreroll': { const D = S.daily; if (!D.reroll && D.tasks[+id] && !D.tasks[+id].c) { D.reroll = true; const cur = D.tasks.map(t => JSON.stringify(t.o)); let n = null; for (let k = 0; k < 10 && !n; k++) { const c = taskPool(1)[randi(0, 2)]; if (c && !cur.includes(JSON.stringify(c.o))) n = c; } if (n) D.tasks[+id] = n; } break; }
     case 'lamp': if (has('lamp')) lampModal(); break;
