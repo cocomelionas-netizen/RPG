@@ -3433,9 +3433,10 @@ function drawEvents(overlayOnly) {
 function chips(e) {
   if (SIM) return;
   const x = entScreenX(e);
+  if (e.kind === 'pond') e.splash = e.hit >= 1 ? 2 : 1; // picked up by the 3D pond: splash, and the fish on a catch
   if (e.kind === 'tree') burst(x - 12, GY - 40, '#c89a5a', 5);
   else if (e.kind === 'rock') { burst(x - 20, GY - 25, '#9a9aa5', 5); burst(x - 20, GY - 25, e.ess ? '#b48cff' : ORES[e.tier].color, 2); }
-  else burst(x - 12, GY + 6, '#bfe2ff', 6);
+  else if (!G3.on) burst(x - 12, GY + 6, '#bfe2ff', 6);
 }
 
 /* --- effects --- */
@@ -5201,7 +5202,18 @@ const G3 = (() => {
         }
       }
       P.rip = []; for (let k = 0; k < 2; k++) { const r = mk(new T.RingGeometry(0.9, 1, 20), unlit('#ffffff', { opacity: 0.5, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.set(bx, 0.08, bz); P.rip.push(r); g.add(r); }
-      P.fish = box(0.4, 0.14, 0.1, TIER_COLORS[e.tier], 0, 0, bz); g.add(P.fish);
+      // the catch: a little fish (body, belly, tail, fin, eye) that gets reeled out of the water
+      P.fish = new T.Group(); P.fish.visible = false; g.add(P.fish); P.fs = 1.7 + e.tier * 0.15;
+      { const fc = TIER_COLORS[e.tier];
+        const body = mk(new T.SphereGeometry(0.2, 8, 6), fc); body.scale.set(1, 0.5, 0.38);
+        const belly = mk(new T.SphereGeometry(0.16, 8, 6), shadeC(fc, 0.45), 0.02, -0.03, 0); belly.scale.set(1, 0.4, 0.4);
+        const tail = mk(new T.ConeGeometry(0.09, 0.13, 4), fc, -0.25, 0, 0); tail.rotation.z = -Math.PI / 2; tail.scale.z = 0.3;
+        const fin = mk(new T.ConeGeometry(0.05, 0.08, 3), fc, -0.02, 0.1, 0); fin.scale.z = 0.3;
+        const eye = mk(new T.SphereGeometry(0.025, 5, 4), '#111111', 0.13, 0.03, 0.06);
+        P.fish.add(body, belly, tail, fin, eye); P.fishTail = tail; }
+      P.drops = []; for (let k = 0; k < 14; k++) { const d = mk(new T.IcosahedronGeometry(0.045, 0), unlit('#d8f0ff', { opacity: 0.9 })); d.visible = false; d.userData.v = new T.Vector3(); P.drops.push(d); g.add(d); }
+      P.splash = mk(new T.RingGeometry(0.7, 1, 20), unlit('#ffffff', { opacity: 0, depthWrite: false })); P.splash.rotation.x = -Math.PI / 2; P.splash.position.set(bx, 0.09, bz); g.add(P.splash);
+      P.ct = -9; P.st = -9; P.lt = 0;
       P.bob = mk(new T.IcosahedronGeometry(0.06, 0), '#e84a4a', bx, 0.06, bz); g.add(P.bob);
       P.line = new T.Line(new T.BufferGeometry().setFromPoints(Array.from({ length: 9 }, () => new T.Vector3())), new T.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.7 }));
       P.line.frustumCulled = false; scene.add(P.line); g.userData.line = P.line;
@@ -5444,17 +5456,57 @@ const G3 = (() => {
       if (wTex) { wTex.offset.x = time * 0.05; wTex.offset.y = Math.sin(time * 0.4) * 0.05; }
       if (P.life) for (const f of P.life) f(time);
       P.rip.forEach((r, k) => { const p = (time * 0.6 + k * 0.5) % 1; r.scale.set(0.15 + p * 0.9, 0.06 + p * 0.25, 1); r.material.opacity = 0.5 * (1 - p) * dying; });
-      P.fish.visible = e.hit > 0.2;
-      if (P.fish.visible) { const p = 1 - e.hit; P.fish.position.set(P.bx + (-e.stop / U3 - P.bx) * p, 0.1 + Math.sin(p * Math.PI) * 1.25, P.bz + (-3.2 - P.bz) * p); P.fish.rotation.z = 1 - p * 2; }
       const show = S.activity === 'fishing' && R.phase === 'act' && R.ent === e;
-      P.bob.visible = P.line.visible = show;
-      P.bob.position.set(P.bx + Math.sin(time * 2) * 0.08, 0.06 + Math.sin(time * 4) * 0.03, P.bz);
+      const dt = Math.min(0.1, Math.max(0, time - P.lt)); P.lt = time;
+      // a nibble (half swing) dips the bob and splashes; a catch also pulls the fish out
+      if (e.splash) {
+        const big = e.splash === 2; e.splash = 0;
+        P.st = time; if (big) P.ct = time;
+        let n = big ? 14 : 6;
+        for (const d of P.drops) if (n > 0 && (!d.visible || big)) { n--; d.visible = true; d.position.set(P.bx + (Math.random() - 0.5) * 0.2, 0.1, P.bz + (Math.random() - 0.5) * 0.2); d.userData.v.set((Math.random() - 0.5) * 2.2, 1.6 + Math.random() * (big ? 2.4 : 1.2), (Math.random() - 0.5) * 1.4); }
+      }
+      for (const d of P.drops) if (d.visible) { const v = d.userData.v; v.y -= 9 * dt; d.position.addScaledVector(v, dt); if (d.position.y < 0.05) d.visible = false; }
+      const sp = (time - P.st) / 0.7;
+      P.splash.material.opacity = sp < 1 ? 0.8 * (1 - sp) * dying : 0;
+      if (sp < 1) P.splash.scale.setScalar(0.15 + sp * 0.75);
+      // tip of the rod in the pond's local space
+      let tip = null;
       if (show && heroObj) {
         heroObj.updateMatrixWorld(true);
-        const tool = heroObj.userData.p.userData.P.armF.children[2], tip = new T.Vector3();
-        if (tool && tool.userData.tip) tool.userData.tip.getWorldPosition(tip);
-        const end = new T.Vector3(x / U3 + P.bx + Math.sin(time * 2) * 0.08, 0.08, P.bz), pos = P.line.geometry.attributes.position;
-        for (let i = 0; i < 9; i++) { const t = i / 8; pos.setXYZ(i, tip.x + (end.x - tip.x) * t, tip.y + (end.y - tip.y) * t - Math.sin(t * Math.PI) * 0.35, tip.z + (end.z - tip.z) * t); }
+        const tool = heroObj.userData.p.userData.P.armF.children[2];
+        if (tool && tool.userData.tip) { g.updateMatrixWorld(true); tip = g.worldToLocal(tool.userData.tip.getWorldPosition(new T.Vector3())); }
+      }
+      // the reel: up out of the water (0-.3), swinging up to the rod tip while flapping (.3-.75), into the bag (.75-1)
+      const cp = (time - P.ct) / 1.3;
+      P.fish.visible = cp >= 0 && cp < 1 && !!tip;
+      let lineEnd = null;
+      if (P.fish.visible) {
+        const hx = -e.stop / U3, hang = new T.Vector3(tip.x, tip.y - 0.35, tip.z);
+        const fl = Math.sin(time * 28);
+        if (cp < 0.3) {
+          const q = cp / 0.3;
+          P.fish.position.set(P.bx, -0.15 + q * 0.75, P.bz); P.fish.rotation.set(0, 0, Math.PI / 2 + fl * 0.25); P.fish.scale.setScalar(P.fs);
+        } else if (cp < 0.75) {
+          const q = (cp - 0.3) / 0.45, qq = q * q * (3 - 2 * q);
+          P.fish.position.set(P.bx + (hang.x - P.bx) * qq, 0.6 + (hang.y - 0.6) * qq + Math.sin(q * Math.PI) * 0.5, P.bz + (hang.z - P.bz) * qq);
+          P.fish.rotation.set(0, fl * 0.3, -Math.PI / 2 + fl * 0.45); P.fish.scale.setScalar(P.fs);
+        } else {
+          const q = (cp - 0.75) / 0.25;
+          P.fish.position.set(hang.x + (hx - hang.x) * q, hang.y + (0.9 - hang.y) * q, hang.z + (-3.1 - hang.z) * q);
+          P.fish.rotation.set(0, 0, -Math.PI / 2 + fl * 0.2); P.fish.scale.setScalar(P.fs * (1 - q * 0.8));
+        }
+        P.fishTail.rotation.y = fl * 0.6;
+        lineEnd = P.fish.position.clone(); lineEnd.y += 0.2;
+      }
+      const reeling = P.fish.visible && cp < 0.75;
+      P.bob.visible = show && !reeling;
+      P.line.visible = show && (!P.fish.visible || cp < 0.75);
+      const dip = Math.max(0, 1 - (time - P.st) / 0.35);
+      P.bob.position.set(P.bx + Math.sin(time * 2) * 0.08, 0.06 + Math.sin(time * 4) * 0.03 - dip * 0.12, P.bz);
+      if (P.line.visible && tip) {
+        const end = reeling ? lineEnd : P.bob.position.clone(), pos = P.line.geometry.attributes.position, sag = reeling ? 0.02 : 0.35 * (1 - dip * 0.8);
+        g.localToWorld(end); const tw = g.localToWorld(tip.clone());
+        for (let i = 0; i < 9; i++) { const t = i / 8; pos.setXYZ(i, tw.x + (end.x - tw.x) * t, tw.y + (end.y - tw.y) * t - Math.sin(t * Math.PI) * sag, tw.z + (end.z - tw.z) * t); }
         pos.needsUpdate = true;
       }
     } else {
