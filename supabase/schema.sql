@@ -735,6 +735,11 @@ alter table public.profiles add column if not exists wins int not null default 0
 alter table public.profiles add column if not exists losses int not null default 0;
 alter table public.profiles add column if not exists credit bigint not null default 0;   -- PvP gold the next save may add
 alter table public.hiscores add column if not exists rating int not null default 1000;
+-- weekly gains: total XP when this week's first save came in (weeks start Monday, UTC)
+alter table public.hiscores add column if not exists week_key text;
+alter table public.hiscores add column if not exists week_base bigint not null default 0;
+create or replace function public.week_key() returns text
+language sql stable set search_path = public as $$ select to_char(date_trunc('week', now() at time zone 'utc'), 'YYYY-MM-DD') $$;
 
 create table if not exists public.pvp_fights (
   id bigserial primary key,
@@ -825,13 +830,16 @@ begin
                 + coalesce((lv ->> 'defence')::int, 1) + coalesce((lv ->> 'hitpoints')::int, 1)) / 3);
   select count(*) into bosses from jsonb_each_text(coalesce(d -> 'kc', '{}')) e
     where e.key = any (array['kingslime','gobchief','bonelord','frosttroll','dragon','bogmother','warden','overlord']) and e.value::numeric > 0;
-  insert into hiscores (user_id, name, total_level, total_xp, combat, skills, kills, bosses, pks, imported, updated_at, rating)
+  insert into hiscores (user_id, name, total_level, total_xp, combat, skills, kills, bosses, pks, imported, updated_at, rating, week_key, week_base)
   select uid, p.name, tl, tx, cmb, coalesce(d -> 'skills', '{}'), coalesce((d ->> 'kills')::numeric, 0), bosses,
-         coalesce((d -> 'wild' ->> 'pks')::int, 0), p.imported, now(), p.rating
+         coalesce((d -> 'wild' ->> 'pks')::int, 0), p.imported, now(), p.rating, week_key(), tx
   from profiles p where p.id = uid
   on conflict (user_id) do update set name = excluded.name, total_level = excluded.total_level, total_xp = excluded.total_xp,
     combat = excluded.combat, skills = excluded.skills, kills = excluded.kills, bosses = excluded.bosses, pks = excluded.pks,
-    imported = excluded.imported, rating = excluded.rating, updated_at = now();
+    imported = excluded.imported, rating = excluded.rating, updated_at = now(),
+    -- a new week starts counting from the XP the hero had at the last save of the old one
+    week_base = case when hiscores.week_key is distinct from excluded.week_key then hiscores.total_xp else hiscores.week_base end,
+    week_key = excluded.week_key;
 end $$;
 
 -- ---------- functions the game calls ----------
@@ -1589,6 +1597,7 @@ create or replace function public.clan_list() returns jsonb
 language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(x order by x.xp desc), '[]') from (
     select c.id, c.name, c.tag, c.motd, count(m.user_id) as members, coalesce(sum(h.total_xp), 0)::bigint as xp, coalesce(sum(h.total_level), 0) as levels,
+      coalesce(sum(case when h.week_key = week_key() then greatest(0, h.total_xp - h.week_base) end), 0)::bigint as week,
       (select name from profiles where id = c.owner) as owner
     from clans c left join clan_members m on m.clan_id = c.id left join hiscores h on h.user_id = m.user_id
     group by c.id) x
@@ -1597,7 +1606,8 @@ $$;
 create or replace function public.clan_info(p_id bigint) returns jsonb
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object('id', c.id, 'name', c.name, 'tag', c.tag, 'motd', c.motd, 'owner', c.owner,
-    'members', coalesce((select jsonb_agg(jsonb_build_object('id', m.user_id, 'name', p.name, 'total_level', h.total_level, 'total_xp', h.total_xp, 'combat', h.combat) order by h.total_xp desc nulls last)
+    'members', coalesce((select jsonb_agg(jsonb_build_object('id', m.user_id, 'name', p.name, 'total_level', h.total_level, 'total_xp', h.total_xp, 'combat', h.combat,
+      'week', case when h.week_key = week_key() then greatest(0, h.total_xp - h.week_base) else 0 end) order by h.total_xp desc nulls last)
       from clan_members m join profiles p on p.id = m.user_id left join hiscores h on h.user_id = m.user_id where m.clan_id = c.id), '[]'))
   from clans c where c.id = p_id
 $$;
@@ -1621,3 +1631,75 @@ revoke execute on function public.wb_current(), public.wb_state(), public.wb_hit
   public.clan_leave(), public.clan_kick(uuid), public.clan_motd(text), public.clan_list(), public.clan_info(bigint), public.clan_say(text) from public, anon, authenticated;
 grant execute on function public.wb_state(), public.wb_hit(bigint), public.wb_claim(), public.clan_create(text, text), public.clan_join(bigint),
   public.clan_leave(), public.clan_kick(uuid), public.clan_motd(text), public.clan_list(), public.clan_info(bigint), public.clan_say(text) to authenticated;
+
+-- ---------- this week: XP hiscores and a shared clan goal ----------
+-- the top 50 by XP gained since Monday (UTC)
+create or replace function public.hiscores_week() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(x order by x.gain desc), '[]') from (
+    select h.name, h.combat, h.total_level, (h.total_xp - h.week_base) as gain, h.imported
+    from hiscores h join profiles p on p.id = h.user_id
+    where h.week_key = week_key() and h.total_xp > h.week_base and not p.banned
+    order by h.total_xp - h.week_base desc limit 50) x
+$$;
+
+-- clan goal tiers: XP the members gain together this week, and what each member gets for every tier
+create table if not exists public.clan_week_claims (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  week_key text not null,
+  tier int not null default 0,
+  primary key (user_id, week_key)
+);
+alter table public.clan_week_claims enable row level security;
+revoke insert, update, delete on public.clan_week_claims from anon, authenticated;
+
+create or replace function public.clan_week_xp(cid bigint) returns bigint
+language sql stable security definer set search_path = public as $$
+  select coalesce(sum(greatest(0, h.total_xp - h.week_base)), 0)::bigint
+  from clan_members m join hiscores h on h.user_id = m.user_id where m.clan_id = cid and h.week_key = week_key()
+$$;
+
+create or replace function public.clan_week() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare uid uuid := auth.uid(); cid bigint; mine bigint;
+begin
+  select clan_id into cid from clan_members where user_id = uid;
+  if cid is null then return jsonb_build_object('ok', false, 'reason', 'Join a clan first'); end if;
+  select case when week_key = week_key() then greatest(0, total_xp - week_base) else 0 end into mine from hiscores where user_id = uid;
+  return jsonb_build_object('ok', true, 'week', week_key(), 'xp', clan_week_xp(cid), 'mine', coalesce(mine, 0),
+    'tiers', jsonb_build_array(500000, 2000000, 8000000), 'gold', jsonb_build_array(3000, 8000, 20000), 'need', 5000,
+    'claimed', coalesce((select tier from clan_week_claims where user_id = uid and week_key = week_key()), 0),
+    'ends', (date_trunc('week', now() at time zone 'utc') + interval '7 days') at time zone 'utc');
+end $$;
+
+-- every member who helped (5,000 XP this week) collects each tier the clan reached, once a week
+create or replace function public.clan_week_claim() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); cid bigint; xp bigint; mine bigint; done int; reached int := 0;
+  tiers bigint[] := array[500000, 2000000, 8000000]; golds bigint[] := array[3000, 8000, 20000];
+  gold bigint := 0; med int := 0; hard int := 0; t int;
+begin
+  if uid is null then return jsonb_build_object('ok', false, 'reason', 'Sign in first'); end if;
+  if is_banned(uid) then return jsonb_build_object('ok', false, 'reason', 'You cannot do that'); end if;
+  select clan_id into cid from clan_members where user_id = uid;
+  if cid is null then return jsonb_build_object('ok', false, 'reason', 'Join a clan first'); end if;
+  select case when week_key = week_key() then greatest(0, total_xp - week_base) else 0 end into mine from hiscores where user_id = uid;
+  if coalesce(mine, 0) < 5000 then return jsonb_build_object('ok', false, 'reason', 'Gain 5,000 XP this week to share the clan reward'); end if;
+  xp := clan_week_xp(cid);
+  for t in 1..3 loop if xp >= tiers[t] then reached := t; end if; end loop;
+  insert into clan_week_claims (user_id, week_key, tier) values (uid, week_key(), 0) on conflict do nothing;
+  select tier into done from clan_week_claims where user_id = uid and week_key = week_key() for update;
+  if reached <= done then return jsonb_build_object('ok', false, 'reason', 'Nothing new to collect yet'); end if;
+  for t in done + 1 .. reached loop
+    gold := gold + golds[t];
+    if t = 2 then med := med + 1; elsif t = 3 then hard := hard + 1; end if;
+  end loop;
+  update clan_week_claims set tier = reached where user_id = uid and week_key = week_key();
+  -- the next save may grow by this much (a clue scroll is worth 100)
+  update profiles set credit = credit + gold + (med + hard) * 100 where id = uid;
+  return jsonb_build_object('ok', true, 'gold', gold, 'medium', med, 'hard', hard, 'tier', reached);
+end $$;
+
+revoke execute on function public.week_key(), public.hiscores_week(), public.clan_week_xp(bigint), public.clan_week(), public.clan_week_claim() from public, anon, authenticated;
+grant execute on function public.hiscores_week() to anon, authenticated;
+grant execute on function public.clan_week(), public.clan_week_claim() to authenticated;
