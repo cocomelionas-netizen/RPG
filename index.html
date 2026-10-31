@@ -76,6 +76,8 @@
   }
   @keyframes toastIn { from { transform: translate(-50%, -50%) scale(1.25); opacity: 0; } }
   @media (max-width: 700px) { #toast { font-size: 15px; top: 30%; } }
+  nav.tabs button.locked, .chips button.lockd, .acticons button.lockd { opacity: .42; filter: grayscale(.8); }
+  .soon { margin-bottom: 10px; } .soon div { padding: 3px 0; }
   nav.tabs button.alert { position: relative; }
   nav.tabs button.alert::after {
     content: ''; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
@@ -906,7 +908,7 @@ function newState() {
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
     gsel: { woodcutting: -1, mining: -1, fishing: -1 }, prevAct: 'combat', prevZone: 0, ctarget: null, muted: false, tipA2HS: false,
-    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, geSeq: 0, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
+    smithV: 2, fmSel: -1, tsel: null, bonfire: null, pets: {}, pet: null, kc: {}, task: null, scoins: 0, autoSlayer: false, ownsAutoSlayer: false, quests: {}, qv: QUEST_V, clog: {}, mastery: {}, unlocked: {}, geSeq: 0, wild: { in: false, loot: {}, gold: 0, skull: false, flee: true, pks: 0, deaths: 0, banked: 0 },
   };
 }
 function recalcLevels() { for (const k in SKILLS) LV[k] = levelFromXp(S.skills[k] || 0); }
@@ -964,6 +966,8 @@ function applySave(data) {
     }
     S.clog = Object.assign({}, data.clog);
     S.mastery = Object.assign({}, data.mastery);
+    // heroes from before soft locks keep everything they could already use
+    S.unlocked = data.unlocked ? Object.assign({}, data.unlocked) : Object.fromEntries(UNLOCKS.map(u => [u.id, true]));
     S.wild = Object.assign(def.wild, data.wild);
     // one kind of rune became eight: old runes turn into air and mind runes plus some catalysts
     if (S.inv.rune) { const n = S.inv.rune; delete S.inv.rune; give('r_air', n); give('r_mind', n); give('r_chaos', Math.floor(n / 3)); give('r_death', Math.floor(n / 6)); }
@@ -1166,6 +1170,45 @@ function offlineCap() { return (12 + 2 * S.rup.patience) * 3600; }
 function totalLevel() { return Object.values(LV).reduce((a, l) => a + l, 0); }
 function achDesc(a) { return typeof a.desc === 'function' ? a.desc() : a.desc; }
 function bonusText(b) { return `+${b[1]}% ${{ xp: 'XP', gold: 'gold', gather: 'gathering speed' }[b[0]]}`; }
+/* --- soft locks: features open one by one so a new hero isn't buried in menus --- */
+const qDone = id => !!(S.quests[id] && S.quests[id].s === 'done');
+const UNLOCKS = [
+  { id: 'quests', icon: '📜', name: 'Quests & Bosses', tab: 'quests', need: 'Defeat your first enemy', test: () => S.kills >= 1 },
+  { id: 'firemaking', icon: '🔥', name: 'Firemaking', sub: ['craft', 'firemaking'], act: 'firemaking', need: 'Woodcutting level 3', test: () => LV.woodcutting >= 3 },
+  { id: 'fletching', icon: '🪶', name: 'Fletching & bows', sub: ['craft', 'fletching'], act: 'fletching', need: 'Woodcutting level 5', test: () => LV.woodcutting >= 5 },
+  { id: 'thieving', icon: '🥷', name: 'Thieving', act: 'thieving', need: 'Finish the quest "First Steps"', test: () => qDone('q1') },
+  { id: 'slayer', icon: '💀', name: 'Slayer', tab: 'slayer', need: 'Combat level 10', test: () => combatLevel() >= 10 },
+  { id: 'runecrafting', icon: '🔮', name: 'Runecrafting & magic', sub: ['craft', 'runecrafting'], act: 'runecrafting', need: 'Finish the quest "Forged in Bronze"', test: () => qDone('q2') },
+  { id: 'mastery', icon: '🎓', name: 'Mastery', need: 'Any gathering or crafting skill at level 15', test: () => MASTERY_SKILLS.some(k => LV[k] >= 15) },
+  { id: 'progress', icon: '🏆', name: 'Achievements, Journeys & Hiscores', tab: 'progress', need: 'Total level 50', test: () => totalLevel() >= 50 },
+  { id: 'ge', icon: '📈', name: 'Grand Exchange', sub: ['inventory', 'ge'], need: 'Total level 100', test: () => totalLevel() >= 100 },
+];
+const UNLOCK = Object.fromEntries(UNLOCKS.map(u => [u.id, u]));
+const isOpen = id => !UNLOCK[id] || !!S.unlocked[id];
+// which unlock guards a tab, a sub-view or a map activity (null when it is always open)
+function lockFor(tab, sub) {
+  const u = UNLOCKS.find(u => (u.tab && u.tab === tab) || (u.sub && u.sub[0] === tab && u.sub[1] === sub));
+  return u && !S.unlocked[u.id] ? u : null;
+}
+const actLock = a => { const u = UNLOCKS.find(u => u.act === a); return u && !S.unlocked[u.id] ? u : null; };
+function lockedMsg(u) { showBanner(`🔒 ${u.name}: ${u.need}`); }
+const freshTabs = new Set();
+function checkUnlocks() {
+  for (const u of UNLOCKS) {
+    if (S.unlocked[u.id] || !u.test()) continue;
+    S.unlocked[u.id] = true;
+    log(`🔓 Unlocked: ${u.icon} ${u.name}`, 'lg-xp');
+    showBanner(`🔓 New: ${u.icon} ${u.name}`); sfx('level');
+    const t = u.tab || (u.sub ? u.sub[0] : u.act ? 'activity' : u.id === 'mastery' ? 'skills' : null);
+    if (t) freshTabs.add(t);
+    uiDirty = true; lastHtml = '';
+  }
+}
+function htmlSoon() {
+  const next = UNLOCKS.filter(u => !S.unlocked[u.id]).slice(0, 3);
+  if (!next.length) return '';
+  return '<div class="info soon"><b>🔒 Coming up</b>' + next.map(u => `<div>${u.icon} <b>${u.name}</b> <span class="muted">– ${u.need}</span></div>`).join('') + '</div>';
+}
 function checkAch() {
   for (const a of ACH) {
     if (S.ach[a.id] || !a.test()) continue;
@@ -1188,7 +1231,7 @@ function newJourney() {
   if (!S.bosses[4]) return;
   const gain = renownGain();
   // keep achievements, lifetime stats and Renown; everything else starts over
-  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet,
+  const keep = { ach: S.ach, stats: S.stats, kills: S.kills, deaths: S.deaths, dist: S.dist, rup: S.rup, kc: S.kc, muted: S.muted, pets: S.pets, pet: S.pet, unlocked: S.unlocked,
     renown: S.renown + gain, journeys: S.journeys + 1, tipEvent: true };
   S = Object.assign(newState(), keep);
   const hs = S.rup.headstart;
@@ -1708,7 +1751,7 @@ function spendPool(skill, key) {
   m.pool -= cost; m.xp[key] = mXp(skill, key) + cost;
   log(`🎓 Spent ${fmt(cost)} pool XP: ${masteryName(skill, key)} is now Mastery ${mLv(skill, key)}`, 'lg-xp');
 }
-function mTag(skill, key) { const l = mLv(skill, key); return ` <span class="tag m" title="Mastery">🎓 ${l}</span>`; }
+function mTag(skill, key) { if (!isOpen('mastery')) return ''; const l = mLv(skill, key); return ` <span class="tag m" title="Mastery">🎓 ${l}</span>`; }
 function masteryModal(skill) {
   const pct = poolPct(skill), pool = mState(skill).pool;
   openModal(`<h2>🎓 ${SKILLS[skill].icon} ${SKILLS[skill].name} Mastery</h2>
@@ -4359,7 +4402,7 @@ function htmlActivity() {
   if (mapSel === null) mapSel = S.zone;
   const acts = ACT_ORDER.filter(a => locHas(mapSel, a));
   const hunting = S.activity === 'combat' && S.ctarget === 'pvp';
-  if (!acts.includes(mapAct)) mapAct = mapSel === S.zone && hunting ? 'pvp' : mapSel === S.zone && acts.includes(S.activity) ? S.activity : acts[0];
+  if (!acts.includes(mapAct) || actLock(mapAct)) mapAct = mapSel === S.zone && hunting ? 'pvp' : mapSel === S.zone && acts.includes(S.activity) && !actLock(S.activity) ? S.activity : (acts.find(a => !actLock(a)) || acts[0]);
   let h = '<div class="map" id="worldmap"><canvas id="mapcv"></canvas>' + ZONES.map((z, i) => {
     const locked = !locOpen(i);
     const cls = ['loc', i === mapSel ? 'sel' : '', locked ? 'locked' : ''].join(' ');
@@ -4372,7 +4415,7 @@ function htmlActivity() {
     <p class="muted">${z.desc}${mapSel === S.zone ? ' <b>Your hero is here.</b>' : ''}</p>`;
   if (!locOpen(mapSel)) return h + `<p class="need">Reach Slayer level ${z.slayer} to enter (you are ${LV.slayer}).</p></div>`;
   const doing = a => S.zone === mapSel && (a === 'pvp' ? hunting : S.activity === a && !(a === 'combat' && hunting));
-  h += '<div class="acticons">' + acts.map(a => `<button class="${a === mapAct ? 'sel' : ''} ${doing(a) ? 'doing' : ''}" data-a="mapact" data-id="${a}">
+  h += '<div class="acticons">' + acts.map(a => actLock(a) ? `<button class="lockd" data-a="locked" data-id="${actLock(a).id}"><span class="big">🔒</span>${SKILLS[a].name}<small>locked</small></button>` : `<button class="${a === mapAct ? 'sel' : ''} ${doing(a) ? 'doing' : ''}" data-a="mapact" data-id="${a}">
     <span class="big">${actIcon(a)}</span>${a === 'combat' ? 'Combat' : a === 'pvp' ? 'PvP' : SKILLS[a].name}<small>${a === 'combat' ? 'Combat ' + combatLevel() : a === 'pvp' ? `${fmt(S.wild.pks)} PKs` : 'Level ' + LV[a]}</small></button>`).join('') + '</div>';
   h += htmlLocAct(mapSel, mapAct) + '</div>';
   if ((mapAct === 'combat' || mapAct === 'pvp') && S.activity === 'combat' && S.zone === mapSel) h += `<div class="info">${htmlCombatPanel()}</div>`;
@@ -4499,21 +4542,26 @@ function htmlLocAct(i, a) {
 }
 
 function htmlSkills() {
-  return '<div class="grid">' + Object.entries(SKILLS).map(([k, sk]) => {
+  return htmlSoon() + '<div class="grid">' + Object.entries(SKILLS).map(([k, sk]) => {
     const l = LV[k], xp = S.skills[k];
     const cur = XP_TABLE[l], nxt = l < 99 ? XP_TABLE[l + 1] : xp;
     const frac = l < 99 ? (xp - cur) / (nxt - cur) : 1;
     return `<div class="skill"><div class="top"><span>${sk.icon} ${sk.name}</span><span class="lv">${l} / 99</span></div>
       <div class="bar"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
-      <small>${fmt(xp)} / ${fmt(nxt)} XP</small>${MASTERY_SKILLS.includes(k) ? `
+      <small>${fmt(xp)} / ${fmt(nxt)} XP</small>${MASTERY_SKILLS.includes(k) && isOpen('mastery') ? `
       <div class="mpool"><small>🎓 Mastery pool ${(poolPct(k) * 100).toFixed(1)}%</small><div class="bar pool"><i style="width:${(poolPct(k) * 100).toFixed(1)}%"></i></div>
       <button data-a="mastery" data-id="${k}">🎓 Mastery</button></div>` : ''}</div>`;
   }).join('') + '</div>';
 }
 
 let bagSub = 'items', craftSub = 'smithing', smithMetal = null;
+const SUBNAV_TAB = { craftsub: 'craft', bagsub: 'inventory' };
 function subNav(action, current, list) {
-  return `<div class="chips sub">` + list.map(([id, label]) => `<button class="${current === id ? 'sel' : ''}" data-a="${action}" data-id="${id}">${label}</button>`).join('') + '</div>';
+  return `<div class="chips sub">` + list.map(([id, label]) => {
+    const u = SUBNAV_TAB[action] && lockFor(SUBNAV_TAB[action], id);
+    return u ? `<button class="lockd" data-a="locked" data-id="${u.id}">🔒 ${label}</button>`
+      : `<button class="${current === id ? 'sel' : ''}" data-a="${action}" data-id="${id}">${label}</button>`;
+  }).join('') + '</div>';
 }
 function itemStats(it) {
   return [it.heal && 'heals ' + it.heal, it.power && (it.slot ? `${TYPE_ICON[it.wtype]} power +${it.power}` : 'arrow power +' + it.power),
@@ -4592,6 +4640,7 @@ function slotMenu(sl) {
     <button data-a="close">Close</button></div></div>`);
 }
 function htmlBag() {
+  if (lockFor('inventory', bagSub)) bagSub = 'items';
   const nav = subNav('bagsub', bagSub, [['items', '🎒 Items'], ['shop', '🏪 Shop'], ['ge', '📈 Grand Exchange']]);
   if (bagSub === 'shop') return nav + htmlShop();
   if (bagSub === 'ge') return nav + htmlGE();
@@ -4609,6 +4658,7 @@ function matsHtml(mats) {
 }
 
 function htmlCraft() {
+  if (lockFor('craft', craftSub)) craftSub = 'smithing';
   let h = subNav('craftsub', craftSub, [['smithing', '🔨 Smithing'], ['cooking', '🍳 Cooking'], ['fletching', '🪶 Fletching'], ['runecrafting', '🔮 Runecrafting'], ['firemaking', '🔥 Firemaking']]);
   if (craftSub === 'cooking') return h + htmlCooking();
   if (craftSub === 'firemaking') return h + htmlFiremaking();
@@ -4846,7 +4896,7 @@ function nextGoal() {
 }
 let lastGoal = '';
 function renderGoal() {
-  checkAch();
+  checkAch(); checkUnlocks();
   const g = nextGoal();
   const html = `<b>🎯 Goal</b><span>${g.t}</span>`;
   const el = document.getElementById('goal');
@@ -4861,14 +4911,21 @@ function renderGoal() {
     quests: QUESTS.some(q => questReady(q) || questState(q) === 'open'),
     progress: S.bosses[4] || Object.keys(RUP).some(k => S.rup[k] < RUP[k].max && S.renown >= rupCost(k)),
   };
-  document.querySelectorAll('nav.tabs [data-tab]').forEach(b => b.classList.toggle('alert', !!alerts[b.dataset.tab] && b.dataset.tab !== tab));
+  document.querySelectorAll('nav.tabs [data-tab]').forEach(b => {
+    const lk = !!lockFor(b.dataset.tab);
+    b.classList.toggle('locked', lk);
+    b.classList.toggle('alert', !lk && (!!alerts[b.dataset.tab] || freshTabs.has(b.dataset.tab)) && b.dataset.tab !== tab);
+  });
 }
 // old tab names (used by goals and buttons) map to a tab plus its sub-view
 const TAB_ALIAS = { firemaking: ['craft', 'firemaking'], smithing: ['craft', 'smithing'], cooking: ['craft', 'cooking'], fletching: ['craft', 'fletching'], runecrafting: ['craft', 'runecrafting'], shop: ['inventory', 'shop'] };
 function openTab(name, scroll) {
   const al = TAB_ALIAS[name];
+  const lk = al ? lockFor(al[0], al[1]) || lockFor(al[0]) : lockFor(name);
+  if (lk) { lockedMsg(lk); return; }
+  freshTabs.delete(al ? al[0] : name);
   if (al) { name = al[0]; if (name === 'craft') craftSub = al[1]; else bagSub = al[1]; }
-  else if (name === 'craft' && CRAFTING.has(S.activity)) craftSub = S.activity;
+  else if (name === 'craft' && CRAFTING.has(S.activity) && !lockFor('craft', S.activity)) craftSub = S.activity;
   if (name === 'activity' && tab !== 'activity') { mapSel = null; mapAct = null; }
   tab = name;
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('sel', b.dataset.tab === name));
@@ -4955,6 +5012,7 @@ document.addEventListener('click', ev => {
     case 'pet': if (S.pets[id]) S.pet = id; break;
     case 'loc': mapSel = +id; mapAct = null; break;
     case 'mapact': mapAct = id; break;
+    case 'locked': lockedMsg(UNLOCK[id]); break;
     case 'fight': S.ctarget = id === 'mix' ? null : id; travel(+b.dataset.z, 'combat'); resetEncounter(); break;
     case 'gather': S.gsel[b.dataset.skill] = +id; travel(+b.dataset.z, b.dataset.skill); resetEncounter(); break;
     case 'station': travel(+b.dataset.z, id); break;
