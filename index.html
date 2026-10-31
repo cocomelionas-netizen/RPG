@@ -346,11 +346,12 @@
     <aside>
       <div class="card" id="hero"></div>
       <div class="card">
-        <div class="logtabs"><button class="sel" data-a="logtab" data-id="log">📜 Log</button><button data-a="logtab" data-id="chat">💬 Chat <span id="chat-new" hidden></span></button><button data-a="logtab" data-id="friends">👥 Friends <span id="pm-new" hidden></span></button></div>
+        <div class="logtabs"><button class="sel" data-a="logtab" data-id="log">📜 Log</button><button data-a="logtab" data-id="chat">💬 Chat <span id="chat-new" hidden></span></button><button data-a="logtab" data-id="friends">👥 Friends <span id="pm-new" hidden></span></button><button data-a="logtab" data-id="clan">🛡️ Clan <span id="clan-new" hidden></span></button></div>
         <div id="log"></div>
         <div id="chat" hidden><div id="chatlist"></div>
           <div class="chatbar"><input id="chat-input" maxlength="200" placeholder="Say something…" autocomplete="off"><button data-a="chatsend">Send</button></div></div>
         <div id="friends" hidden></div>
+        <div id="clan" hidden></div>
       </div>
       <div class="card row">
         <button data-a="save">💾 Save</button>
@@ -760,6 +761,14 @@ const BOSS_UNIQUES = {
   warden: [['crystalgloves', 1 / 12], ['cbow', 1 / 50]], overlord: [['abyssring', 1 / 16], ['whip', 1 / 30], ['sstaff', 1 / 40]],
 };
 for (const [id, list] of Object.entries(BOSS_UNIQUES)) for (const [it, ch] of list) ENEMIES[id].drops.push([it, ch, 1, 1]);
+// world bosses: one is up for everybody at a time; the server keeps its real HP
+const WB_BOSSES = ['wbslime', 'wbwyrm', 'wbtitan', 'wbroc'];
+Object.assign(ENEMIES, {
+  wbslime: { name: 'Gelatinous Colossus', type: 'melee', styles: ['melee', 'magic'], hp: 1e9, maxHit: 42, atk: 70, def: 60, speed: 2.8, gold: [0, 0], shape: 'blob', size: 3, color: '#62e07a', orb: '#9dffb0', world: true, drops: [] },
+  wbwyrm:  { name: 'Ancient Wyrm', type: 'magic', styles: ['magic', 'ranged'], hp: 1e9, maxHit: 46, atk: 75, def: 65, speed: 3.0, gold: [0, 0], shape: 'dragon', size: 1, color: '#4a5a8a', orb: '#7fd0ff', world: true, drops: [] },
+  wbtitan: { name: 'Titan of the Abyss', type: 'melee', styles: ['melee', 'ranged'], hp: 1e9, maxHit: 48, atk: 78, def: 70, speed: 3.0, gold: [0, 0], shape: 'humanoid', size: 2.3, color: '#5a3a6a', body: '#2a1a3a', world: true, drops: [] },
+  wbroc:   { name: 'Storm Roc', type: 'ranged', styles: ['ranged', 'magic'], hp: 1e9, maxHit: 44, atk: 72, def: 62, speed: 2.6, gold: [0, 0], shape: 'flyer', size: 2.2, color: '#c8b070', orb: '#fff27a', world: true, drops: [] },
+});
 
 // a riverside hub with every crafting station and no monsters
 ZONES.push({ name: 'Riverbend', town: true, tier: 0, enemies: [],
@@ -798,6 +807,11 @@ ZONES.push({ name: 'My Home', home: true, tier: 0, enemies: [], icon: '🏡', x:
   th: { sky: ['#8fd0ff', '#eaf7ff'], far: '#b8d8c8', mid: '#8ccf6b', near: '#5aa04a', ground: '#6aae4a', dirt: '#9a7a50', sun: '#fff3a0', decor: 'home' } });
 const HOME = ZONES.length - 1;
 Object.defineProperty(ZONES[HOME], 'stations', { get: () => homeStations() });
+// the world boss arena: everyone online fights the same boss
+ZONES.push({ name: 'World Boss Arena', wboss: true, req: 40, tier: 3, enemies: [], icon: '👹', x: .55, y: .95,
+  desc: 'A great arena where every hero online fights the same world boss. Your damage is sent to the server; when the boss falls, everyone who hit it shares the reward.',
+  th: { sky: ['#3a1a2a', '#8a4a3a'], far: '#5a3a3a', mid: '#7a5a4a', near: '#4a3028', ground: '#8a6a50', dirt: '#6a4a34', sun: '#ffb070', decor: 'wild' } });
+const WBOSS = ZONES.length - 1;
 [[0, ['man', 'farmer']], [1, ['golbin']], [2, ['miner']], [3, ['wizard']], [TOWN, ['man', 'merchant', 'guard', 'lord']]].forEach(([i, n]) => { ZONES[i].npcs = n; });
 const GATHERING = ['woodcutting', 'mining', 'fishing'];
 
@@ -1045,18 +1059,19 @@ function addXp(skill, amt, raw) {
 function zoneOpen(i) {
   const z = ZONES[i];
   if (z.home) return false;
+  if (z.wboss) return !!(sb && me) && combatLevel() >= z.req;
   if (z.slayer) return LV.slayer >= z.slayer;
   if (z.wild) return combatLevel() >= z.req;
   return i === 0 || (S.bosses[i - 1] && combatLevel() >= z.req);
 }
 // Slayer areas need Slayer level for everything; other places can always be visited to gather and craft
-function locOpen(i) { const z = ZONES[i]; return z.home ? isOpen('home') : !z.slayer || LV.slayer >= z.slayer; }
+function locOpen(i) { const z = ZONES[i]; return z.home ? isOpen('home') : z.wboss ? zoneOpen(i) : !z.slayer || LV.slayer >= z.slayer; }
 function locTiers(skill, z = S.zone) { return (ZONES[z].res && ZONES[z].res[skill]) || []; }
 function locHas(i, act) {
   const z = ZONES[i];
-  if (act === 'combat') return z.enemies.length > 0;
+  if (act === 'combat') return z.enemies.length > 0 || !!z.wboss;
   if (act === 'thieving') return !!(z.npcs && z.npcs.length);
-  if (act === 'firemaking') return !z.wild;
+  if (act === 'firemaking') return !z.wild && !z.wboss;
   if (act === 'pvp') return !!z.wild;
   if (act === 'farming') return !!z.home;
   if (act === 'agility') return !!z.course && (!z.course.home || room('course') > 0);
@@ -1289,7 +1304,14 @@ function spawnEntity() {
     // Auto Slayer walks to the task's area and only fights the task monster
     const auto = S.autoSlayer && S.task && zoneOpen(S.task.zone);
     if (auto && S.zone !== S.task.zone) S.zone = S.task.zone;
+    if (ZONES[S.zone].wboss && !zoneOpen(S.zone)) S.zone = bestZone();
     const z = ZONES[S.zone];
+    if (z.wboss) {
+      const id = WB_BOSSES[(WB.st && WB.st.kind) || 0], d = ENEMIES[id];
+      R.ent = { kind: 'enemy', id, food: 0, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x,
+        stop: (d.shape === 'dragon' ? 130 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0), hit: 0, lunge: 0, pend: 0, style: d.styles[0], swap: randi(3, 5) };
+      return;
+    }
     const lair = S.ctarget && S.ctarget === z.boss && bossOpen(bossOf(z.boss));
     const id = auto ? S.task.id : lair || (S.ctarget && z.enemies.includes(S.ctarget)) ? S.ctarget : z.enemies[Math.floor(Math.random() * z.enemies.length)];
     const pk = z.wild && (S.ctarget === 'pvp' || Math.random() < PK_CHANCE);
@@ -1368,7 +1390,7 @@ function startAct() {
 
 function tick(dt) {
   time += dt;
-  homeTick(dt);
+  homeTick(dt); wbTick(dt);
   if (inWild() && !S.wild.in) { S.wild.in = true; log('☠️ You enter the Revenant Caves. Loot stays in your looting bag until you leave – die here and you lose it, and most of your gear.', 'lg-bad'); }
   else if (!inWild() && S.wild.in) bankWild('You left the caves');
   if (R.phase === 'walk') {
@@ -1395,7 +1417,7 @@ function tick(dt) {
       S.hp = maxHp(); R.phase = 'walk'; R.ent = null;
       // don't let an idle hero die over and over (and bleed gold) in a zone that is too hard
       if (S.activity === 'combat' && S.zone > 0 && (foodCount() === 0 || R.deathStreak >= 3)) {
-        S.zone = ZONES[S.zone].slayer ? bestZone() : S.zone - 1;
+        S.zone = S.zone < MAIN_ZONES ? S.zone - 1 : bestZone();
         R.deathStreak = 0; S.autoSlayer = false;
         log(`🏃 You retreat to ${ZONES[S.zone].name} to recover.`, 'lg-bad');
       } else log('You get back up and continue on.');
@@ -1525,6 +1547,7 @@ function playerHit(e, shot) {
   const mult = (tri > 0 ? 1.2 : tri < 0 ? 0.85 : 1) * (onTask(e) ? 1 + amu('slay') : 1) * (shot.weak ? WEAK_BONUS : 1) * (1 - (e.d.dr || 0));
   const dmg = Math.min(e.hp, Math.max(1, Math.round(roll * mult)));
   e.hp -= dmg; e.hit = 1;
+  if (e.d.world && !SIM) WB.pend += dmg;
   combatXp(dmg);
   if (pray('heal')) S.hp = Math.min(maxHp(), S.hp + maxHp() * pray('heal'));
   sfx(crit ? 'crit' : 'hit');
@@ -1552,7 +1575,7 @@ function autoEat() {
 
 function die() {
   if (inWild()) wildDeath(R.ent);
-  const lost = Math.floor(Math.min(S.gold * 0.1, 2000 * ((ZONES[S.zone].tier || 0) + 1)));
+  const lost = ZONES[S.zone].wboss ? 0 : Math.floor(Math.min(S.gold * 0.1, 2000 * ((ZONES[S.zone].tier || 0) + 1)));
   S.gold -= lost; S.deaths++; R.deathStreak++;
   S.hp = 0; R.phase = 'dead'; R.deadT = 20;
   if (R.ent.d.boss) {
@@ -3586,12 +3609,13 @@ function drawHud() {
     if (e.kind === 'enemy') {
       const top = Math.max(GY - entHeight(e) - 24, 34 * FS + 26);
       const tri = triangle(e);
-      const name = (e.d.boss ? '👑 ' : e.d.pker ? '☠️ ' : '') + TYPE_ICON[etype(e)] + ' ' + e.d.name + (e.d.pker ? ` (lvl ${e.d.lvl})` : '') + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
+      const name = (e.d.boss || e.d.world ? '👑 ' : e.d.pker ? '☠️ ' : '') + TYPE_ICON[etype(e)] + ' ' + e.d.name + (e.d.pker ? ` (lvl ${e.d.lvl})` : '') + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
       // name colour shows the combat triangle: green = your style is strong here, red = weak
       font(e.d.boss ? 700 : 600, e.d.boss ? 14 : 12); ctx.textAlign = 'center';
       ctx.fillStyle = tri > 0 ? '#9dffa0' : tri < 0 ? '#ffaaa0' : e.d.boss ? '#ffe27a' : '#fff';
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; outlined(name, ex, top - 10 * FS, ctx.fillStyle);
-      bar(ex - bw / 2, top, bw, e.d.boss ? 8 : 6, e.hp / e.maxHp, '#e85a5a');
+      if (e.d.world) { const st = WB.st; bar(ex - 90, top, 180, 9, st ? Math.max(0, st.hp - WB.pend) / st.max_hp : 1, '#e85a5a'); if (st) { font(600, 11); ctx.textAlign = 'center'; outlined(`${fmt(Math.max(0, st.hp - WB.pend))} / ${fmt(st.max_hp)} · ${st.fighters} heroes`, ex, top + 22, '#fff'); } }
+      else bar(ex - bw / 2, top, bw, e.d.boss ? 8 : 6, e.hp / e.maxHp, '#e85a5a');
       ctx.textAlign = 'left';
       bar(HX - 25, GY - 82, 50, 3, 1 - R.atkT / playerSpeed(), '#f2c94c');
     } else if (e.kind === 'npc') {
@@ -3742,7 +3766,7 @@ async function onSignedIn(user, typed) {
   const { data: row } = await sb.from('saves').select('data').eq('user_id', user.id).maybeSingle();
   if (row && row.data) useCloud(row.data, `☁️ Welcome back, ${me.name}! Loaded your hero from the cloud.`);
   else log(`☁️ Welcome, ${me.name}! Uploading this device's hero to your account.`, 'lg-xp');
-  renderAccount(); renderChat(); GE.offers = null; friendsStart(); renderFriends();
+  renderAccount(); renderChat(); GE.offers = null; friendsStart(); renderFriends(); clanStop(); clanLoad();
   await netSync();
 }
 function useCloud(data, msg) {
@@ -3778,7 +3802,7 @@ async function netSync() {
 }
 async function netLogout() {
   if (sb) await sb.auth.signOut();
-  friendsStop(); me = null; renderAccount(); renderChat(); renderFriends(); closeModal();
+  friendsStop(); clanStop(); WB.st = null; me = null; renderAccount(); renderChat(); renderFriends(); renderClan(); closeModal();
   log('👤 Signed out. Your hero keeps playing on this device.');
 }
 
@@ -3887,6 +3911,171 @@ function renderFriends() {
       : FR.list.map(f => `<div class="friend"><span class="dot ${f.online ? 'on' : ''}" title="${f.online ? 'online' : 'offline'}"></span>
         <span class="nm"><b>${esc(f.name)}</b> <small class="muted">combat ${f.combat} · ⚔️ ${f.rating}</small>${FR.unread[f.id] ? ` <span class="tag good">${FR.unread[f.id]} new</span>` : ''}</span>
         <button data-a="pmopen" data-id="${f.id}" title="Message">💬</button><button data-a="frfight" data-id="${f.id}" title="Challenge to a PvP fight">⚔️</button><button data-a="frdel" data-id="${f.id}" title="Remove">✖</button></div>`).join('')}</div>`;
+}
+
+/* --- World boss: everybody hits the same boss; damage goes to the server every 15 s --- */
+const WB = { st: null, pend: 0, t: 0, sendT: 0, loadT: -99, busy: false, msg: '', told: 0 };
+function wbTick(dt) {
+  if (SIM || !sb || !me) return;
+  WB.t += dt;
+  const here = S.zone === WBOSS && S.activity === 'combat';
+  if (!WB.busy && WB.pend > 0 && WB.t - WB.sendT >= (here ? 15 : 1)) wbSend();
+  else if (!WB.busy && WB.t - WB.loadT >= (here || mapSel === WBOSS ? 30 : 300)) wbLoad();
+}
+async function wbLoad() {
+  WB.loadT = WB.t; WB.busy = true;
+  try {
+    const { data, error } = await sb.rpc('wb_state');
+    if (!error) wbSet(data);
+  } catch (e) { }
+  WB.busy = false; uiDirty = true;
+}
+function wbSet(st) {
+  const old = WB.st;
+  WB.st = Object.assign({}, old || {}, st);
+  if (st.unclaimed && WB.told !== st.id) { WB.told = st.id; log('👹 You have world boss rewards to claim (Map → World Boss Arena).', 'lg-gold'); }
+  // a new boss rose: the arena shows it
+  if (old && old.id !== WB.st.id && S.zone === WBOSS && R.ent && R.ent.d.world) resetEncounter();
+}
+async function wbSend() {
+  const dmg = WB.pend; WB.pend = 0; WB.sendT = WB.t; WB.busy = true;
+  try {
+    const { data, error } = await sb.rpc('wb_hit', { p_dmg: dmg });
+    if (error) { WB.msg = 'Could not reach the server'; WB.pend += dmg; }
+    else if (!data.ok) WB.msg = data.reason;
+    else {
+      WB.msg = data.counted < dmg ? `The server counted ${fmt(data.counted)} of ${fmt(dmg)} damage.` : '';
+      if (WB.st) { WB.st.hp = data.hp; WB.st.max_hp = data.max_hp; WB.st.mine = (WB.st.mine || 0) + data.counted; }
+      if (data.dead) {
+        showBanner('👹 The world boss has fallen!'); sfx('level');
+        log('👹 The world boss has fallen! Claim your reward in the World Boss Arena.', 'lg-xp');
+        if (R.ent && R.ent.d.world) { R.phase = 'done'; R.doneT = 1.5; R.ent.dying = true; }
+        WB.loadT = -99;
+      }
+    }
+  } catch (e) { WB.pend += dmg; }
+  WB.busy = false; uiDirty = true;
+}
+async function wbClaim() {
+  if (!me || WB.busy) return;
+  WB.busy = true;
+  for (let i = 0; i < 40 && NET.busy; i++) await new Promise(r => setTimeout(r, 250));
+  try {
+    const { data, error } = await sb.rpc('wb_claim');
+    if (error || !data.ok) WB.msg = 'Could not claim – try again';
+    else {
+      S.gold += data.gold; if (data.clues) give('clue_hard', data.clues);
+      S.stats.wboss = (S.stats.wboss || 0) + 1;
+      const got = [`${fmt(data.gold)} gold`].concat(data.clues ? [`${data.clues}× Clue Scroll (hard)`] : []);
+      log(`👹 World boss reward: ${got.join(', ')}`, 'lg-gold'); showBanner(`👹 +${fmt(data.gold)} gold`); sfx('coin');
+      if (WB.st) WB.st.unclaimed = 0;
+      WB.busy = false; await netSync();
+    }
+  } catch (e) { WB.msg = 'Could not reach the server'; }
+  WB.busy = false; uiDirty = true;
+}
+function htmlWorldBoss(i) {
+  const z = ZONES[i];
+  if (!sb) return '<p class="need">The world boss needs a connection to the server.</p>';
+  if (!me) return '<p class="need">Log in to fight the world boss with everybody else.</p><button data-a="acct">👤 Log in</button>';
+  if (combatLevel() < z.req) return `<p class="need">Reach combat level ${z.req} to fight the world boss (you are ${combatLevel()}).</p>`;
+  const st = WB.st;
+  if (!st) { if (!WB.busy) wbLoad(); return '<p class="muted">Looking for the world boss…</p>'; }
+  const id = WB_BOSSES[st.kind || 0], d = ENEMIES[id], hp = Math.max(0, st.hp - WB.pend), on = S.zone === i && S.activity === 'combat';
+  const left = Math.max(0, new Date(st.ends_at).getTime() - Date.now()) / 1000;
+  return `<div class="info"><b>👹 ${d.name}</b> <span class="tag">${TYPE_ICON[d.type]} ${d.styles.map(t => TYPE_NAME[t]).join(' / ')}</span>
+    <div class="bar"><i style="width:${(hp / st.max_hp * 100).toFixed(1)}%;background:#e85a5a"></i></div>
+    <small>${fmt(hp)} / ${fmt(st.max_hp)} HP · ${fmt(st.fighters)} heroes · leaves in ${fmtTime(left)}</small>
+    <p>Your damage: <b>${fmt((st.mine || 0) + WB.pend)}</b>. Damage is sent to the server every 15 seconds; it counts at most what your saved hero could hit.
+    When the boss falls everyone who hit it shares <b>up to 50k gold</b> by damage, and the top 3 get a <b>hard clue scroll</b>. If it escapes after a week, rewards are halved.
+    Dying here costs no gold.</p>
+    ${WB.msg ? `<p class="need">${esc(WB.msg)}</p>` : ''}
+    <div class="btns">${on ? '<button class="sel" disabled>⚔️ Fighting…</button>' : `<button data-a="fight" data-z="${i}" data-id="mix">⚔️ Fight the world boss</button>`}
+      ${st.unclaimed ? `<button data-a="wbclaim" class="good">🎁 Claim ${st.unclaimed} reward${st.unclaimed > 1 ? 's' : ''}</button>` : ''}</div>
+    <b>Top damage</b>${(st.top || []).length ? '<table class="hs"><tbody>' + st.top.map((r, n) => `<tr class="${r.name === me.name ? 'me' : ''}"><td>${n + 1}</td><td>${esc(r.name)}</td><td><b>${fmt(r.dmg)}</b></td></tr>`).join('') + '</tbody></table>' : '<p class="muted">Nobody has hit it yet.</p>'}</div>`;
+}
+
+/* --- Clans: a group of up to 50 heroes with its own chat and a clan ranking --- */
+const CL = { me: undefined, info: null, list: null, msgs: [], chan: null, at: 0, msg: '', unread: 0, busy: false };
+async function clanLoad() {
+  if (!sb || !me || CL.busy) return;
+  CL.busy = true; CL.at = Date.now();
+  try {
+    const { data: m } = await sb.from('clan_members').select('clan_id').eq('user_id', me.id).maybeSingle();
+    const cid = m ? m.clan_id : null;
+    if (cid !== CL.me) { clanUnsub(); CL.msgs = []; }
+    CL.me = cid;
+    if (cid) {
+      const [info, chat] = await Promise.all([sb.rpc('clan_info', { p_id: cid }),
+        CL.chan ? null : sb.from('clan_chat').select('id,name,body,created_at').eq('clan_id', cid).order('created_at', { ascending: false }).limit(40)]);
+      CL.info = info.error ? null : info.data;
+      if (chat) { CL.msgs = (chat.data || []).reverse(); clanSub(cid); }
+    } else {
+      CL.info = null;
+      const { data, error } = await sb.rpc('clan_list');
+      CL.list = error ? [] : data;
+    }
+  } catch (e) { CL.msg = 'Could not reach the server'; }
+  CL.busy = false; renderClan();
+}
+function clanSub(cid) {
+  CL.chan = sb.channel('clan-' + cid).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clan_chat', filter: `clan_id=eq.${cid}` }, pl => {
+    if (CL.msgs.some(m => m.id === pl.new.id)) return;
+    CL.msgs.push(pl.new); if (CL.msgs.length > 80) CL.msgs.shift();
+    if (CHAT.tab !== 'clan') CL.unread++;
+    renderClan();
+  }).subscribe();
+}
+function clanUnsub() { if (CL.chan) { sb.removeChannel(CL.chan); CL.chan = null; } }
+function clanStop() { clanUnsub(); CL.me = undefined; CL.info = null; CL.list = null; CL.msgs = []; CL.unread = 0; }
+async function clanCall(fn, args, okMsg) {
+  if (!me || CL.busy) return;
+  try {
+    const { data, error } = await sb.rpc(fn, args || {});
+    CL.msg = error ? 'Could not reach the server' : data.ok ? okMsg || '' : data.reason;
+  } catch (e) { CL.msg = 'Could not reach the server'; }
+  await clanLoad();
+}
+function clanCreate() {
+  const n = (document.getElementById('cl-name') || {}).value || '', t = (document.getElementById('cl-tag') || {}).value || '';
+  clanCall('clan_create', { p_name: n.trim(), p_tag: t.trim().toUpperCase() }, 'Clan founded!');
+}
+async function clanSay() {
+  const inp = document.getElementById('cl-input'), body = inp.value.trim();
+  if (!body || !me) return;
+  inp.value = '';
+  try {
+    const { data, error } = await sb.rpc('clan_say', { p_body: body });
+    if (error || !data.ok) { inp.value = body; CL.msg = error ? 'Could not send' : data.reason; renderClan(); }
+  } catch (e) { inp.value = body; }
+}
+function renderClan() {
+  const el = document.getElementById('clan'), badge = document.getElementById('clan-new');
+  if (badge) { badge.hidden = !CL.unread; badge.textContent = CL.unread; }
+  if (!el || CHAT.tab !== 'clan') return;
+  CL.unread = 0; if (badge) badge.hidden = true;
+  if (!sb || !me) { el.innerHTML = '<div class="muted">Log in to found or join a clan.</div>'; return; }
+  if (CL.me === undefined || Date.now() - CL.at > 120000) { if (!CL.busy) clanLoad(); if (CL.me === undefined) { el.innerHTML = '<div class="muted">Loading…</div>'; return; } }
+  const note = CL.msg ? `<div class="need">${esc(CL.msg)}</div>` : '';
+  if (CL.me && CL.info) {
+    const c = CL.info, owner = c.owner === me.id, xp = c.members.reduce((a, m) => a + (m.total_xp || 0), 0);
+    el.innerHTML = `<div class="row"><b>🛡️ ${esc(c.name)} [${esc(c.tag)}]</b> <small class="muted">${c.members.length}/50 · ${fmt(xp)} XP</small>
+        <button data-a="clanleave" title="Leave the clan">🚪 Leave</button></div>
+      ${c.motd ? `<div class="muted">📌 ${esc(c.motd)}</div>` : ''}
+      ${owner ? `<div class="chatbar"><input id="cl-motd" maxlength="120" placeholder="Message of the day" value="${esc(c.motd)}" autocomplete="off"><button data-a="clanmotd">📌</button></div>` : ''}
+      <details><summary>Members</summary>${c.members.map(m => `<div class="friend"><span class="nm"><b>${esc(m.name)}</b>${m.id === c.owner ? ' 👑' : ''} <small class="muted">total ${m.total_level || 0} · combat ${m.combat || 3}</small></span>
+        ${owner && m.id !== me.id ? `<button data-a="clankick" data-id="${m.id}" title="Kick">✖</button>` : ''}</div>`).join('')}</details>
+      <div id="cllist" class="msgs">${CL.msgs.map(m => `<div><span class="muted">${new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> <b class="${m.name === me.name ? 'lg-gold' : ''}">${esc(m.name)}:</b> ${esc(m.body)}</div>`).join('') || '<div class="muted">No clan messages yet.</div>'}</div>
+      ${note}<div class="chatbar"><input id="cl-input" maxlength="200" placeholder="Talk to your clan…" autocomplete="off"><button data-a="clansay">Send</button></div>`;
+    const l = document.getElementById('cllist'); l.scrollTop = l.scrollHeight;
+    return;
+  }
+  const list = CL.list || [];
+  el.innerHTML = `<div class="muted">Found a clan (total level 100) or join one. Clans are ranked by their members' total XP.</div>
+    <div class="chatbar"><input id="cl-name" maxlength="18" placeholder="Clan name" autocomplete="off"><input id="cl-tag" maxlength="4" placeholder="TAG" style="max-width:64px;text-transform:uppercase" autocomplete="off"><button data-a="clancreate">🛡️ Found</button></div>
+    ${note}<div class="msgs">${!CL.list ? '<div class="muted">Loading…</div>' : !list.length ? '<div class="muted">No clans yet – found the first one!</div>'
+      : list.map((c, n) => `<div class="friend"><span class="nm">${n + 1}. <b>${esc(c.name)}</b> [${esc(c.tag)}] <small class="muted">${c.members}/50 · ${fmt(c.xp)} XP · 👑 ${esc(c.owner || '')}</small>${c.motd ? `<br><small class="muted">${esc(c.motd)}</small>` : ''}</span>
+        ${c.members < 50 ? `<button data-a="clanjoin" data-id="${c.id}">Join</button>` : ''}</div>`).join('')}</div>`;
 }
 
 /* --- PvP against other players' heroes: the server rolls the fight, the game plays it back --- */
@@ -4134,10 +4323,10 @@ async function chatSend() {
 }
 function logTab(which) {
   CHAT.tab = which; CHAT.open = which === 'chat';
-  for (const id of ['log', 'chat', 'friends']) document.getElementById(id).hidden = id !== which;
+  for (const id of ['log', 'chat', 'friends', 'clan']) document.getElementById(id).hidden = id !== which;
   document.querySelectorAll('.logtabs button').forEach(b => b.classList.toggle('sel', b.dataset.id === which));
   if (CHAT.open) { CHAT.unread = 0; chatStart(); }
-  renderChat(); renderFriends();
+  renderChat(); renderFriends(); renderClan();
 }
 
 /* --- hiscores --- */
@@ -5364,7 +5553,7 @@ function htmlActivity() {
       <span class="pin">${locked ? '🔒' : z.icon}${i === S.zone ? '<i class="me">🧍</i>' : ''}</span><span class="nm">${z.name}</span></button>`;
   }).join('') + '</div>';
   const z = ZONES[mapSel];
-  const kind = z.home ? 'Your home' : z.town ? 'Town' : z.wild ? `☠️ Wilderness · combat ${z.req}+` : z.slayer ? `💀 Slayer area · Slayer ${z.slayer}` : `Region ${mapSel + 1} · combat ${z.req}+`;
+  const kind = z.home ? 'Your home' : z.wboss ? '👹 World boss · combat 40+ · online' : z.town ? 'Town' : z.wild ? `☠️ Wilderness · combat ${z.req}+` : z.slayer ? `💀 Slayer area · Slayer ${z.slayer}` : `Region ${mapSel + 1} · combat ${z.req}+`;
   h += `<div class="info locpanel"><div class="row" style="justify-content:space-between"><b class="locname">${z.icon} ${z.name}</b><span class="tag">${kind}</span></div>
     <p class="muted">${z.desc}${mapSel === S.zone ? ' <b>Your hero is here.</b>' : ''}</p>`;
   if (!locOpen(mapSel)) return h + `<p class="need">${z.home ? `🔒 ${UNLOCK.home.need} to get your own home.` : `Reach Slayer level ${z.slayer} to enter (you are ${LV.slayer}).`}</p></div>`;
@@ -5417,6 +5606,7 @@ function bossCard(b, fromMap) {
 
 function htmlLocAct(i, a) {
   const z = ZONES[i], here = S.zone === i && S.activity === a;
+  if (z.wboss) return htmlWorldBoss(i);
   if (a === 'construction') return htmlRooms(i);
   if (a === 'farming') return htmlFarm(i);
   if (a === 'agility') return htmlAgility(i);
@@ -5979,6 +6169,13 @@ document.addEventListener('click', ev => {
     case 'pmopen': pmOpen(id); break;
     case 'pmback': FR.open = null; FR.msg = ''; renderFriends(); break;
     case 'pmsend': pmSend(); break;
+    case 'wbclaim': wbClaim(); break;
+    case 'clancreate': clanCreate(); break;
+    case 'clanjoin': clanCall('clan_join', { p_id: +id }, 'Welcome to the clan!'); break;
+    case 'clanleave': if (confirm('Leave your clan?')) clanCall('clan_leave', {}, 'You left the clan.'); break;
+    case 'clankick': clanCall('clan_kick', { p_user: id }); break;
+    case 'clanmotd': clanCall('clan_motd', { p_text: document.getElementById('cl-motd').value }); break;
+    case 'clansay': clanSay(); break;
     case 'frfight': pvpFight(id).then(() => { if (PVP.msg) { FR.msg = PVP.msg; renderFriends(); } }); break;
     case 'chatsend': chatSend(); break;
     case 'acct': accountModal(); break;
@@ -6172,6 +6369,7 @@ function init() {
     if (ev.target.id === 'chat-input') { ev.preventDefault(); chatSend(); }
     else if (ev.target.id === 'pm-input') { ev.preventDefault(); pmSend(); }
     else if (ev.target.id === 'fr-name') { ev.preventDefault(); friendAdd(); }
+    else if (ev.target.id === 'cl-input') { ev.preventDefault(); clanSay(); }
   });
   requestAnimationFrame(t => { lastFrame = t; lastWall = Date.now(); requestAnimationFrame(frame); });
 }
