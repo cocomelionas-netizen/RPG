@@ -4404,6 +4404,8 @@ const G3 = (() => {
       if (n.material && n.material !== shadowMat) n.material.dispose();
     });
   }
+  // real sun shadows for lit, solid parts of a model
+  function cast(o) { o.traverse(n => { if (n.isMesh && n.material && n.material.isMeshLambertMaterial && n.material.opacity > 0.9) n.castShadow = true; }); }
   function shadow(r) { const s = new T.Mesh(shadowGeo, shadowMat); s.scale.set(r, r * 0.55, 1); s.rotation.x = -Math.PI / 2; s.position.y = 0.02; s.renderOrder = -1; return s; }
   // every material of a model, for hit flashes and fading out
   function mats(o) { const list = []; o.traverse(n => { if (n.material && n.material !== shadowMat && !n.isSprite) list.push(n.material); }); return list; }
@@ -4431,13 +4433,13 @@ const G3 = (() => {
     a.p.push(...P); a.n.push(...N);
     g.dispose();
   }
-  function quad(a, pts, color, down) {
-    // pts: 4 corners [x,y,z] in order around the tile
-    const [p0, p1, p2, p3] = pts, tri = down ? [p0, p2, p1, p0, p3, p2] : [p0, p1, p2, p0, p2, p3];
-    const v1 = new T.Vector3(...p1).sub(new T.Vector3(...p0)), v2 = new T.Vector3(...p2).sub(new T.Vector3(...p0));
+  function quad(a, pts, color, down, cols) {
+    // pts: 4 corners [x,y,z] in order around the tile; cols: optional [r,g,b] per corner
+    const ix = down ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3];
+    const v1 = new T.Vector3(...pts[1]).sub(new T.Vector3(...pts[0])), v2 = new T.Vector3(...pts[2]).sub(new T.Vector3(...pts[0]));
     const nrm = v1.cross(v2).normalize(); if (down) nrm.negate();
-    const col = C(color);
-    for (const v of tri) { a.p.push(...v); a.n.push(nrm.x, nrm.y, nrm.z); a.c.push(col.r, col.g, col.b); }
+    const col = color && C(color);
+    for (const i of ix) { a.p.push(...pts[i]); a.n.push(nrm.x, nrm.y, nrm.z); if (cols) a.c.push(...cols[i]); else a.c.push(col.r, col.g, col.b); }
   }
   function toMesh(a, m) {
     const g = new T.BufferGeometry();
@@ -4465,16 +4467,19 @@ const G3 = (() => {
 
   function buildChunk(ci, z) {
     const th = z.th, pal = palette(th), a = acc(), g = acc(), x0 = ci * CH;
-    // tiled ground with a dirt road along z = 0
+    // OSRS-style ground: colours blend smoothly from corner to corner, with soft patches of lighter and darker grass
+    const corner = (x, tz) => {
+      const rw = 1.55 + 0.3 * Math.sin(x * 0.29) + 0.2 * Math.sin(x * 0.83 + 1.3);
+      const t = clamp((Math.abs(tz) - rw + 0.45) / 0.9, 0, 1), road = t * t * (3 - 2 * t);
+      const patch = 0.9 + 0.12 * Math.sin(x * 0.21 + tz * 0.33) + 0.08 * Math.sin(x * 0.57 - tz * 0.71) + (hash(x * 131 + tz * 17) - 0.5) * 0.1;
+      const c = C(pal.path).lerp(C(pal.grass), road).multiplyScalar(road > 0.5 ? patch : 0.95 + (patch - 0.9) * 0.5);
+      return [Math.min(1, c.r), Math.min(1, c.g), Math.min(1, c.b)];
+    };
     for (let tx = 0; tx < CH; tx++) for (let tz = -BACK; tz < 4; tz++) {
       const x = x0 + tx, k = x * 131 + tz * 17;
-      const zc = tz + 0.5, edge = Math.abs(zc) === 2.5 && hash(k + 3) < 0.3;
-      const road = Math.abs(zc) <= 1.5 || edge;
-      let c = road ? pal.path : pal.grass;
-      if (!road && th.lava && hash(k + 9) > 0.93) c = '#d8571e';
-      const j = road ? 0.9 + hash(k) * 0.14 : 0.88 + hash(k) * 0.2;
-      const cc = C(c).multiplyScalar(j); cc.r = Math.min(1, cc.r); cc.g = Math.min(1, cc.g); cc.b = Math.min(1, cc.b);
-      quad(th.lava && c === '#d8571e' ? g : a, [[x, hgt(x, tz), tz], [x, hgt(x, tz + 1), tz + 1], [x + 1, hgt(x + 1, tz + 1), tz + 1], [x + 1, hgt(x + 1, tz), tz]], '#' + cc.getHexString());
+      const pts = [[x, hgt(x, tz), tz], [x, hgt(x, tz + 1), tz + 1], [x + 1, hgt(x + 1, tz + 1), tz + 1], [x + 1, hgt(x + 1, tz), tz]];
+      if (th.lava && Math.abs(tz + 0.5) > 2.5 && hash(k + 9) > 0.93) quad(g, pts, '#d8571e');
+      else quad(a, pts, null, false, pts.map(([px, , pz]) => corner(px, pz)));
       if (th.cave && tz < 2) {
         const cy = 6.3 - hash(k + 5) * 0.5;
         quad(a, [[x, cy, tz], [x, cy, tz + 1], [x + 1, cy, tz + 1], [x + 1, cy, tz]], mix(th.near, '#000000', 0.2 + hash(k) * 0.2), true);
@@ -4729,6 +4734,8 @@ const G3 = (() => {
     sun.color = C(th.lava ? '#ffb080' : '#fff4e0');
     torch.intensity = th.cave ? 1.3 : 0;
     ceiling = !!th.cave;
+    sun.castShadow = !th.cave;   // the cave roof would shade everything
+    shadowMat.opacity = th.cave ? 0.25 : 0.12;
   }
 
   let homeKey = '';
@@ -4740,7 +4747,7 @@ const G3 = (() => {
     const mid = cx + (W / 2 - HX) / U3;
     const lo = Math.floor((mid - half * spread - 2) / CH), hi = Math.floor((mid + half * spread + 2) / CH);
     for (const [ci, c] of chunks) if (ci < lo || ci > hi) { scene.remove(c); dispose(c); chunks.delete(ci); }
-    for (let ci = lo; ci <= hi; ci++) if (!chunks.has(ci)) { const c = buildChunk(ci, z); chunks.set(ci, c); scene.add(c); }
+    for (let ci = lo; ci <= hi; ci++) if (!chunks.has(ci)) { const c = buildChunk(ci, z); c.children.forEach(m => { m.castShadow = m.material === chunkMat; m.receiveShadow = true; }); chunks.set(ci, c); scene.add(c); }
     if (ridge) { const P = 200, rx = mid * 0.75; ridge.position.x = rx + Math.round((mid - rx) / P) * P; }
   }
 
@@ -4748,31 +4755,56 @@ const G3 = (() => {
   // a box-limbed OSRS style person facing +x; o: body, leg, skin, hair, helm, shield, ribs, hat
   function person(o) {
     const g = new T.Group(), P = {};
-    const leg = c => { const p = new T.Group(); p.add(box(0.17, 0.62, 0.17, c, 0, -0.31, 0)); p.add(box(0.22, 0.08, 0.19, o.boots || shadeC(c, -0.25), 0.03, -0.6, 0)); return p; };
+    // legs: plain trousers, or wider platelegs with knee plates
+    const leg = c => {
+      const p = new T.Group(), w = o.plateLegs ? 0.2 : 0.17;
+      p.add(box(w, 0.62, w, c, 0, -0.31, 0));
+      if (o.plateLegs) p.add(box(0.06, 0.12, w * 0.8, shadeC(c, 0.12), 0.11, -0.3, 0));
+      p.add(box(0.23, 0.09, 0.2, o.boots || shadeC(c, -0.25), 0.03, -0.6, 0));
+      return p;
+    };
     P.legB = at(leg(shadeC(o.leg, -0.12)), 0, 0.62, -0.11); P.legF = at(leg(o.leg), 0, 0.62, 0.11);
-    const torso = box(0.32, 0.64, 0.5, o.body, 0, 0.93, 0);
-    const belt = box(0.34, 0.08, 0.52, shadeC(o.body, -0.35), 0, 0.64, 0);
-    g.add(P.legB, P.legF, torso, belt);
-    if (o.cape) { const c = box(0.05, 0.9, 0.46, o.cape, -0.19, 0.76, 0); c.rotation.z = -0.06; g.add(c); }
+    // OSRS bodies are broad in the chest and narrow at the waist
+    const chest = box(0.34, 0.36, 0.56, o.body, 0, 1.07, 0);
+    const waist = box(0.29, 0.3, 0.46, shadeC(o.body, -0.06), 0, 0.77, 0);
+    const belt = box(0.31, 0.07, 0.48, shadeC(o.body, -0.35), 0, 0.65, 0);
+    g.add(P.legB, P.legF, chest, waist, belt, box(0.14, 0.08, 0.14, o.skin, 0, 1.27, 0));
+    if (o.plate) {
+      // shoulder plates and a ridge down the chest
+      g.add(box(0.26, 0.12, 0.2, shadeC(o.body, 0.1), 0, 1.24, 0.3), box(0.26, 0.12, 0.2, shadeC(o.body, -0.05), 0, 1.24, -0.3));
+      g.add(box(0.03, 0.4, 0.08, shadeC(o.body, 0.18), 0.17, 0.98, 0));
+    } else if (o.chain) for (let k = 0; k < 4; k++) g.add(box(0.02, 0.025, 0.5, shadeC(o.body, -0.2), 0.175, 0.8 + k * 0.1, 0));
+    if (o.cape) { const c = box(0.05, 0.92, 0.5, o.cape, -0.2, 0.78, 0); c.rotation.z = -0.06; g.add(c, box(0.08, 0.06, 0.56, shadeC(o.cape, -0.15), -0.17, 1.24, 0)); }
     if (o.ribs) for (let k = 0; k < 3; k++) g.add(box(0.02, 0.05, 0.38, '#7a7466', 0.17, 0.82 + k * 0.13, 0));
-    const head = new T.Group(); head.position.y = 1.46;
+    const head = new T.Group(); head.position.y = 1.48;
     head.add(box(0.36, 0.38, 0.36, o.skin, 0, 0, 0));
     head.add(box(0.04, 0.06, 0.06, o.eye || '#1a1a1a', 0.18, 0.03, 0.09), box(0.04, 0.06, 0.06, o.eye || '#1a1a1a', 0.18, 0.03, -0.09));
+    head.add(box(0.07, 0.08, 0.07, shadeC(o.skin, -0.06), 0.2, -0.04, 0), box(0.02, 0.025, 0.12, shadeC(o.skin, -0.3), 0.185, -0.12, 0));
     if (o.helm) {
       head.add(box(0.42, 0.22, 0.42, o.helm, -0.01, 0.12, 0));
       if (o.fullhelm) { head.add(box(0.38, 0.4, 0.42, o.helm, -0.04, -0.02, 0)); head.add(box(0.02, 0.05, 0.3, '#111111', 0.16, 0.03, 0)); }
-    } else if (o.hair) head.add(box(0.4, 0.12, 0.4, o.hair, -0.02, 0.2, 0), box(0.1, 0.25, 0.4, o.hair, -0.17, 0.06, 0));
+      else head.add(box(0.04, 0.2, 0.06, o.helm, 0.19, -0.04, 0));   // nose guard
+    } else if (o.hair) {
+      head.add(box(0.4, 0.12, 0.4, o.hair, -0.02, 0.2, 0), box(0.12, 0.3, 0.4, o.hair, -0.17, 0.04, 0), box(0.2, 0.12, 0.04, o.hair, -0.04, 0.08, 0.19), box(0.2, 0.12, 0.04, o.hair, -0.04, 0.08, -0.19));
+      if (o.beard) head.add(box(0.1, 0.16, 0.3, o.hair, 0.15, -0.17, 0));
+    }
     if (o.hat) o.hat(head);
     g.add(head); P.head = head;
-    const arm = (c, z) => { const p = new T.Group(); p.position.set(0, 1.18, z); p.add(box(0.14, 0.48, 0.14, c, 0, -0.24, 0)); p.add(box(0.13, 0.12, 0.13, o.gloves || o.skin, 0, -0.53, 0)); return p; };
-    P.armB = arm(shadeC(o.body, -0.15), -0.32); P.armF = arm(shadeC(o.body, 0.06), 0.32);
-    if (o.shield) { const sh = box(0.08, 0.52, 0.42, o.shield, 0.12, -0.42, -0.08); sh.rotation.y = 0.1; P.armB.add(sh); }
+    // arms keep [sleeve, hand, tool] as their children
+    const arm = (c, z) => { const p = new T.Group(); p.position.set(0, 1.2, z); p.add(box(0.15, 0.5, 0.15, c, 0, -0.25, 0)); p.add(box(0.13, 0.12, 0.13, o.gloves || o.skin, 0, -0.55, 0)); return p; };
+    P.armB = arm(shadeC(o.body, -0.15), -0.34); P.armF = arm(shadeC(o.body, 0.06), 0.34);
+    if (o.shield) {
+      const sh = new T.Group(); sh.position.set(0.13, -0.42, -0.1); sh.rotation.y = 0.1;
+      if (o.kite) { sh.add(box(0.07, 0.42, 0.4, o.shield, 0, 0.06, 0), box(0.07, 0.2, 0.26, o.shield, 0, -0.24, 0), box(0.07, 0.1, 0.12, o.shield, 0, -0.38, 0), box(0.08, 0.3, 0.05, shadeC(o.shield, 0.15), 0.01, 0, 0)); }
+      else sh.add(box(0.08, 0.52, 0.42, o.shield, 0, 0, 0));
+      P.armB.add(sh);
+    }
     g.add(P.armB, P.armF);
     if (o.tool) P.armF.add(o.tool);
     g.userData.P = P;
     return g;
   }
-  function shadeC(hex, amt) { return shade(hex.length === 7 ? hex : '#888888', amt); }
+  function shadeC(c, amt) { return shade('#' + C(c || '#888888').getHexString(), amt); }
 
   // tools and weapons hang from the hand and point along -y (the way the arm points)
   function weapon(kind, blade) {
@@ -4835,11 +4867,12 @@ const G3 = (() => {
       const p = person({
         body: body ? body.color || '#9aa0a8' : '#3f6fb5', leg: legs ? shade(legs.color, -0.08) : '#3b3550', skin: '#f1c27d', hair: '#6b3e1f',
         helm: helm && shade(helm.color, -0.05), fullhelm: helm && helm.kind === 'fullhelm',
-        shield: shield && S.activity === 'combat' ? shield.color : null, tool: heroTool3(),
+        shield: shield && S.activity === 'combat' ? shield.color : null, kite: shield && shield.kind === 'kiteshield', tool: heroTool3(),
+        plate: body && (body.kind === 'platebody' || /plate/i.test(body.name)), chain: body && body.kind === 'chainbody', plateLegs: legs && legs.kind === 'platelegs', beard: true,
         cape: cape && cape.color, gloves: hands && hands.color, boots: feet && feet.color,
       });
       p.rotation.y = -0.6;
-      heroObj = group(p, shadow(0.45)); heroObj.userData.p = p; heroObj.userData.mats = mats(p);
+      heroObj = group(p, shadow(0.45)); heroObj.userData.p = p; heroObj.userData.mats = mats(p); cast(p);
       scene.add(heroObj);
     }
     const p = heroObj.userData.p, P = p.userData.P;
@@ -5225,7 +5258,7 @@ const G3 = (() => {
   function syncEnt() {
     const e = R.ent;
     if (e && e.kind === 'patch' && e.pk && patch(e.pk).s !== e.seedShown) entRef = null;
-    if (e !== entRef) { dropEnt(); entRef = e; if (e) { entObj = buildEnt(e); scene.add(entObj); } }
+    if (e !== entRef) { dropEnt(); entRef = e; if (e) { entObj = buildEnt(e); cast(entObj); scene.add(entObj); } }
     fireLight.intensity = 0;
     if (!e) return;
     const g = entObj, P = g.userData.P, dying = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
@@ -5303,7 +5336,7 @@ const G3 = (() => {
     for (const [ev, o] of evObjs) if (!R.events.includes(ev)) { scene.remove(o); dispose(o); evObjs.delete(ev); }
     for (const ev of R.events) {
       let o = evObjs.get(ev);
-      if (!o) { o = buildEvent(ev); evObjs.set(ev, o); scene.add(o); }
+      if (!o) { o = buildEvent(ev); cast(o); evObjs.set(ev, o); scene.add(o); }
       const { y } = evScreen(ev);
       const by = ev.type === 'chest' ? Math.abs(Math.sin(time * 4)) * 0.08 : ev.type === 'star' ? (GY - y) / U3 : 0;
       o.position.set(ev.x / U3, by, 0);
@@ -5320,7 +5353,10 @@ const G3 = (() => {
     scene = new T.Scene();
     camera = new T.PerspectiveCamera();
     hemi = new T.HemisphereLight('#ffffff', '#4a4232', 0.8); scene.add(hemi);
-    sun = new T.DirectionalLight('#fff4e0', 0.65); sun.position.set(-4, 10, 7); scene.add(sun);
+    sun = new T.DirectionalLight('#fff4e0', 0.65); sun.position.set(-4, 10, 7); scene.add(sun, sun.target);
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
+    sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
+    Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 22, bottom: -22, near: 1, far: 70 }); sun.shadow.camera.updateProjectionMatrix();
     torch = new T.PointLight('#ffb060', 0, 14, 1.6); scene.add(torch);
     fireLight = new T.PointLight('#ff9a40', 0, 7, 2); scene.add(fireLight);
     shadowGeo = new T.CircleGeometry(1, 16);
@@ -5351,6 +5387,9 @@ const G3 = (() => {
     camera.projectionMatrix.makePerspective(-half * k, half * k, (GY / U3 - CAM_Y) * k, ((GY - H) / U3 - CAM_Y) * k, n, 200);
     camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
     torch.position.set(R.worldX / U3 + 0.6, 2.6, 1.6);
+    // the sun follows the view, snapped to whole shadow texels so shadows don't shimmer while walking
+    const sx = Math.round((R.worldX / U3 + (W / 2 - HX) / U3) * 40) / 40;
+    sun.target.position.set(sx, 0, -8); sun.position.set(sx - 7, 14, 4);
     if (lavaMat) { const p = 0.85 + 0.15 * Math.sin(time * 3); lavaMat.color.setRGB(p, p, p); }
     renderer.render(scene, camera);
   };
