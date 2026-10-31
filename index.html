@@ -1903,9 +1903,10 @@ function craftTick(dt) {
   }
   const need = stationTime(e), ex = entScreenX(e);
   e.t += dt;
-  if (!cooking && !fm && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; burst(ex - 6, GY - 46, CRAFT[skill].spark, 4); }
+  if (!cooking && !fm && !e.swung && e.t >= need / 2) { e.swung = true; R.swing = 1; e.hit = 0.6; e.splash = 1; if (!G3.on || skill !== 'smithing') burst(ex - 6, GY - 46, CRAFT[skill].spark, 4); }
   if (e.t >= need) {
     e.t -= need; e.swung = false; e.hit = 1;
+    if (!SIM && r) { e.splash = 2; e.prod = r.out; }
     if (fm) {
       const t = fmTarget(); burnOnce(t);
       burst(ex, GY - 30, '#ffb347', 10);
@@ -3433,9 +3434,9 @@ function drawEvents(overlayOnly) {
 function chips(e) {
   if (SIM) return;
   const x = entScreenX(e);
-  if (e.kind === 'pond') e.splash = e.hit >= 1 ? 2 : 1; // picked up by the 3D pond: splash, and the fish on a catch
+  e.splash = e.hit >= 1 ? 2 : 1;   // picked up by the 3D view: splash / chips, and the fish or ore on a full one
   if (e.kind === 'tree') burst(x - 12, GY - 40, '#c89a5a', 5);
-  else if (e.kind === 'rock') { burst(x - 20, GY - 25, '#9a9aa5', 5); burst(x - 20, GY - 25, e.ess ? '#b48cff' : ORES[e.tier].color, 2); }
+  else if (e.kind === 'rock') { if (!G3.on) { burst(x - 20, GY - 25, '#9a9aa5', 5); burst(x - 20, GY - 25, e.ess ? '#b48cff' : ORES[e.tier].color, 2); } }
   else if (!G3.on) burst(x - 12, GY + 6, '#bfe2ff', 6);
 }
 
@@ -4465,6 +4466,13 @@ const G3 = (() => {
     return new T.Mesh(g, m);
   }
 
+  // mining always happens down a mine and smithing inside a smithy, wherever the road is
+  const IN_TH = {
+    mine: { sky: ['#0a0806', '#16110c'], ground: '#4a3e32', dirt: '#6e5a44', near: '#3a3028', mid: '#4e4438', far: '#1a1612', decor: 'mine', cave: true, lava: false, snow: false },
+    smithy: { sky: ['#1a100a', '#24170e'], ground: '#5e554c', dirt: '#8a7c6a', near: '#4a3424', mid: '#5a4a3a', far: '#2a1a10', decor: 'smithy', cave: true, warm: true, lava: false, snow: false },
+  };
+  function indoor(z) { return z.home ? '' : S.activity === 'mining' ? 'mine' : S.activity === 'smithing' ? 'smithy' : ''; }
+  function zoneTh(z) { const k = indoor(z); return k ? Object.assign({}, z.th, IN_TH[k]) : z.th; }
   function hgt(x, z) {
     if (z > -2.2 && z < 2.2) return 0;
     // flat, slightly sunken ground under a pond so no hill hides the water
@@ -4489,7 +4497,7 @@ const G3 = (() => {
   }
 
   function buildChunk(ci, z) {
-    const th = z.th, pal = palette(th), a = acc(), g = acc(), x0 = ci * CH;
+    const th = zoneTh(z), pal = palette(th), a = acc(), g = acc(), x0 = ci * CH, inside = th.decor === 'mine' || th.decor === 'smithy';
     // OSRS-style ground: colours blend smoothly from corner to corner, with soft patches of lighter and darker grass
     const corner = (x, tz) => {
       const rw = 1.55 + 0.3 * Math.sin(x * 0.29) + 0.2 * Math.sin(x * 0.83 + 1.3);
@@ -4509,8 +4517,9 @@ const G3 = (() => {
       }
     }
     if (z.home) buildHome(a, g, x0);
+    if (inside) buildInside(a, g, th, x0);
     // scenery: deterministic per chunk so it is the same every time you pass
-    const n = th.decor === 'house' ? 26 : z.home ? 18 : 46;
+    const n = inside ? 0 : th.decor === 'house' ? 26 : z.home ? 18 : 46;
     for (let i = 0; i < n; i++) {
       const s0 = ci * 977 + i * 13;
       const x = x0 + hash(s0) * CH, zz = z.home ? -10 - hash(s0 + 1) * (BACK - 11) : -3.2 - Math.pow(hash(s0 + 1), 0.8) * (BACK - 5), y = hgt(x, zz), s = 0.7 + hash(s0 + 2) * 0.7;
@@ -4518,7 +4527,7 @@ const G3 = (() => {
       decor(a, g, th, pal, x, y, zz, s, s0);
     }
     // small things in front of the road (low enough never to hide the hero)
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < (th.decor === 'smithy' ? 0 : 6); i++) {
       const s0 = ci * 577 + i * 31, x = x0 + hash(s0) * CH, zz = 1.9 + hash(s0 + 1) * 0.5, s = 0.5 + hash(s0 + 2) * 0.4;
       if (th.cave || th.lava || th.decor === 'spike') put(a, new T.DodecahedronGeometry(0.3 * s, 0), mix(th.mid, '#777777', 0.4), x, 0.1, zz, hash(s0) * 3, 1, 0.6, 1);
       else if (th.snow) put(a, new T.DodecahedronGeometry(0.3 * s, 0), '#f4f8fc', x, 0.1, zz, 0, 1.3, 0.6, 1);
@@ -4535,6 +4544,76 @@ const G3 = (() => {
     if (g.p.length) grp.add(toMesh(g, lavaMat));
     grp.userData.ci = ci;
     return grp;
+  }
+
+  /* --- inside: a mine tunnel or a smithy hall, repeating along the road --- */
+  function buildInside(a, g, th, x0) {
+    const H = 6.3, hs = k => hash(x0 * 1.7 + k * 7.31);
+    if (th.decor === 'mine') {
+      // rough rock wall at the back, with ore veins glinting in it
+      for (let x = x0 - 0.5; x < x0 + CH + 0.5; x += 1.1) {
+        const k = x * 3.7;
+        put(a, new T.DodecahedronGeometry(1.3, 0), mix(th.mid, '#000000', hash(k) * 0.35), x, 1.2, -4.9 - hash(k + 1) * 0.6, k, 1, 1.4, 0.8);
+        put(a, new T.DodecahedronGeometry(1.4, 0), mix(th.near, '#000000', hash(k + 2) * 0.3), x + 0.5, 3.9, -5.3, k + 3, 1, 1.6, 0.8);
+        if (hash(k + 4) > 0.55) put(a, new T.DodecahedronGeometry(0.5, 0), mix(th.mid, '#ffffff', 0.08), x + 0.3, 0.25, -3.6 - hash(k + 5) * 0.5, k, 1.2, 0.7, 1);
+      }
+      for (let i = 0; i < 16; i++) put(g, new T.OctahedronGeometry(0.1 + hs(i) * 0.08, 0), ORES[Math.floor(hs(i + 40) * ORES.length)].color, x0 + hs(i + 20) * CH, 0.6 + hs(i + 30) * 3.2, -3.75 - hs(i + 50) * 0.4, i);
+      // timber supports, a beam over the road, and a lantern on every other post
+      for (let x = x0 + 1; x < x0 + CH; x += 4) {
+        put(a, new T.BoxGeometry(0.3, H, 0.3), '#5a3e22', x, H / 2, -3.4);
+        put(a, new T.BoxGeometry(0.32, 0.32, 7.5), '#4a3218', x, H - 0.35, -0.4);
+        put(a, new T.BoxGeometry(4, 0.28, 0.28), '#4a3218', x + 2, H - 0.6, -3.4);
+        if (Math.round(x - x0 - 1) % 8 === 0) { put(a, new T.BoxGeometry(0.06, 0.4, 0.06), '#2a2a2a', x + 0.3, 3.5, -3.15); put(g, new T.BoxGeometry(0.2, 0.26, 0.2), '#ffc860', x + 0.3, 3.2, -3.15); }
+      }
+      // mine-cart rails just behind the road
+      for (const rz of [-1.95, -2.55]) put(a, new T.BoxGeometry(CH, 0.06, 0.07), '#8a8a92', x0 + CH / 2, 0.07, rz);
+      for (let x = x0 + 0.3; x < x0 + CH; x += 0.7) put(a, new T.BoxGeometry(0.16, 0.05, 0.95), '#5a3e22', x, 0.03, -2.25);
+      // a cart full of ore, crates and a stuck pickaxe
+      const cx = x0 + 4 + hs(1) * (CH - 8);
+      put(a, new T.BoxGeometry(1.1, 0.55, 0.75), '#6a5a4a', cx, 0.42, -2.25); put(a, new T.BoxGeometry(1.16, 0.08, 0.8), '#4a4048', cx, 0.7, -2.25);
+      for (const wx of [-0.35, 0.35]) for (const wz of [-0.38, 0.38]) put(a, new T.CylinderGeometry(0.13, 0.13, 0.06, 8), '#2a2a2e', cx + wx, 0.13, -2.25 + wz, 0, 1, 1, 1, Math.PI / 2);
+      for (let k = 0; k < 5; k++) put(k & 1 ? a : g, new T.DodecahedronGeometry(0.16, 0), k & 1 ? '#5a5560' : ORES[Math.floor(hs(k + 9) * ORES.length)].color, cx - 0.35 + k * 0.17, 0.78, -2.25 + (hs(k) - 0.5) * 0.4);
+      for (let k = 0; k < 3; k++) { const bx = x0 + hs(k + 60) * CH; put(a, new T.BoxGeometry(0.6, 0.6, 0.6), '#8a6a3a', bx, 0.3, -3.1, hs(k) * 0.5); }
+      const px = x0 + hs(70) * CH; put(a, new T.BoxGeometry(0.07, 0.9, 0.07), '#7a5530', px, 0.6, -3.0, 0, 1, 1, 1, 0, 0.5); put(a, new T.BoxGeometry(0.55, 0.08, 0.08), '#8a8f98', px - 0.2, 1.0, -3.0, 0, 1, 1, 1, 0, 0.5);
+    } else {
+      // half-timbered stone walls, windows letting daylight in, beams overhead
+      put(a, new T.BoxGeometry(CH, H, 0.4), '#8a7a68', x0 + CH / 2, H / 2, -4.7);
+      put(a, new T.BoxGeometry(CH, 1.1, 0.45), '#6e6258', x0 + CH / 2, 0.55, -4.65);
+      put(a, new T.BoxGeometry(CH, 0.22, 0.2), '#5a3e22', x0 + CH / 2, 2.9, -4.42);
+      for (let x = x0; x < x0 + CH; x += 3) {
+        put(a, new T.BoxGeometry(0.3, H, 0.2), '#5a3e22', x, H / 2, -4.42);
+        put(a, new T.BoxGeometry(0.28, 0.3, 8), '#4a3218', x, H - 0.25, -0.6);
+      }
+      for (let x = x0 + 4.5; x < x0 + CH; x += 9) {
+        put(a, new T.BoxGeometry(1.3, 1.5, 0.12), '#4a3218', x, 4.2, -4.45);
+        put(g, new T.BoxGeometry(0.5, 0.6, 0.05), '#cfe6ff', x - 0.3, 4.55, -4.38); put(g, new T.BoxGeometry(0.5, 0.6, 0.05), '#cfe6ff', x + 0.3, 4.55, -4.38);
+        put(g, new T.BoxGeometry(0.5, 0.6, 0.05), '#b8d8f8', x - 0.3, 3.85, -4.38); put(g, new T.BoxGeometry(0.5, 0.6, 0.05), '#b8d8f8', x + 0.3, 3.85, -4.38);
+      }
+      // a big forge with glowing coals and a hood up to the roof
+      const fx = x0 + 3 + hs(2) * 8;
+      put(a, new T.BoxGeometry(2.6, 1.2, 1.5), '#6a5a52', fx, 0.6, -3.6); put(a, new T.BoxGeometry(2.8, 0.15, 1.6), '#5a4a42', fx, 1.25, -3.6);
+      put(g, new T.BoxGeometry(2.0, 0.12, 1.0), '#ff7a20', fx, 1.3, -3.6);
+      for (let k = 0; k < 7; k++) put(g, new T.DodecahedronGeometry(0.12, 0), hs(k + 80) > 0.5 ? '#ffb040' : '#ff5a10', fx - 0.8 + k * 0.27, 1.38, -3.6 + (hs(k + 90) - 0.5) * 0.6);
+      put(a, new T.CylinderGeometry(0.5, 1.5, 1.6, 4), '#5a5050', fx, 2.9, -3.8, Math.PI / 4, 1, 1, 0.7);
+      put(a, new T.BoxGeometry(0.9, 2.6, 0.9), '#5a5050', fx, 4.9, -3.9);
+      put(a, new T.BoxGeometry(0.9, 0.35, 0.6), '#6a4a2a', fx + 1.8, 0.75, -3.4); put(a, new T.BoxGeometry(0.5, 0.06, 0.06), '#3a3a3a', fx + 1.3, 0.8, -3.4);
+      // weapons and shields hung on the wall
+      for (let x = x0 + 1.2; x < x0 + CH; x += 2.2) {
+        if (Math.abs(x - fx) < 2.2) continue;
+        const m = Math.floor(hash(x * 5.3) * 6), c = METAL_COLORS[m];
+        if (hash(x * 2.1) > 0.5) { put(a, new T.BoxGeometry(0.09, 1.1, 0.04), mix(c, '#ffffff', 0.25), x - 0.2, 2.1, -4.4, 0, 1, 1, 1, 0, 0.15); put(a, new T.BoxGeometry(0.09, 1.1, 0.04), mix(c, '#ffffff', 0.25), x + 0.2, 2.1, -4.4, 0, 1, 1, 1, 0, -0.15); put(a, new T.BoxGeometry(0.4, 0.07, 0.06), '#5a3e22', x, 1.65, -4.38); }
+        else { put(a, new T.CylinderGeometry(0.42, 0.42, 0.06, 7), c, x, 2.1, -4.4, 0, 1, 1, 1, Math.PI / 2); put(a, new T.CylinderGeometry(0.14, 0.14, 0.08, 6), '#d8c070', x, 2.1, -4.35, 0, 1, 1, 1, Math.PI / 2); }
+      }
+      // barrels, a water trough, crates of bars, spare anvils
+      for (let k = 0; k < 4; k++) {
+        const bx = x0 + 1 + hs(k + 100) * (CH - 2); if (Math.abs(bx - fx) < 2) continue;
+        const t = hs(k + 110);
+        if (t < 0.35) { put(a, new T.CylinderGeometry(0.32, 0.36, 0.85, 8), '#7a5530', bx, 0.43, -3.3); put(a, new T.CylinderGeometry(0.37, 0.37, 0.05, 8), '#3a3a3a', bx, 0.62, -3.3); }
+        else if (t < 0.6) { put(a, new T.BoxGeometry(1.4, 0.5, 0.6), '#6a4a2a', bx, 0.25, -3.2); put(a, new T.BoxGeometry(1.25, 0.04, 0.45), '#3a6a8a', bx, 0.48, -3.2); }
+        else if (t < 0.8) { put(a, new T.BoxGeometry(0.8, 0.45, 0.6), '#8a6a3a', bx, 0.23, -3.3); for (let b = 0; b < 3; b++) put(a, new T.BoxGeometry(0.3, 0.08, 0.13), METAL_COLORS[Math.floor(hs(k + b) * 6)], bx - 0.2 + b * 0.2, 0.5, -3.3); }
+        else { put(a, new T.CylinderGeometry(0.25, 0.3, 0.45, 8), '#6b4426', bx, 0.22, -3.2); put(a, new T.BoxGeometry(0.7, 0.12, 0.25), '#41454d', bx, 0.52, -3.2); }
+      }
+    }
   }
 
   /* --- My Home: the rooms you built and your patches, repeating along the road --- */
@@ -4735,8 +4814,8 @@ const G3 = (() => {
 
   /* --- zone setup: sky, fog, lights, scenery --- */
   function setZone(i) {
-    const z = ZONES[i], th = z.th;
-    zoneKey = i;
+    const z = ZONES[i], th = zoneTh(z);
+    zoneKey = i + indoor(z);
     for (const c of chunks.values()) { scene.remove(c); dispose(c); }
     chunks.clear();
     if (ridge) { scene.remove(ridge); dispose(ridge); ridge = null; }
@@ -4751,9 +4830,9 @@ const G3 = (() => {
     const fogNear = th.decor === 'dead' ? D + 2 : D + 9;
     scene.fog = new T.Fog(th.cave ? '#000000' : th.sky[1], fogNear, D + BACK + 4);
     if (th.cave) scene.fog.color = C(mix(th.sky[1], '#000000', 0.3));
-    hemi.color = C(th.cave ? '#b8a8d8' : th.lava ? '#ffd0b0' : '#ffffff');
+    hemi.color = C(th.warm ? '#ffd8b0' : th.cave ? '#b8a8d8' : th.lava ? '#ffd0b0' : '#ffffff');
     hemi.groundColor = C(th.cave ? '#1a1420' : th.lava ? '#4a1408' : '#4a4232');
-    hemi.intensity = th.cave ? 0.5 : 0.8;
+    hemi.intensity = th.warm ? 0.75 : th.decor === 'mine' ? 0.8 : th.cave ? 0.5 : 0.8;
     sun.intensity = th.cave ? 0.15 : th.lava ? 0.55 : 0.65;
     sun.color = C(th.lava ? '#ffb080' : '#fff4e0');
     torch.intensity = th.cave ? 1.3 : 0;
@@ -4765,7 +4844,7 @@ const G3 = (() => {
   let homeKey = '';
   function syncChunks() {
     const z = ZONES[S.zone];
-    if (S.zone !== zoneKey) setZone(S.zone);
+    if (S.zone + indoor(z) !== zoneKey) setZone(S.zone);
     if (z.home) { const k = homeSig(); if (k !== homeKey) { homeKey = k; for (const c of chunks.values()) { scene.remove(c); dispose(c); } chunks.clear(); } }
     const cx = R.worldX / U3, spread = (D + BACK) / D, half = W / 2 / U3;
     const mid = cx + (W / 2 - HX) / U3;
@@ -5080,6 +5159,10 @@ const G3 = (() => {
       for (const [ox, oy, oz] of [[-0.5, 0.55, 0.45], [0.1, 0.95, 0.3], [0.55, 0.5, 0.55], [-0.15, 0.3, 0.7], [-0.75, 0.75, -0.1], [0.35, 0.8, -0.4]]) r.add(at(mk(new T.OctahedronGeometry(0.12, 0), e.ess ? unlit(oc) : lam(oc)), ox, oy, oz));
       g.add(r); P.r = r;
       g.add(shadow(1));
+      fxInit(g, P, '#a8a8b2');
+      P.prod = new T.Group(); P.prod.visible = false; P.fx.add(P.prod);
+      P.prod.add(mk(new T.DodecahedronGeometry(0.17, 0), '#6e6e78'));
+      for (const [ox, oy, oz] of [[0.09, 0.08, 0.1], [-0.08, 0.1, 0.06], [0.02, -0.04, 0.15]]) P.prod.add(at(mk(new T.OctahedronGeometry(0.08, 0), e.ess ? unlit(oc) : lam(oc, { emissive: C(oc).multiplyScalar(0.25) })), ox, oy, oz));
     } else {
       // a real pond: every one has its own size and shape, and its own life that suits the place
       const th = ZONES[S.zone].th, sd = hash(e.x * 0.013 + 7.7) * 1000, rnd = k => hash(sd + k * 13.37);
@@ -5233,6 +5316,35 @@ const G3 = (() => {
     const b = mk(new T.CylinderGeometry(0.09, 0.09, w, 6), c2, 0, 0.1, -0.1); b.rotation.set(0, -0.5, Math.PI / 2);
     g.add(a, b);
   }
+  // what you just made: a bar, a blade, a helm, a body... shaped from the item id
+  function prodMesh(id) {
+    const g = new T.Group(), d = /(\d)$/.exec(id), c = METAL_COLORS[d ? +d[1] : 0], lt = mix(c, '#ffffff', 0.3);
+    if (/^bar/.test(id)) g.add(box(0.38, 0.1, 0.16, c), box(0.3, 0.03, 0.1, lt, 0, 0.06, 0));
+    else if (/^(sword|dagger|scimitar|2h)/.test(id)) {
+      const L = /^2h/.test(id) ? 0.75 : /^dagger/.test(id) ? 0.32 : 0.55;
+      const bl = box(L, 0.07, 0.025, lt, L / 2, 0, 0); if (/^scimitar/.test(id)) bl.rotation.z = 0.12;
+      g.add(bl, box(0.05, 0.22, 0.07, '#c8a040', 0, 0, 0), box(0.18, 0.05, 0.05, '#5a3e22', -0.11, 0, 0));
+    } else if (/helm/.test(id)) { const h = mk(new T.SphereGeometry(0.17, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), c); g.add(h); if (/^full/.test(id)) g.add(box(0.3, 0.14, 0.3, c, 0, -0.06, 0)); }
+    else if (/^(armor|chainbody)/.test(id)) g.add(box(0.34, 0.36, 0.2, c), box(0.46, 0.09, 0.22, lt, 0, 0.15, 0));
+    else if (/^platelegs/.test(id)) g.add(box(0.32, 0.1, 0.18, c, 0, 0.12, 0), box(0.12, 0.36, 0.14, c, -0.08, -0.08, 0), box(0.12, 0.36, 0.14, c, 0.08, -0.08, 0));
+    else if (/^kiteshield/.test(id)) { const sh = mk(new T.CylinderGeometry(0.24, 0.24, 0.05, 6), c); sh.rotation.x = Math.PI / 2; sh.scale.set(0.8, 1, 1.2); g.add(sh, box(0.05, 0.3, 0.07, lt)); }
+    else for (let k = 0; k < 4; k++) g.add(box(0.14, 0.04, 0.04, lt, (k - 1.5) * 0.06, k * 0.03, 0));
+    g.userData.metal = c;
+    return g;
+  }
+  function fxInit(g, P, color) {
+    P.fx = new T.Group(); g.userData.fx = P.fx; scene.add(P.fx);
+    P.drops = []; for (let k = 0; k < 14; k++) { const d = mk(new T.IcosahedronGeometry(0.045, 0), unlit(color)); d.visible = false; d.userData.v = new T.Vector3(); P.drops.push(d); P.fx.add(d); }
+    P.ct = -9; P.lt = 0; P.prodId = '';
+  }
+  // flying chips / sparks from (x, y, z), local to the node
+  function fxBurst(P, x, y, z, n, up, spread = 2.2) {
+    for (const d of P.drops) if (n > 0 && !d.visible) { n--; d.visible = true; d.position.set(x + (Math.random() - 0.5) * 0.15, y, z + (Math.random() - 0.5) * 0.15); d.userData.v.set((Math.random() - 0.5) * spread, up * (0.6 + Math.random() * 0.6), (Math.random() - 0.2) * spread * 0.6); }
+  }
+  function fxStep(P) {
+    const dt = Math.min(0.1, Math.max(0, time - P.lt)); P.lt = time;
+    for (const d of P.drops) if (d.visible) { const v = d.userData.v; v.y -= 9 * dt; d.position.addScaledVector(v, dt); if (d.position.y < 0.03) d.visible = false; }
+  }
   function buildStation(e) {
     const g = new T.Group(), P = {};
     if (e.kind === 'furnace') {
@@ -5281,6 +5393,7 @@ const G3 = (() => {
       P.meat = box(0.32, 0.2, 0.2, '#c9774a', 0, 0.82, 0); g.add(P.meat);
     }
     g.add(shadow(e.kind === 'pyre' || e.kind === 'fire' ? 0.8 : 0.95));
+    if (e.kind === 'furnace' || e.kind === 'anvil') fxInit(g, P, '#ffc040');
     g.userData.P = P; g.userData.mats = mats(g);
     return g;
   }
@@ -5410,7 +5523,7 @@ const G3 = (() => {
     return g;
   }
   function buildEnt(e) { return e.kind === 'enemy' ? buildEnemy(e) : e.kind === 'npc' ? buildNpc(e) : e.kind === 'patch' ? buildPatch(e) : e.kind === 'obstacle' ? buildObstacle(e) : CRAFTING.has(e.skill) ? buildStation(e) : buildNode(e); }
-  function dropEnt() { if (!entObj) return; scene.remove(entObj); if (entObj.userData.line) { scene.remove(entObj.userData.line); dispose(entObj.userData.line); } dispose(entObj); entObj = null; }
+  function dropEnt() { if (!entObj) return; scene.remove(entObj); if (entObj.userData.line) { scene.remove(entObj.userData.line); dispose(entObj.userData.line); } if (entObj.userData.fx) { scene.remove(entObj.userData.fx); dispose(entObj.userData.fx); } dispose(entObj); entObj = null; }
   function syncEnt() {
     const e = R.ent;
     if (e && e.kind === 'patch' && e.pk && patch(e.pk).s !== e.seedShown) entRef = null;
@@ -5444,6 +5557,16 @@ const G3 = (() => {
     } else if (e.kind === 'rock') {
       x += Math.sin(time * 70) * e.hit * 3;
       P.r.scale.setScalar(0.55 + 0.45 * (e.yields / e.maxYields));
+      // each swing knocks chips off; a full one breaks an ore loose that flies into the hero's pack
+      fxStep(P);
+      if (e.splash) { const big = e.splash === 2; e.splash = 0; fxBurst(P, -0.5, 0.7, 0.4, big ? 10 : 5, big ? 3.5 : 2.5); if (big) P.ct = time; }
+      const cp = (time - P.ct) / 0.9, hx = -e.stop / U3;
+      P.prod.visible = cp >= 0 && cp < 1;
+      if (P.prod.visible) {
+        const q = cp, s = q < 0.55 ? 1 : 1 - (q - 0.55) / 0.45 * 0.85;
+        P.prod.position.set(-0.3 + (hx + 0.1 + 0.3) * q, 0.8 + Math.sin(q * Math.PI) * 1.3 + (q > 0.55 ? (q - 0.55) * 0.6 : 0), 0.35 - q * 0.55);
+        P.prod.rotation.set(time * 7, time * 5, 0); P.prod.scale.setScalar(1.3 * s);
+      }
     } else if (e.kind === 'obstacle') {
       x = e.x - e.stop;
       const act = R.phase === 'act' && R.ent === e;
@@ -5521,11 +5644,39 @@ const G3 = (() => {
       }
       if (P.glow) { const fl = working ? 0.7 + 0.3 * Math.sin(time * 9) : 0.35; P.glow.material.color.setRGB(1, 0.5 + 0.3 * fl, 0.15); P.halo.material.opacity = 0.6 * fl; if (working) fireLight.intensity = 0.8 * fl; if (working && Math.random() < 0.3) particles.push({ wx: e.x - 12, y: GY - 112, vx: rand(-8, 8), vy: rand(-40, -20), life: 0.8, color: 'rgba(120,120,120,0.6)' }); }
       if (P.bar) { P.bar.visible = working; P.halo.visible = working; }
+      if (P.fx) {
+        fxStep(P);
+        const anv = e.kind === 'anvil';
+        if (e.splash) {
+          const big = e.splash === 2; e.splash = 0;
+          fxBurst(P, anv ? -0.05 : 0, anv ? 1.05 : 0.55, anv ? 0 : 0.6, big ? 12 : 6, big ? 3 : 2.2, 2.6);
+          if (big && e.prod) {
+            if (P.prod) { P.fx.remove(P.prod); dispose(P.prod); }
+            P.prod = prodMesh(e.prod); P.prod.visible = false; P.fx.add(P.prod); P.ct = time; e.prod = '';
+            P.prod.traverse(n => { if (n.material) n.userData.base = n.material.color.clone(); });
+          }
+        }
+        if (P.prod) {
+          // hot from the forge: glowing orange, cooling to the metal while it is held up, then into the pack
+          const cp = (time - P.ct) / 1.6, hx = -e.stop / U3;
+          P.prod.visible = cp >= 0 && cp < 1;
+          if (P.prod.visible) {
+            const heat = clamp(1 - (cp - 0.2) / 0.45, 0, 1), hot = C('#ffa040');
+            P.prod.traverse(n => { if (n.userData.base) { n.material.color.copy(n.userData.base).lerp(hot, heat); if (n.material.emissive) n.material.emissive.setRGB(0.9 * heat, 0.35 * heat, 0); } });
+            const sx = anv ? -0.05 : 0, sy = anv ? 1.1 : 0.55, sz = anv ? 0 : 0.7;
+            if (cp < 0.3) { const q = cp / 0.3; P.prod.position.set(sx, sy + q * (anv ? 0.1 : 0.5), sz + (anv ? 0 : q * 0.3)); P.prod.rotation.set(0, 0, 0); P.prod.scale.setScalar(1.6); }
+            else if (cp < 0.75) { const q = (cp - 0.3) / 0.45, qq = q * q * (3 - 2 * q); P.prod.position.set(sx + (hx * 0.5 - sx) * qq, sy + (anv ? 0.1 : 0.5) + qq * (1.9 - sy), sz + (0.5 - sz) * qq); P.prod.rotation.set(0, qq * Math.PI * 2, Math.sin(time * 3) * 0.1); P.prod.scale.setScalar(1.6 + qq * 0.3); }
+            else { const q = (cp - 0.75) / 0.25; P.prod.position.set(hx * 0.5 + (hx - hx * 0.5) * q, 1.9 - q * 0.9, 0.5 - q * 0.6); P.prod.scale.setScalar(1.9 * (1 - q * 0.85)); }
+            if (cp > 0.2 && cp < 0.55 && Math.random() < 0.15) fxBurst(P, P.prod.position.x, P.prod.position.y, P.prod.position.z, 1, 1.2, 0.6);
+          }
+        }
+      }
       if (P.gem) { P.gem.rotation.y = time * (working ? 2 : 0.5); P.gem.position.y = 1.45 + Math.sin(time * 2) * 0.05; P.halo.material.opacity = working ? 0.6 : 0.3; }
       if (P.saw) P.saw.position.x = 0.4 + (working ? Math.sin(time * 14) * 0.25 : 0);
       if (e.kind === 'bench' && working && e.hit > 0.3) burst(e.x - R.worldX + HX, GY - 40, '#d8b888', 1);
     }
     g.position.set(x / U3, 0, 0);
+    if (P.fx) P.fx.position.set(e.x / U3, 0, 0);
     fireLight.position.set(x / U3, 1.6, 1.2);
   }
 
