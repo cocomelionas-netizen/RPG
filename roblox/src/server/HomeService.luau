@@ -196,6 +196,7 @@ local function claimPlot(player: Player)
 		if not plot.owner then
 			plot.owner = player
 			plotOf[player] = plot
+			plot.model:SetAttribute("Owner", player.UserId)
 			plot.sign.Title.Text = player.DisplayName .. "'s Home"
 			plot.sign.Sub.Text = "Plot " .. plot.index
 			renderRooms(plot)
@@ -210,6 +211,7 @@ local function freePlot(player: Player)
 	if plot then
 		plotOf[player] = nil
 		plot.owner = nil
+		plot.model:SetAttribute("Owner", nil)
 		plot.sign.Title.Text = "For rent"
 		plot.sign.Sub.Text = "A free plot"
 		plot.rooms:ClearAllChildren()
@@ -336,6 +338,11 @@ function HomeService.teleport(player: Player, where: string)
 		-- stand at the gate, facing the house
 		local gate = plot.center + Vector3.new(0, 3, -plot.side * (PLOT_SIZE / 2 + 3))
 		target = CFrame.lookAt(gate, Vector3.new(plot.center.X, 3, plot.center.Z))
+		local data = DataService.get(player)
+		if data then
+			data.stats.homeTrips += 1
+			DataService.sync(player)
+		end
 	else
 		target = CFrame.new(14, 3, 0) * CFrame.Angles(0, -math.pi / 2, 0)
 	end
@@ -351,7 +358,7 @@ function HomeService.init()
 		local plot = claimPlot(player)
 		task.delay(6, function()
 			if player.Parent and plot then
-				Remotes.Notify:FireClient(player, ("Your home is plot %d in Hometown, behind the start of the road. Tap 🏠 Home to go there."):format(plot.index), "good")
+				Remotes.Notify:FireClient(player, ("Your home is plot %d in Hometown, behind the start of the road. Tap 🏡 Go home to go there."):format(plot.index), "good")
 			end
 		end)
 	end)

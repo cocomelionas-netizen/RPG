@@ -126,6 +126,9 @@ local function grant(player: Player, st)
 	local before, after = DataService.addXp(player, st.skill, info.xp)
 	DataService.addItem(player, info.item, out)
 	data.stats.actions += 1
+	if info.inputs then
+		data.stats.made[info.item] = (data.stats.made[info.item] or 0) + out
+	end
 	DataService.sync(player)
 	Remotes.Gathered:FireClient(player, {
 		node = st.node,
@@ -264,6 +267,9 @@ local function applyOffline(player: Player, data, seconds: number)
 	local after = XP.levelFromXp(data.skills[act.skill])
 	data.inv[info.item] = (data.inv[info.item] or 0) + out
 	data.stats.actions += n
+	if info.inputs then
+		data.stats.made[info.item] = (data.stats.made[info.item] or 0) + out
+	end
 	data.stats.offlineSeconds += counted
 	task.delay(2, function()
 		if player.Parent then

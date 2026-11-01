@@ -10,6 +10,7 @@ local Skills = require(Shared.Skills)
 local XP = require(Shared.XP)
 local Items = require(Shared.Items)
 local Construction = require(Shared.Construction)
+local Goals = require(Shared.Goals)
 local Remotes = require(Shared.Remotes)
 
 local DataService = {}
@@ -55,7 +56,8 @@ local function defaultData()
 		activity = nil, -- { skill, tier } while gathering: used for offline progress
 		lastSeen = 0,
 		created = os.time(),
-		stats = { actions = 0, offlineSeconds = 0 },
+		stats = { actions = 0, offlineSeconds = 0, sold = 0, homeTrips = 0, made = {} },
+		goal = 1, -- index into Goals.LIST: the next-goal guide
 	}
 end
 
@@ -98,6 +100,9 @@ local function reconcile(data)
 			data.stats[k] = v
 		end
 	end
+	if type(data.goal) ~= "number" then
+		data.goal = 1
+	end
 	data.version = DATA_VERSION
 	return data
 end
@@ -122,12 +127,28 @@ end
 
 -- client view of the save (no lock / internal fields)
 function DataService.view(data)
-	return { skills = data.skills, inv = data.inv, gold = data.gold, tools = data.tools, rooms = data.home.rooms, memoryOnly = memoryOnly }
+	return {
+		skills = data.skills, inv = data.inv, gold = data.gold, tools = data.tools, rooms = data.home.rooms,
+		stats = { sold = data.stats.sold, homeTrips = data.stats.homeTrips, made = data.stats.made }, goal = data.goal,
+		memoryOnly = memoryOnly,
+	}
+end
+
+-- finished next-goal steps pay out a little gold and move the guide on
+local function advanceGoals(player: Player, data)
+	while Goals.LIST[data.goal] and Goals.done(data.goal, DataService.view(data)) do
+		local g = Goals.LIST[data.goal]
+		data.goal += 1
+		data.gold += g.reward
+		Remotes.Notify:FireClient(player, ("Goal complete: %s  +%d gold"):format(g.text, g.reward), "goal")
+	end
 end
 
 function DataService.sync(player: Player)
 	local data = profiles[player]
 	if data then
+		advanceGoals(player, data)
+		DataService.refreshLeaderstats(player)
 		Remotes.DataSync:FireClient(player, DataService.view(data))
 	end
 end

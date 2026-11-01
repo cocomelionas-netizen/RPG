@@ -1,0 +1,50 @@
+-- The "next goal" guide: one step at a time, each teaches the next part of the loop by doing it.
+-- Checks only use numbers that never go back down (xp, counters, rooms, tools), so a step can't un-complete.
+-- view is the DataSync view (skills, inv, gold, tools, rooms, stats).
+local XP = require(script.Parent.XP)
+
+local Goals = {}
+
+local function made(v, item)
+	return v.stats and v.stats.made and v.stats.made[item] or 0
+end
+local function stat(v, k)
+	return v.stats and v.stats[k] or 0
+end
+
+-- target: what the arrow points at ("tree0", "rock0", "bench") or which menu button pulses ("bag", "home", "house", "tools")
+Goals.LIST = {
+	{ text = "Chop 5 logs from a Birch tree", target = "tree0", reward = 20,
+		progress = function(v) return math.min(math.floor(v.skills.woodcutting / 10), 5), 5 end },
+	{ text = "Mine a Copper and a Tin rock", target = "rock0", reward = 20,
+		progress = function(v) return math.min(math.floor(v.skills.mining / 10), 2), 2 end },
+	{ text = "Open the 🎒 Bag and sell some logs", target = "bag", reward = 30,
+		progress = function(v) return math.min(stat(v, "sold"), 1), 1 end },
+	{ text = "Tap 🏡 Go home to visit your plot", target = "home", reward = 20,
+		progress = function(v) return math.min(stat(v, "homeTrips"), 1), 1 end },
+	{ text = "Make 6 Birch Planks at your workbench", target = "bench", reward = 40,
+		progress = function(v) return math.min(made(v, "plank0"), 6), 6 end },
+	{ text = "Make Bronze Nails at your workbench", target = "bench", reward = 40,
+		progress = function(v) return math.min(made(v, "nails"), 10), 10 end },
+	{ text = "Build the Woodshed (🏗️ House menu)", target = "house", reward = 100,
+		progress = function(v) return math.min(v.rooms.woodshed or 0, 1), 1 end },
+	{ text = "Upgrade your axe (🛠️ Tools menu)", target = "tools", reward = 100,
+		progress = function(v) return math.min(v.tools.axe or 0, 1), 1 end },
+	{ text = "Build the Workshop (🏗️ House menu)", target = "house", reward = 150,
+		progress = function(v) return math.min(v.rooms.workshop or 0, 1), 1 end },
+	{ text = "Reach Woodcutting level 15 to chop Oak", target = "tree0", reward = 250,
+		progress = function(v) return math.min(XP.levelFromXp(v.skills.woodcutting), 15), 15 end },
+	{ text = "Build the Ore Cellar (🏗️ House menu)", target = "house", reward = 250,
+		progress = function(v) return math.min(v.rooms.cellar or 0, 1), 1 end },
+}
+
+function Goals.done(i: number, view): boolean
+	local g = Goals.LIST[i]
+	if not g then
+		return false
+	end
+	local cur, max = g.progress(view)
+	return cur >= max
+end
+
+return Goals

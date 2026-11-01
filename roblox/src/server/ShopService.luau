@@ -42,6 +42,7 @@ local function sell(player: Player, id, amount)
 	local gold = worth(data, Items[id], n)
 	DataService.addItem(player, id, -n)
 	DataService.addGold(player, gold)
+	data.stats.sold += 1
 	DataService.sync(player)
 	Remotes.Notify:FireClient(player, ("Sold %d × %s for %s gold"):format(n, Items[id].name, fmt(gold)), "gold")
 end
@@ -64,6 +65,7 @@ local function sellAll(player: Player)
 		return
 	end
 	DataService.addGold(player, gold)
+	data.stats.sold += 1
 	DataService.sync(player)
 	Remotes.Notify:FireClient(player, ("Sold %d resources for %s gold"):format(count, fmt(gold)), "gold")
 end

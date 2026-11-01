@@ -150,8 +150,102 @@ task.spawn(function()
 	end
 end)
 
-task.delay(3, function()
-	UI.toast("Walk up to a tree, rock or fishing spot and press E (or tap) to start gathering.")
-	task.wait(4)
+task.delay(4, function()
 	UI.toast("Leave while gathering and your hero keeps working offline (up to 12h).", "good")
+end)
+
+-- ===== goal pointer: a bouncing arrow over the thing the next goal needs, and a glowing line to it =====
+local arrow = Instance.new("BillboardGui")
+arrow.Name = "GoalArrow"
+arrow.Size = UDim2.fromOffset(60, 60)
+arrow.AlwaysOnTop = true
+arrow.LightInfluence = 0
+arrow.Enabled = false
+local arrowText = Instance.new("TextLabel")
+arrowText.BackgroundTransparency = 1
+arrowText.Size = UDim2.fromScale(1, 1)
+arrowText.Text = "⬇️"
+arrowText.TextScaled = true
+arrowText.Parent = arrow
+arrow.Parent = player:WaitForChild("PlayerGui")
+
+local beam = Instance.new("Beam")
+beam.Name = "GoalBeam"
+beam.Color = ColorSequence.new(Color3.fromRGB(255, 190, 60))
+beam.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 0.7) })
+beam.LightEmission = 1
+beam.LightInfluence = 0
+beam.Width0, beam.Width1 = 0.5, 0.25
+beam.FaceCamera = true
+beam.Segments = 1
+beam.Enabled = false
+local targetAttachment = Instance.new("Attachment")
+targetAttachment.Name = "GoalTarget"
+targetAttachment.Parent = workspace.Terrain
+
+local function nearestNode(skill, tier, from)
+	local nodes = workspace:FindFirstChild("World") and workspace.World:FindFirstChild("Nodes")
+	local best, bd = nil, math.huge
+	for _, n in nodes and nodes:GetChildren() or {} do
+		if n:GetAttribute("Skill") == skill and n:GetAttribute("Tier") == tier and n.PrimaryPart then
+			local d = (n.PrimaryPart.Position - from).Magnitude
+			if d < bd then
+				best, bd = n, d
+			end
+		end
+	end
+	return best
+end
+
+local function myBench()
+	local town = workspace:FindFirstChild("World") and workspace.World:FindFirstChild("Hometown")
+	for _, plot in town and town.Plots:GetChildren() or {} do
+		if plot:GetAttribute("Owner") == player.UserId then
+			return plot:FindFirstChild("Workbench")
+		end
+	end
+	return nil
+end
+
+task.spawn(function()
+	local t = 0
+	while true do
+		local goal = UI.goal()
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local target = nil
+		if goal and hrp then
+			if goal.target == "tree0" then
+				target = nearestNode("woodcutting", 0, hrp.Position)
+			elseif goal.target == "rock0" then
+				target = nearestNode("mining", 0, hrp.Position)
+			elseif goal.target == "bench" then
+				target = myBench()
+			end
+		end
+		-- no arrow once the hero is already working right there
+		local pos = target and target.PrimaryPart and target:GetPivot().Position
+		local near = pos and hrp and (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(hrp.Position.X, 0, hrp.Position.Z)).Magnitude < 12
+		if pos and not near then
+			t += 0.1
+			arrow.Adornee = target.PrimaryPart
+			arrow.StudsOffsetWorldSpace = Vector3.new(0, 8 + math.sin(t * 4) * 0.8, 0)
+			arrow.Enabled = true
+			targetAttachment.WorldPosition = pos + Vector3.new(0, 1, 0)
+			local a0 = hrp:FindFirstChild("GoalFrom")
+			if not a0 then
+				a0 = Instance.new("Attachment")
+				a0.Name = "GoalFrom"
+				a0.Position = Vector3.new(0, -2, 0)
+				a0.Parent = hrp
+			end
+			beam.Attachment0, beam.Attachment1 = a0, targetAttachment
+			beam.Parent = workspace.Terrain
+			beam.Enabled = true
+		else
+			arrow.Enabled = false
+			beam.Enabled = false
+		end
+		task.wait(0.1)
+	end
 end)
