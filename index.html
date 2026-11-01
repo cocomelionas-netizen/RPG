@@ -8635,7 +8635,7 @@ function init() {
   requestAnimationFrame(t => { lastFrame = t; lastWall = Date.now(); requestAnimationFrame(frame); });
 }
 /* ===== Moving house: the game's home is NEW_HOME. The old address sends its local save along in the link ===== */
-const NEW_HOME = '';   // e.g. 'https://endless-road.pages.dev/' – empty: stay where we are
+const NEW_HOME = 'https://endless-road.cocomelionas.workers.dev/';   // the old github.io address forwards players here with their save
 const b64u = {
   enc: buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
   dec: s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
