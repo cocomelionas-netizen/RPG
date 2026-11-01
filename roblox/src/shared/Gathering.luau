@@ -43,6 +43,14 @@ function G.toolName(tool: string, level: number): string
 	return G.METALS[level] .. " " .. G.TOOL_NAMES[tool]
 end
 
+-- place on the rarity ladder (Tiers.luau): copper and tin share the starter tier, so ores sit one step lower
+function G.rarity(skill: string, tier: number): number
+	if skill == "mining" then
+		return math.max(tier - 1, 0)
+	end
+	return tier
+end
+
 -- everything about one kind of node: display name, level needed, seconds, xp and the item it gives
 function G.node(skill: string, tier: number)
 	if skill == "mining" then

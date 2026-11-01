@@ -12,6 +12,7 @@ local Items = require(Shared.Items)
 local G = require(Shared.Gathering)
 local Construction = require(Shared.Construction)
 local Goals = require(Shared.Goals)
+local Tiers = require(Shared.Tiers)
 
 local player = Players.LocalPlayer
 local UI = {}
@@ -348,7 +349,6 @@ do
 		request("sellAll")
 	end)
 
-	local TIER_BORDER = { [0] = Color3.fromRGB(150, 150, 160), Color3.fromRGB(110, 200, 110), Color3.fromRGB(90, 160, 255), Color3.fromRGB(190, 110, 255), Color3.fromRGB(255, 170, 50), Color3.fromRGB(255, 90, 90), Color3.fromRGB(80, 230, 230) }
 	renderers.bag = function()
 		for _, c in grid:GetChildren() do
 			if c:IsA("GuiObject") then c:Destroy() end
@@ -368,7 +368,7 @@ do
 				selectedItem = id
 				renderers.bag()
 			end)
-			stroke(selectedItem == id and C.gold or TIER_BORDER[it.tier or 0], selectedItem == id and 3 or 2).Parent = slot
+			stroke(selectedItem == id and C.gold or Tiers.color(it.rarity or it.tier), selectedItem == id and 3 or 2).Parent = slot
 			text({ Text = it.icon, Position = UDim2.fromOffset(0, 4), Size = UDim2.new(1, 0, 0, 44), TextSize = 34, ZIndex = 3, Parent = slot })
 			text({ Text = fmt(n), Position = UDim2.fromOffset(0, 48), Size = UDim2.new(1, 0, 0, 18), Font = TITLE, TextSize = 17, ZIndex = 3, Parent = slot })
 			if it.color then

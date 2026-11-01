@@ -27,7 +27,7 @@ for t = 0, 4 do
 end
 for t = 0, 6 do
 	local o = G.ORES[t]
-	defItem("ore_" .. o.id, { name = o.name, icon = o.id == "coal" and "⚫" or "🔶", tier = t, value = o.value, type = "Ores", color = o.color })
+	defItem("ore_" .. o.id, { name = o.name, icon = o.id == "coal" and "⚫" or "🔶", tier = t, rarity = G.rarity("mining", t), value = o.value, type = "Ores", color = o.color })
 end
 -- construction materials, made at the workbench
 local PLANK_N = { [0] = "Birch Planks", "Oak Planks", "Maple Planks", "Yew Planks", "Elder Planks" }

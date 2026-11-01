@@ -3,6 +3,23 @@
 Dvi pagrindinės žaidimo esmės: **savas namas** (statai, gyveni, tobulini) ir **PvP Wraith Caves**.
 Visa kita (renkimas, amatai, kova) maitina šias dvi.
 
+## Kryptis
+
+- Žanras kaip OSRS: įgūdžiai 1–99, ta pati XP kreivė, resursų lygiai, idle renkimas, Wilderness tipo PvP.
+  Bet **savas žaidimas**: savi pavadinimai (Cobalt, Verdite, Skyrite, Wraith Caves...), sava grafika ir taisyklės.
+  OSRS pavadinimų, grafikos ir turinio nekopijuojam (Jagex autorių teisės, ir Roblox tokius žaidimus šalina).
+- Roblox stilius kaip didžiųjų žaidimų (Pet Simulator, Bee Swarm, Fisch, Grow a Garden): ryškios spalvos,
+  dideli aiškūs užrašai, viena retumo spalvų skalė visur, „juice“ (iššokimai, blizgučiai), telefonas pirmiausia.
+
+## Vizualinės taisyklės
+
+- **Retumo skalė** (`Tiers.luau`): pilka → žalia → mėlyna → violetinė → oranžinė → raudona → žydra.
+  Ta pati spalva: žiedas ant žemės, lentelės rėmelis, daikto rėmelis krepšyje.
+- **Niekada tik spalva:** kiekvienas lygis skiriasi forma (beržas su dryžiais, platus ąžuolas, oranžinis klevas su
+  krentančiais lapais, kūgio formos kukmedis, švytintis Elder; rūda: gumulai → kubeliai → anglis → švytintys kristalai).
+- **Lentelė virš kiekvieno taško:** ikona + pavadinimas + „Lv 15“ (žalia – gali, raudona su 🔒 – dar negali).
+- Emoji tik iki Unicode 12 (naujesni Roblox šriftuose rodomi kaip kvadratėliai).
+
 ## Statymo tvarka
 
 1. ✅ Kelias, renkimas, krepšys, išsaugojimas, offline progresas.

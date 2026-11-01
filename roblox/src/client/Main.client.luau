@@ -249,3 +249,56 @@ task.spawn(function()
 		task.wait(0.1)
 	end
 end)
+
+-- ===== node labels: green level when you can gather there, red with a lock when you can't yet =====
+local XP = require(Shared.XP)
+local CAN = Color3.fromRGB(130, 240, 130)
+local CANT = Color3.fromRGB(255, 110, 95)
+task.spawn(function()
+	while true do
+		local view = UI.getData()
+		local nodes = workspace:FindFirstChild("World") and workspace.World:FindFirstChild("Nodes")
+		if view and nodes then
+			for _, n in nodes:GetChildren() do
+				local core = n.PrimaryPart
+				local bb = core and core:FindFirstChild("LabelAnchor") and core.LabelAnchor:FindFirstChild("NodeLabel")
+				local lv = bb and bb:FindFirstChild("Level", true)
+				if lv then
+					local req = bb:GetAttribute("Req") or 1
+					local ok = XP.levelFromXp(view.skills[n:GetAttribute("Skill")] or 0) >= req
+					lv.Text = ok and ("Lv " .. req) or ("🔒 Needs Lv " .. req)
+					lv.TextColor3 = ok and CAN or CANT
+				end
+			end
+		end
+		task.wait(1)
+	end
+end)
+
+-- ===== fish fins circle inside their ripple =====
+local RunService = game:GetService("RunService")
+-- (the place streams parts in and out, so fins are picked up as they arrive and dropped when they leave)
+local fins = {}
+local function addFin(d)
+	if d:IsA("BasePart") and d:GetAttribute("Swim") and not fins[d] then
+		fins[d] = { part = d, center = d.Position - Vector3.new(1.5, 0.5, 0), phase = math.random() * 6 }
+	end
+end
+task.spawn(function()
+	local world = workspace:WaitForChild("World")
+	world.DescendantAdded:Connect(addFin)
+	world.DescendantRemoving:Connect(function(d)
+		fins[d] = nil
+	end)
+	for _, d in world:GetDescendants() do
+		addFin(d)
+	end
+end)
+RunService.RenderStepped:Connect(function()
+	local t = os.clock()
+	for _, f in fins do
+		local a = t * 1.2 + f.phase
+		local p = f.center + Vector3.new(math.cos(a) * 1.6, 0.35 + math.sin(t * 3 + f.phase) * 0.15, math.sin(a) * 1.6)
+		f.part.CFrame = CFrame.lookAt(p, p + Vector3.new(-math.sin(a), 0, math.cos(a)))
+	end
+end)

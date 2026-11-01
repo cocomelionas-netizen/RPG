@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Zones = require(Shared.Zones)
 local G = require(Shared.Gathering)
+local Tiers = require(Shared.Tiers)
 
 local WorldBuilder = {}
 
@@ -16,6 +17,9 @@ local function part(props)
 	p.Anchored = true
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
+	if props.Shape then
+		p.Shape = props.Shape -- before Size: changing the shape afterwards can reshape the part
+	end
 	for k, v in props do
 		p[k] = v
 	end
@@ -55,6 +59,9 @@ local function label(parent, text, sub, dist)
 end
 
 -- ===================== resource nodes =====================
+-- Every node tells the player what it is three ways, so colour is never the only cue:
+-- its own shape, a ring on the ground in the rarity colour (Tiers.luau) and a label with name and level.
+-- The client recolours the level line for the local player (green: you can, red with a lock: not yet).
 local nodeCount = 0
 
 local function chipEmitter(core, color)
@@ -72,9 +79,79 @@ local function chipEmitter(core, color)
 	e.Parent = core
 end
 
-local function finishNode(model, core, skill, tier, top)
+-- slow rising glints that mark rare nodes from far away
+local function sparkles(parent, color, rate)
+	local e = Instance.new("ParticleEmitter")
+	e.Name = "Sparkles"
+	e.Color = ColorSequence.new(color)
+	e.LightEmission = 1
+	e.LightInfluence = 0
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.5, 0.35), NumberSequenceKeypoint.new(1, 0) })
+	e.Lifetime = NumberRange.new(1, 1.8)
+	e.Rate = rate or 4
+	e.Speed = NumberRange.new(1, 2.5)
+	e.SpreadAngle = Vector2.new(180, 180)
+	e.Acceleration = Vector3.new(0, 1.5, 0)
+	e.Parent = parent
+end
+
+local function tierRing(model, pos: Vector3, radius: number, color: Color3)
+	part({
+		Name = "TierRing", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, radius * 2, radius * 2),
+		CFrame = CFrame.new(pos + Vector3.new(0, 0.1, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = color, Material = Enum.Material.Neon, Transparency = 0.72, CanCollide = false, CanQuery = false, CanTouch = false, Parent = model,
+	})
+end
+
+-- name on top, "Lv 15" underneath; the BillboardGui is sized in studs so far-away labels shrink
+local function nodeLabel(anchor, title: string, req: number, color: Color3)
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "NodeLabel"
+	bb.Size = UDim2.fromScale(7, 2.3)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 1.4, 0)
+	bb.MaxDistance = 70
+	bb.LightInfluence = 0
+	bb:SetAttribute("Req", req)
+	local f = Instance.new("Frame")
+	f.BackgroundColor3 = Color3.fromRGB(24, 22, 38)
+	f.BackgroundTransparency = 0.25
+	f.Size = UDim2.fromScale(1, 1)
+	f.Parent = bb
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0.25, 0)
+	c.Parent = f
+	local s = Instance.new("UIStroke")
+	s.Color = color
+	s.Thickness = 2
+	s.Parent = f
+	local t = Instance.new("TextLabel")
+	t.Name = "Title"
+	t.BackgroundTransparency = 1
+	t.Position = UDim2.fromScale(0.05, 0.06)
+	t.Size = UDim2.fromScale(0.9, 0.5)
+	t.Font = Enum.Font.FredokaOne
+	t.TextScaled = true
+	t.TextColor3 = Color3.new(1, 1, 1)
+	t.Text = title
+	t.Parent = f
+	local lv = t:Clone()
+	lv.Name = "Level"
+	lv.Position = UDim2.fromScale(0.05, 0.56)
+	lv.Size = UDim2.fromScale(0.9, 0.38)
+	lv.Font = Enum.Font.GothamBold
+	lv.TextColor3 = color
+	lv.Text = "Lv " .. req
+	lv.Parent = f
+	bb.Parent = anchor
+	return bb
+end
+
+local SKILL_ICON = { woodcutting = "🌲", mining = "⛏️", fishing = "🎣" }
+
+local function finishNode(model, core, skill, tier, top: Vector3, ringRadius: number)
 	nodeCount += 1
 	local info = G.node(skill, tier)
+	local color = Tiers.color(G.rarity(skill, tier))
 	model.Name = "Node_" .. nodeCount
 	model.PrimaryPart = core
 	model:SetAttribute("NodeId", nodeCount)
@@ -91,89 +168,148 @@ local function finishNode(model, core, skill, tier, top)
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.Parent = core
 
+	local base = Vector3.new(core.Position.X, 0, core.Position.Z)
+	tierRing(model, base, ringRadius, color)
 	local anchor = Instance.new("Attachment")
 	anchor.Name = "LabelAnchor"
 	anchor.Parent = core
 	anchor.WorldPosition = top
-	label(anchor, info.name, "Lv " .. info.req)
+	nodeLabel(anchor, SKILL_ICON[skill] .. " " .. info.name, info.req, color)
 end
 
+-- each tree type has its own silhouette, not just another colour
+local TREES = {
+	[0] = { trunk = "#ece8de", d = 1.1, h = 8, leaves = "#a6dc72", r = 6, form = "round" }, -- Birch: thin white trunk
+	{ trunk = "#6b4a2b", d = 2.4, h = 7, leaves = "#3f8f3a", r = 8.5, form = "wide" }, -- Oak: fat trunk, wide crown
+	{ trunk = "#7a4a2a", d = 1.6, h = 9, leaves = "#e8742c", r = 7.5, form = "round", fall = true }, -- Maple: autumn orange
+	{ trunk = "#3e2a1a", d = 1.8, h = 6, leaves = "#24604a", r = 9, form = "cone" }, -- Yew: tall dark cone
+	{ trunk = "#4a2a5a", d = 2.1, h = 10, leaves = "#b56cf0", r = 8, form = "round", glow = true }, -- Elder: magic
+}
+
 local function makeTree(parent, pos, tier, rng)
+	local st = TREES[tier]
 	local model = Instance.new("Model")
-	local h = 7 + tier * 1.6
-	local d = 1.6 + tier * 0.25
+	local h, d = st.h, st.d
 	local trunk = part({
 		Name = "Trunk", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, d, d),
 		CFrame = CFrame.new(pos + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = tier == 0 and hex("#d8d0c0") or hex("#6b4a2b"), Material = Enum.Material.Wood, Parent = model,
+		Color = hex(st.trunk), Material = Enum.Material.Wood, Parent = model,
 	})
-	local canopyColor = hex(G.CANOPY[tier])
-	local r = 6 + tier * 1.4
-	part({
-		Name = "Canopy", Shape = Enum.PartType.Ball, Size = Vector3.new(r, r, r),
-		CFrame = CFrame.new(pos + Vector3.new(0, h + r * 0.25, 0)), Color = canopyColor,
-		Material = Enum.Material.Grass, CanCollide = false, Parent = model,
-	})
-	for i = 1, 2 do
-		local rr = r * 0.65
-		local off = Vector3.new(rng:NextNumber(-1, 1) * r * 0.35, -r * 0.1, rng:NextNumber(-1, 1) * r * 0.35)
-		part({
-			Name = "Canopy" .. i, Shape = Enum.PartType.Ball, Size = Vector3.new(rr, rr, rr),
-			CFrame = CFrame.new(pos + Vector3.new(0, h, 0) + off), Color = darker(canopyColor, 0.85),
-			Material = Enum.Material.Grass, CanCollide = false, Parent = model,
-		})
+	local leaves = hex(st.leaves)
+	local top = h
+	if tier == 0 then
+		-- birch bark stripes
+		for i = 1, 4 do
+			part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.25, d + 0.06, d + 0.06), CFrame = CFrame.new(pos + Vector3.new(0, i * h / 5 + rng:NextNumber(-0.4, 0.4), 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#2a2a2a"), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = model })
+		end
 	end
-	if tier == 4 then
-		local light = Instance.new("PointLight")
-		light.Color = canopyColor
-		light.Range = 14
-		light.Brightness = 1.5
-		light.Parent = model.Canopy
+	if st.form == "cone" then
+		for i = 0, 3 do
+			local s = st.r * (1 - i * 0.22)
+			part({ Name = "Leaves" .. i, Size = Vector3.new(s, 3, s), CFrame = CFrame.new(pos + Vector3.new(0, h - 1 + i * 2.6, 0)) * CFrame.Angles(0, math.rad(45 * i), 0), Color = darker(leaves, 1 - i * 0.06), Material = Enum.Material.Grass, CanCollide = false, Parent = model })
+		end
+		top = h + 4 * 2.6
+	elseif st.form == "wide" then
+		local r = st.r
+		part({ Name = "Canopy", Shape = Enum.PartType.Ball, Size = Vector3.new(r, r * 0.8, r), CFrame = CFrame.new(pos + Vector3.new(0, h + r * 0.2, 0)), Color = leaves, Material = Enum.Material.Grass, CanCollide = false, Parent = model })
+		for i = 1, 4 do
+			local a = i * math.pi / 2 + rng:NextNumber(-0.3, 0.3)
+			local rr = r * 0.62
+			part({ Name = "Canopy" .. i, Shape = Enum.PartType.Ball, Size = Vector3.new(rr, rr, rr), CFrame = CFrame.new(pos + Vector3.new(math.cos(a) * r * 0.45, h - 0.4, math.sin(a) * r * 0.45)), Color = darker(leaves, 0.88), Material = Enum.Material.Grass, CanCollide = false, Parent = model })
+		end
+		top = h + r * 0.7
+	else
+		local r = st.r
+		local canopy = part({ Name = "Canopy", Shape = Enum.PartType.Ball, Size = Vector3.new(r, r, r), CFrame = CFrame.new(pos + Vector3.new(0, h + r * 0.25, 0)), Color = leaves, Material = st.glow and Enum.Material.Neon or Enum.Material.Grass, Transparency = st.glow and 0.15 or 0, CanCollide = false, Parent = model })
+		for i = 1, 2 do
+			local rr = r * 0.65
+			local off = Vector3.new(rng:NextNumber(-1, 1) * r * 0.35, -r * 0.1, rng:NextNumber(-1, 1) * r * 0.35)
+			part({ Name = "Canopy" .. i, Shape = Enum.PartType.Ball, Size = Vector3.new(rr, rr, rr), CFrame = CFrame.new(pos + Vector3.new(0, h, 0) + off), Color = darker(leaves, 0.85), Material = Enum.Material.Grass, CanCollide = false, Parent = model })
+		end
+		if st.fall then
+			local e = Instance.new("ParticleEmitter")
+			e.Name = "Leaves"
+			e.Color = ColorSequence.new(leaves, hex("#c0402a"))
+			e.Size = NumberSequence.new(0.3)
+			e.Lifetime = NumberRange.new(2.5, 4)
+			e.Rate = 2
+			e.Speed = NumberRange.new(0.5, 1)
+			e.Acceleration = Vector3.new(0.4, -1.2, 0)
+			e.RotSpeed = NumberRange.new(-90, 90)
+			e.Rotation = NumberRange.new(0, 360)
+			e.Parent = canopy
+		end
+		if st.glow then
+			local light = Instance.new("PointLight")
+			light.Color = leaves
+			light.Range = 16
+			light.Brightness = 1.6
+			light.Parent = canopy
+			sparkles(canopy, Color3.fromRGB(230, 200, 255), 6)
+		end
+		top = h + r * 0.8
 	end
 	chipEmitter(trunk, hex("#c8a070"))
-	finishNode(model, trunk, "woodcutting", tier, pos + Vector3.new(0, h + r * 0.8, 0))
+	finishNode(model, trunk, "woodcutting", tier, pos + Vector3.new(0, top + 0.8, 0), math.max(st.r * 0.42, 3))
 	model.Parent = parent
 	return model
 end
+
+-- low ores are lumps on the rock, high ores grow as glowing crystals
+local ROCK_FORM = { [0] = "lumps", "cubes", "lumps", "coal", "crystals", "crystals", "crystals" }
 
 local function makeRock(parent, pos, tier, rng)
 	local model = Instance.new("Model")
 	local ore = G.ORES[tier]
 	local oreColor = hex(ore.color)
+	local size = 1 + tier * 0.07
+	local rockColor = hex("#7d7a78"):Lerp(oreColor, 0.15)
 	local base = part({
-		Name = "Rock", Size = Vector3.new(5.5, 3.6, 5),
-		CFrame = CFrame.new(pos + Vector3.new(0, 1.6, 0)) * CFrame.Angles(math.rad(rng:NextNumber(-8, 8)), rng:NextNumber(0, math.pi * 2), math.rad(rng:NextNumber(-8, 8))),
-		Color = hex("#7d7a78"), Material = Enum.Material.Slate, Parent = model,
+		Name = "Rock", Size = Vector3.new(5.5, 3.6, 5) * size,
+		CFrame = CFrame.new(pos + Vector3.new(0, 1.6 * size, 0)) * CFrame.Angles(math.rad(rng:NextNumber(-8, 8)), rng:NextNumber(0, math.pi * 2), math.rad(rng:NextNumber(-8, 8))),
+		Color = rockColor, Material = Enum.Material.Slate, Parent = model,
 	})
 	part({
-		Name = "Rock2", Size = Vector3.new(3.4, 2.6, 3.2),
+		Name = "Rock2", Size = Vector3.new(3.4, 2.6, 3.2) * size,
 		CFrame = base.CFrame * CFrame.new(1.2, 1.6, 0.4) * CFrame.Angles(0.3, 0.5, 0.2),
-		Color = hex("#8a8784"), Material = Enum.Material.Slate, Parent = model,
+		Color = darker(rockColor, 1.08), Material = Enum.Material.Slate, Parent = model,
 	})
-	local shiny = tier >= 4
-	for i = 1, 5 do
-		local s = rng:NextNumber(0.9, 1.4)
-		local a = (i / 5) * math.pi * 2
-		part({
-			Name = "Ore" .. i, Shape = Enum.PartType.Ball, Size = Vector3.new(s, s, s),
-			CFrame = base.CFrame * CFrame.new(math.cos(a) * 2.5, rng:NextNumber(-0.4, 1.4), math.sin(a) * 2.2),
-			Color = oreColor, Material = shiny and Enum.Material.Neon or Enum.Material.Metal, CanCollide = false, Parent = model,
-		})
+	local form = ROCK_FORM[tier]
+	local count = form == "crystals" and 6 or 6 + tier
+	for i = 1, count do
+		local a = (i / count) * math.pi * 2
+		local at = base.CFrame * CFrame.new(math.cos(a) * 2.4 * size, rng:NextNumber(0.2, 1.6), math.sin(a) * 2.1 * size)
+		if form == "crystals" then
+			local hgt = rng:NextNumber(1.6, 3.2)
+			part({ Name = "Ore" .. i, Size = Vector3.new(0.7, hgt, 0.7), CFrame = at * CFrame.new(0, hgt / 2, 0) * CFrame.Angles(rng:NextNumber(-0.5, 0.5), rng:NextNumber(0, 3), rng:NextNumber(-0.5, 0.5)), Color = oreColor, Material = Enum.Material.Neon, Transparency = 0.1, CanCollide = false, Parent = model })
+		elseif form == "cubes" then
+			local s = rng:NextNumber(0.8, 1.2)
+			part({ Name = "Ore" .. i, Size = Vector3.new(s, s, s), CFrame = at * CFrame.Angles(rng:NextNumber(0, 1), rng:NextNumber(0, 1), 0), Color = oreColor, Material = Enum.Material.Metal, Reflectance = 0.25, CanCollide = false, Parent = model })
+		elseif form == "coal" then
+			local s = rng:NextNumber(1, 1.5)
+			part({ Name = "Ore" .. i, Size = Vector3.new(s, s * 0.7, s), CFrame = at * CFrame.Angles(rng:NextNumber(0, 1), rng:NextNumber(0, 1), 0), Color = oreColor, Material = Enum.Material.Slate, CanCollide = false, Parent = model })
+		else
+			local s = rng:NextNumber(0.9, 1.4)
+			part({ Name = "Ore" .. i, Shape = Enum.PartType.Ball, Size = Vector3.new(s, s, s), CFrame = at, Color = oreColor, Material = Enum.Material.Metal, Reflectance = 0.15, CanCollide = false, Parent = model })
+		end
 	end
-	if shiny then
+	if form == "crystals" then
 		local light = Instance.new("PointLight")
 		light.Color = oreColor
-		light.Range = 10
+		light.Range = 12
+		light.Brightness = 1.4
 		light.Parent = base
+		sparkles(base, oreColor, 3 + tier)
 	end
 	chipEmitter(base, oreColor)
-	finishNode(model, base, "mining", tier, pos + Vector3.new(0, 5.5, 0))
+	finishNode(model, base, "mining", tier, pos + Vector3.new(0, 6 * size + (form == "crystals" and 1.5 or 0), 0), 4 * size)
 	model.Parent = parent
 	return model
 end
 
 local function makeFishSpot(parent, pos, tier)
 	local model = Instance.new("Model")
+	local color = Tiers.color(tier)
 	local ring = part({
 		Name = "Ripple", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, 5, 5),
 		CFrame = CFrame.new(pos + Vector3.new(0, 0.2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
@@ -181,16 +317,20 @@ local function makeFishSpot(parent, pos, tier)
 	})
 	local bubbles = Instance.new("ParticleEmitter")
 	bubbles.Name = "Bubbles"
-	bubbles.Rate = 6
+	bubbles.Rate = 6 + tier * 2
 	bubbles.Lifetime = NumberRange.new(0.6, 1.2)
 	bubbles.Speed = NumberRange.new(1, 3)
 	bubbles.SpreadAngle = Vector2.new(30, 30)
 	bubbles.Size = NumberSequence.new(0.3)
+	bubbles.Color = ColorSequence.new(Color3.new(1, 1, 1):Lerp(color, 0.5))
 	bubbles.Transparency = NumberSequence.new(0.3)
 	bubbles.EmissionDirection = Enum.NormalId.Right -- the cylinder's axis points up
 	bubbles.Parent = ring
+	-- a fish fin circling in the ripple shows what kind of spot this is
+	local fin = part({ Name = "Fin", Size = Vector3.new(0.2, 0.9, 1.1), CFrame = CFrame.new(pos + Vector3.new(1.5, 0.5, 0)), Color = color, Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = model })
+	fin:SetAttribute("Swim", true)
 	chipEmitter(ring, hex("#bfe8ff"))
-	finishNode(model, ring, "fishing", tier, pos + Vector3.new(0, 3, 0))
+	finishNode(model, ring, "fishing", tier, pos + Vector3.new(0, 3.5, 0), 3)
 	model.Parent = parent
 	return model
 end
