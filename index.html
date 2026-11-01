@@ -358,7 +358,7 @@
 </head>
 <body>
 <header>
-  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button><button id="install" data-a="install" hidden>⬇️ Install</button></h1>
+  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D, first person and 2D graphics" hidden>3D</button><button id="install" data-a="install" hidden>⬇️ Install</button></h1>
   <span class="stat" id="gold">Gold: <b>0</b></span>
   <span class="stat" id="cmb">Combat level: <b>1</b></span>
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
@@ -1399,6 +1399,8 @@ function spawnEvent(ent) {
 function evScreen(ev) {
   return { x: ev.x - R.worldX + HX, y: ev.type === 'star' ? GY - 72 + Math.sin(time * 3 + ev.x) * 6 : GY - 22 };
 }
+// where an event shows on screen, first person included (off screen when null)
+function evView(ev) { const q = evScreen(ev); return G3.fp ? G3.ov(q.x, q.y) : q; }
 function collectEvent(ev) {
   R.events.splice(R.events.indexOf(ev), 1);
   const { x, y } = evScreen(ev);
@@ -3688,7 +3690,8 @@ function drawStation(e) {
 
 function drawEvents(overlayOnly) {
   for (const ev of R.events) {
-    const { x, y } = evScreen(ev);
+    const q = evView(ev); if (!q) continue;
+    const { x, y } = q;
     if (x < -60 || x > W + 60) continue;
     ctx.save();
     ctx.globalAlpha = clamp((25 - ev.age) / 3, 0, 1);
@@ -3741,9 +3744,15 @@ function shoot(x0, y0, x1, y1, kind, color, dur) { if (!SIM) projs.push({ x0, y0
 function drawProjs() {
   for (const p of projs) {
     const t = p.t, lift = p.kind === 'arrow' ? 22 : 8;
-    const x = p.x0 + (p.x1 - p.x0) * t, y = p.y0 + (p.y1 - p.y0) * t - Math.sin(t * Math.PI) * lift;
+    let x = p.x0 + (p.x1 - p.x0) * t, y = p.y0 + (p.y1 - p.y0) * t - Math.sin(t * Math.PI) * lift;
+    let dx = p.x1 - p.x0, dy = (p.y1 - p.y0) - Math.cos(t * Math.PI) * Math.PI * lift;
+    if (G3.fp) {
+      // first person: from the bottom of the screen to the target, shrinking with distance
+      const b = G3.ov(p.x1, p.y1); if (!b) continue;
+      const fx = p.x0 > p.x1 ? b.x : W * 0.62, fy = p.x0 > p.x1 ? b.y : H * 0.95, tx = p.x0 > p.x1 ? W / 2 : b.x, ty = p.x0 > p.x1 ? H * 0.9 : b.y;
+      x = fx + (tx - fx) * t; y = fy + (ty - fy) * t - Math.sin(t * Math.PI) * lift; dx = tx - fx; dy = ty - fy;
+    }
     if (p.kind === 'arrow') {
-      const dx = p.x1 - p.x0, dy = (p.y1 - p.y0) - Math.cos(t * Math.PI) * Math.PI * lift;
       ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan2(dy, dx));
       rr(-14, -1, 14, 2, 1, '#d8c8a8'); poly([0, -3, 6, 0, 0, 3], '#c8ccd4'); poly([-14, -3, -10, 0, -14, 3], '#e86a6a');
       ctx.restore();
@@ -3752,7 +3761,7 @@ function drawProjs() {
       g.addColorStop(0, p.color); g.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = g; ctx.fillRect(x - 14, y - 14, 28, 28);
       circle(x, y, 4.5, '#ffffff'); circle(x, y, 3.5, p.color);
-      if (Math.random() < 0.5) particles.push({ wx: R.worldX + x - HX, y, vx: rand(-20, 20), vy: rand(-30, 10), life: 0.3, color: p.color });
+      if (!G3.fp && Math.random() < 0.5) particles.push({ wx: R.worldX + x - HX, y, vx: rand(-20, 20), vy: rand(-30, 10), life: 0.3, color: p.color });
     }
   }
 }
@@ -3893,6 +3902,8 @@ function drawHud() {
     ctx.fillStyle = ready ? '#ffe9a8' : '#fff'; ctx.fillText(t, W - bw, 10 + lh / 2);
   }
 
+  // first person: the hero's bars sit at the bottom centre of the view instead of over the head
+  ctx.save(); if (G3.fp) { ctx.translate(W / 2 - HX, H - 16 - (GY - 82)); ctx.scale(1, 1); }
   if (inWild() && S.wild.skull) { font(400, 16); ctx.textAlign = 'center'; ctx.fillText('☠️', HX, GY - 108); ctx.textAlign = 'left'; }
   // hero HP + food left
   bar(HX - 25, GY - 92, 50, 6, S.hp / maxHp(), R.eatFlash > 0 ? '#b6ffb0' : '#5fd35f');
@@ -3905,7 +3916,16 @@ function drawHud() {
     if (pr) ctx.fillText(pr.icon, HX + 30, GY - 89);
   }
   const e = R.ent;
-  if (e && !e.dying && R.phase !== 'walk') {
+  if (e && !e.dying && R.phase !== 'walk' && e.kind === 'enemy') bar(HX - 25, GY - 82, 50, 3, 1 - R.atkT / playerSpeed(), '#f2c94c');
+  ctx.restore();
+  let ov = !!(e && !e.dying && R.phase !== 'walk');
+  ctx.save();
+  if (ov && G3.fp) {
+    // first person: move the target's name and bars to where the target stands in view
+    const ay = GY - (e.kind === 'enemy' ? entHeight(e) : e.kind === 'tree' ? 150 : 90), q = G3.ov(entScreenX(e), ay);
+    if (q) ctx.translate(q.x - entScreenX(e), Math.max(q.y, 60 * FS) - ay); else ov = false;
+  }
+  if (ov) {
     const ex = entScreenX(e);
     if (e.kind === 'enemy') {
       const top = Math.max(GY - entHeight(e) - 24, 34 * FS + 26);
@@ -3918,7 +3938,6 @@ function drawHud() {
       if (e.d.world) { const st = WB.st; bar(ex - 90, top, 180, 9, st ? Math.max(0, st.hp - WB.pend) / st.max_hp : 1, '#e85a5a'); if (st) { font(600, 11); ctx.textAlign = 'center'; outlined(`${fmt(Math.max(0, st.hp - WB.pend))} / ${fmt(st.max_hp)} · ${st.fighters} heroes`, ex, top + 22, '#fff'); } }
       else bar(ex - bw / 2, top, bw, e.d.boss ? 8 : 6, e.hp / e.maxHp, '#e85a5a');
       ctx.textAlign = 'left';
-      bar(HX - 25, GY - 82, 50, 3, 1 - R.atkT / playerSpeed(), '#f2c94c');
     } else if (e.kind === 'npc') {
       const top = GY - 100;
       font(600, 12); ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
@@ -3949,6 +3968,12 @@ function drawHud() {
       ctx.strokeText(txt, ex, top - 9 * FS); ctx.fillText(txt, ex, top - 9 * FS); ctx.textAlign = 'left';
     }
   }
+  ctx.restore();
+  if (G3.fp && R.phase !== 'dead') {
+    // a small crosshair keeps the eye on the road ahead
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(W / 2 - 6, H / 2); ctx.lineTo(W / 2 + 6, H / 2); ctx.moveTo(W / 2, H / 2 - 6); ctx.lineTo(W / 2, H / 2 + 6); ctx.stroke();
+  }
   if (R.phase === 'dead') {
     ctx.fillStyle = 'rgba(80,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
     font(700, 28); ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
@@ -3968,7 +3993,7 @@ function draw() {
   ctx.save();
   if (G3.on) { ctx.clearRect(0, 0, W, H); G3.render(shx, shy); }
   ctx.translate(shx, shy);
-  if (G3.on) { drawWeather(z.th); drawEvents(true); drawHeroExtras(); }
+  if (G3.on) { drawWeather(z.th); drawEvents(true); if (!G3.fp) drawHeroExtras(); }
   else {
     drawBackground(z);
     if (R.ent) {
@@ -3981,9 +4006,13 @@ function draw() {
   drawProjs();
   if (R.ring > 0) {
     ctx.strokeStyle = `rgba(242,201,76,${R.ring})`; ctx.lineWidth = 4 * R.ring;
-    ctx.beginPath(); ctx.ellipse(HX, GY - 40, 30 + (1 - R.ring) * 90, 20 + (1 - R.ring) * 70, 0, 0, Math.PI * 2); ctx.stroke();
+    const rx = G3.fp ? W / 2 : HX, ry = G3.fp ? H * 0.55 : GY - 40, k = G3.fp ? 2.2 : 1;
+    ctx.beginPath(); ctx.ellipse(rx, ry, (30 + (1 - R.ring) * 90) * k, (20 + (1 - R.ring) * 70) * k, 0, 0, Math.PI * 2); ctx.stroke();
   }
-  for (const p of particles) { ctx.globalAlpha = clamp(p.life * 2, 0, 1); ctx.fillStyle = p.color; ctx.fillRect(p.wx - R.worldX + HX - 2, p.y - 2, 4, 4); }
+  for (const p of particles) {
+    const q = G3.fp ? G3.ov(p.wx - R.worldX + HX, p.y) : { x: p.wx - R.worldX + HX, y: p.y, s: 1 }; if (!q) continue;
+    ctx.globalAlpha = clamp(p.life * 2, 0, 1); ctx.fillStyle = p.color; ctx.fillRect(q.x - 2 * q.s, q.y - 2 * q.s, 4 * q.s, 4 * q.s);
+  }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const f of floaters) {
@@ -3991,9 +4020,10 @@ function draw() {
     const pop = 1 + 0.5 * clamp((f.life - f.max + 0.15) / 0.15, 0, 1);
     font(700, 15 * f.size * pop);
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-    const x = f.screen ? f.sx : f.wx - R.worldX + HX;
-    if (f.splat) drawSplat(x, f.y, f.text, f.splat, f.size * (1 + 0.3 * clamp((f.life - f.max + 0.1) / 0.1, 0, 1)));
-    else outlined(f.text, x, f.y, f.color);
+    let x = f.screen ? f.sx : f.wx - R.worldX + HX, y = f.y;
+    if (G3.fp && !f.screen) { const q = G3.ov(x, y); if (!q) continue; x = q.x; y = q.y; }
+    if (f.splat) drawSplat(x, y, f.text, f.splat, f.size * (1 + 0.3 * clamp((f.life - f.max + 0.1) / 0.1, 0, 1)));
+    else outlined(f.text, x, y, f.color);
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'left';
   ctx.restore();
@@ -4735,8 +4765,9 @@ function htmlHiscores() {
 function applyGfx() {
   if (S.gfx !== '2d' && G3.ok === undefined) G3.ok = !!G3.init && G3.init(document.getElementById('scene3d'));
   G3.on = !!G3.ok && S.gfx !== '2d';
+  G3.fp = G3.on && S.gfx === 'fp';
   document.getElementById('view').classList.toggle('g3', G3.on);
-  const b = $('#gfx'); b.hidden = !window.THREE; b.textContent = G3.on ? '3D' : '2D';
+  const b = $('#gfx'); b.hidden = !window.THREE; b.textContent = G3.fp ? '👁️ 1st' : G3.on ? '3D' : '2D';
 }
 
 /* ================= 3D VIEW (OSRS look) ================= */
@@ -4749,7 +4780,7 @@ const G3 = (() => {
   if (!T) return api;
   const D = 10, CAM_Y = 4.2, CH = 32, BACK = 24;
   let renderer, scene, camera, hemi, sun, torch, fireLight, shadowGeo, shadowMat, glowTex;
-  let zoneKey = -1, ridge = null, lavaMat = null, ceiling = false;
+  let zoneKey = -1, ridge = null, lavaMat = null, ceiling = false, fpFloor = null, fogN = 0, fogF = 0;
   const chunks = new Map();
   const clearZ = [];   // [x0, x1, zBack] world areas kept free of scenery (ponds behind the road)
 
@@ -5192,6 +5223,10 @@ const G3 = (() => {
     const fogNear = th.decor === 'dead' ? D + 2 : D + 9;
     scene.fog = new T.Fog(th.cave ? '#000000' : th.sky[1], fogNear, D + BACK + 4);
     if (th.cave) scene.fog.color = C(mix(th.sky[1], '#000000', 0.3));
+    fogN = fogNear; fogF = D + BACK + 4;
+    // first person sees past the edge of the road strip: a wide plain continues the ground on both sides
+    if (!fpFloor) { fpFloor = new T.Mesh(new T.PlaneGeometry(400, 160), new T.MeshLambertMaterial({ color: '#000000' })); fpFloor.rotation.x = -Math.PI / 2; fpFloor.receiveShadow = true; scene.add(fpFloor); }
+    fpFloor.material.color = C(mix(palette(th).grass, '#000000', 0.12));
     hemi.color = C(th.warm ? '#ffd8b0' : th.cave ? '#b8a8d8' : th.lava ? '#ffd0b0' : '#ffffff');
     hemi.groundColor = C(th.cave ? '#1a1420' : th.lava ? '#4a1408' : '#4a4232');
     hemi.intensity = th.warm ? 0.75 : th.decor === 'mine' ? 0.8 : th.cave ? 0.5 : 0.8;
@@ -5210,10 +5245,11 @@ const G3 = (() => {
     if (z.home) { const k = homeSig(); if (k !== homeKey) { homeKey = k; for (const c of chunks.values()) { scene.remove(c); dispose(c); } chunks.clear(); } }
     const cx = R.worldX / U3, spread = (D + BACK) / D, half = W / 2 / U3;
     const mid = cx + (W / 2 - HX) / U3;
-    const lo = Math.floor((mid - half * spread - 2) / CH), hi = Math.floor((mid + half * spread + 2) / CH);
+    const lo = Math.floor((api.fp ? cx - 8 : mid - half * spread - 2) / CH), hi = Math.floor((api.fp ? cx + 64 : mid + half * spread + 2) / CH);
     for (const [ci, c] of chunks) if (ci < lo || ci > hi) { scene.remove(c); dispose(c); chunks.delete(ci); }
     for (let ci = lo; ci <= hi; ci++) if (!chunks.has(ci)) { const c = buildChunk(ci, z); c.children.forEach(m => { m.castShadow = m.material === chunkMat; m.receiveShadow = true; }); chunks.set(ci, c); scene.add(c); }
-    if (ridge) { const P = 200, rx = mid * 0.75; ridge.position.x = rx + Math.round((mid - rx) / P) * P; }
+    if (ridge) { const P = 200, rx = mid * 0.75; ridge.position.x = rx + Math.round((mid - rx) / P) * P; ridge.visible = !api.fp; }
+    if (fpFloor) { fpFloor.visible = api.fp; fpFloor.position.set(cx + 100, -0.12, 0); }
   }
 
   /* --- characters --- */
@@ -5395,7 +5431,7 @@ const G3 = (() => {
     return t;
   }
 
-  let heroObj = null, heroKey = '', petKey = '', heroZ = 0, heroYaw = -0.6;
+  let heroObj = null, heroKey = '', petKey = '', heroZ = 0, heroYaw = -0.6, fpYaw = 0, fpBack = 0, fpPitch = -0.06, vm = null, vmKey = '';
   function syncHero() {
     const gear = sl => S.equip[sl] ? ITEMS[S.equip[sl]] : null;
     const body = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield');
@@ -5451,15 +5487,48 @@ const G3 = (() => {
       else if (pose === 'crouch') { P.legF.rotation.z = m; P.legB.rotation.z = -m; P.armF.rotation.z = -0.8; }
       else if (pose === 'fall') p.rotation.z = 1.2;
     }
-    const tool = P.armF.children[2];
-    if (tool && tool.userData.glows) tool.userData.glows.forEach((g, i) => {
+    animTool(P.armF.children[2]);
+    if (heroObj.userData.aura) heroObj.userData.aura.material.opacity = 0.28 + 0.1 * Math.sin(time * 2.5);
+    const h = R.heroHit > 0.5 ? 0.45 : 0; flash(heroObj, h, 0, 0);
+    fpYaw += ((fishing ? 1.35 : 0) - fpYaw) * 0.08;
+    if (api.fp) { heroObj.visible = false; syncViewModel(body ? body.color || '#9aa0a8' : heroLook().shirt, hands && hands.color, shield && S.activity === 'combat' && wtype() === 'melee' ? shield : null, walking, dead); }
+    else if (vm) vm.visible = false;
+  }
+  function animTool(tool) {
+    if (!tool) return;
+    if (tool.userData.glows) tool.userData.glows.forEach((g, i) => {
       const k = 0.65 + 0.35 * Math.sin(time * 4 + i * 0.9); g.material.opacity = 0.8 * k;
       if (tool.userData.lv >= 10) { const s = g.userData.s * (0.85 + 0.3 * Math.abs(Math.sin(time * 7 + i * 2.3))); g.scale.set(s, s, 1); }
     });
-    if (heroObj.userData.aura) heroObj.userData.aura.material.opacity = 0.28 + 0.1 * Math.sin(time * 2.5);
-    if (tool && tool.userData.draw) tool.userData.draw(R.phase === 'act' && S.activity === 'combat' ? Math.max(0, 1 - R.swing * 1.6) : 0);
-    if (tool && tool.userData.segs) tool.userData.segs.forEach((sg, i) => { sg.rotation.z = Math.sin(time * 6 - i * 0.7) * 0.12 + R.swing * (i ? 0.35 : -0.6); });
-    const h = R.heroHit > 0.5 ? 0.45 : 0; flash(heroObj, h, 0, 0);
+    if (tool.userData.draw) tool.userData.draw(R.phase === 'act' && S.activity === 'combat' ? Math.max(0, 1 - R.swing * 1.6) : 0);
+    if (tool.userData.segs) tool.userData.segs.forEach((sg, i) => { sg.rotation.z = Math.sin(time * 6 - i * 0.7) * 0.12 + R.swing * (i ? 0.35 : -0.6); });
+  }
+  // first person: the right arm and whatever it holds hang in front of the camera, the left arm carries the shield
+  function syncViewModel(shirt, gloves, shield, walking, dead) {
+    const key = heroKey;
+    if (!vm || vmKey !== key) {
+      vmKey = key;
+      if (vm) { camera.remove(vm); dispose(vm); }
+      const look = heroLook(), arm = c => { const p = new T.Group(); p.add(box(0.15, 0.5, 0.15, c, 0, -0.25, 0), box(0.13, 0.12, 0.13, gloves || look.skin, 0, -0.55, 0)); return p; };
+      // the hero faces +x and the camera looks down -z: turning the rig a quarter turn lines the two up
+      vm = new T.Group(); vm.rotation.y = Math.PI / 2; vm.scale.setScalar(0.62);
+      const a = arm(shadeC(shirt, 0.06)), t = heroTool3(); if (t) a.add(t);
+      a.position.set(0, 0, 0.3); vm.add(a); vm.userData.arm = a;
+      if (shield) {
+        const b = arm(shadeC(shirt, -0.1)); b.position.set(0, 0, -0.3);
+        const sh = box(0.06, shield.kind === 'kiteshield' ? 0.62 : 0.46, 0.42, shield.color, 0.09, -0.5, 0); b.add(sh, box(0.07, 0.1, 0.1, shadeC(shield.color, 0.3), 0.12, -0.5, 0));
+        vm.add(b); vm.userData.armB = b;
+      }
+      vm.traverse(o => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 9; } });
+      camera.add(vm);
+    }
+    vm.visible = !dead;
+    const bob = walking ? Math.sin(time * 13) : 0;
+    vm.position.set(0.12 + 0.015 * bob, -0.2 - Math.abs(bob) * 0.02, -0.16);
+    const A = vm.userData.arm;
+    A.rotation.z = -heroArmAngle() + (S.activity === 'combat' ? { melee: 0.45, ranged: 0.1, magic: -0.15 }[wtype()] : /fishing|cooking|runecrafting|thieving/.test(S.activity) ? 0 : 0.85); A.rotation.x = 0.5;
+    animTool(A.children[2]);
+    if (vm.userData.armB) { vm.userData.armB.rotation.z = -0.9 + bob * 0.05; vm.userData.armB.rotation.x = -0.35; }
   }
 
   /* --- enemies --- */
@@ -6244,6 +6313,7 @@ const G3 = (() => {
     } catch (err) { return false; }
     scene = new T.Scene();
     camera = new T.PerspectiveCamera();
+    scene.add(camera);   // so the first person view model, a child of the camera, is drawn
     hemi = new T.HemisphereLight('#ffffff', '#4a4232', 0.8); scene.add(hemi);
     sun = new T.DirectionalLight('#fff4e0', 0.65); sun.position.set(-4, 10, 7); scene.add(sun, sun.target);
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
@@ -6274,16 +6344,47 @@ const G3 = (() => {
   api.render = (shx, shy) => {
     syncChunks(); syncHero(); syncEnt(); syncFlyers(); syncEvents();
     // centre the camera on the screen and skew nothing: z = 0 maps 1:1 onto the 2D overlay
-    const n = 0.5, k = n / D, half = W / 2 / U3;
-    camera.position.set(R.worldX / U3 + (W / 2 - HX) / U3 - shx / U3, CAM_Y + shy / U3, D);
-    camera.projectionMatrix.makePerspective(-half * k, half * k, (GY / U3 - CAM_Y) * k, ((GY - H) / U3 - CAM_Y) * k, n, 200);
-    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    let sx;
+    if (api.fp) {
+      // first person: eyes at head height, a slight bob while walking, a fall on death
+      const hp = heroObj.position, dead = R.phase === 'dead', walking = R.phase === 'walk', e = R.ent;
+      // at work the eyes step half a pace back and look down at the target, which stands close to the hero
+      const near = e && !walking && !dead && fpYaw < 0.3 && e.kind !== 'obstacle';
+      const back = near ? 1.1 : 0, eye = dead ? 0.45 : 1.58 + hp.y + (walking ? Math.sin(time * 13) * 0.035 : 0);
+      let pitch = -0.06;
+      if (near) { const ty = (e.kind === 'enemy' ? entHeight(e) * 0.55 : 45) / U3, dx = Math.max(0.6, e.x / U3 - (hp.x - back)); pitch = clamp(Math.atan2(ty - eye, dx) * 0.8, -0.5, 0.1); }
+      else if (fpYaw > 0.3) pitch = -0.28;
+      fpBack += (back - fpBack) * 0.05; fpPitch += (pitch - fpPitch) * 0.06;
+      camera.position.set(hp.x - fpBack + shx / U3 * 0.3, eye + shy / U3 * 0.3, hp.z);
+      camera.rotation.set(fpPitch, fpYaw - Math.PI / 2 + 0.06, dead ? 0.9 : walking ? Math.sin(time * 6.5) * 0.008 : 0, 'YXZ');
+      camera.fov = W < H * 2 ? 72 : 62; camera.aspect = W / H; camera.near = 0.05; camera.far = 200; camera.updateProjectionMatrix();
+      scene.fog.near = Math.max(4, fogN - D - 4); scene.fog.far = 62;
+      sx = Math.round((hp.x + 14) * 40) / 40;
+    } else {
+      const n = 0.5, k = n / D, half = W / 2 / U3;
+      camera.rotation.set(0, 0, 0);
+      camera.position.set(R.worldX / U3 + (W / 2 - HX) / U3 - shx / U3, CAM_Y + shy / U3, D);
+      camera.projectionMatrix.makePerspective(-half * k, half * k, (GY / U3 - CAM_Y) * k, ((GY - H) / U3 - CAM_Y) * k, n, 200);
+      camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+      if (scene.fog) { scene.fog.near = fogN; scene.fog.far = fogF; }
+      // the sun follows the view, snapped to whole shadow texels so shadows don't shimmer while walking
+      sx = Math.round((R.worldX / U3 + (W / 2 - HX) / U3) * 40) / 40;
+    }
     torch.position.set(R.worldX / U3 + 0.6, 2.6, 1.6);
-    // the sun follows the view, snapped to whole shadow texels so shadows don't shimmer while walking
-    const sx = Math.round((R.worldX / U3 + (W / 2 - HX) / U3) * 40) / 40;
     sun.target.position.set(sx, 0, -8); sun.position.set(sx - 7, 14, 4);
     if (lavaMat) { const p = 0.85 + 0.15 * Math.sin(time * 3); lavaMat.color.setRGB(p, p, p); }
     renderer.render(scene, camera);
+  };
+  // first person: where a point of the 2D overlay (road x, height above GY) lands on screen; s scales text with distance
+  const pv = T.Vector3 ? new T.Vector3() : null;
+  api.ov = (x, y) => {
+    if (!api.fp) return { x, y, s: 1 };
+    pv.set((x - HX + R.worldX) / U3, (GY - y) / U3, 0);
+    const d = pv.x - camera.position.x;
+    if (d < 1.2 && fpYaw < 0.3) return { x: W / 2 + (x - HX) * 0.6, y: H * 0.42 + (y - GY + 60) * 0.5, s: 1 };   // things at the hero: near the crosshair
+    pv.project(camera);
+    if (pv.z > 1) return null;
+    return { x: (pv.x + 1) / 2 * W, y: (1 - pv.y) / 2 * H, s: clamp(5 / Math.max(1, d), 0.5, 1.6) };
   };
   return api;
 })();
@@ -7418,7 +7519,7 @@ document.addEventListener('click', ev => {
     case 'rup': buyRup(id); break;
     case 'gtier': S.gsel[S.activity] = +id; resetEncounter(); break;
     case 'mute': S.muted = !S.muted; b.textContent = S.muted ? '🔇' : '🔊'; break;
-    case 'gfx': S.gfx = G3.on ? '2d' : '3d'; applyGfx(); save(); break;
+    case 'gfx': S.gfx = G3.fp ? '2d' : G3.on ? 'fp' : '3d'; applyGfx(); save(); break;
     case 'export': {
       const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
       openModal(`<h2>📤 Export save</h2><p class="muted">Copy this code and keep it somewhere safe, or paste it into the game on another device.</p>
@@ -7476,7 +7577,7 @@ function canvasPoint(ev) {
   return { x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H };
 }
 function eventAt(p, slop) {
-  return R.events.find(ev => { const q = evScreen(ev); return Math.hypot(q.x - p.x, q.y - p.y) < slop; });
+  return R.events.find(ev => { const q = evView(ev); return q && Math.hypot(q.x - p.x, q.y - p.y) < (G3.fp ? slop * 1.6 : slop); });
 }
 canvas.addEventListener('pointerdown', ev => {
   const hit = eventAt(canvasPoint(ev), ev.pointerType === 'mouse' ? 36 : 54);
