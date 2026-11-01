@@ -3149,7 +3149,7 @@ const seg = (u, a, b) => clamp((u - a) / (b - a), 0, 1);
 const NETO = { H: 2.2, A: 1.4 }, ROPE = { len: 1.5, top: 3.35, arm: 1.78, swing: 0.8 }, ZIP = { y0: 3.4, y1: 1.9 }, ARM = 1.78;
 const ropeA = u => (seg(u, 0.15, 0.85) - 0.5) * 2 * ROPE.swing;
 const OBS = {
-  hurdles: { name: 'Hurdles',          L: 200, d: 2.0, lift: u => hopY(u, [], 0) + 34 * Math.abs(Math.sin(u * Math.PI * 3)), pose: 'jump' },
+  hurdles: { name: 'Hurdles',          L: 200, d: 2.0, lift: u => 34 * Math.abs(Math.sin(u * Math.PI * 3)), pose: u => Math.abs(Math.sin(u * Math.PI * 3)) < 0.35 ? 'walk' : 'jump' },
   log:     { name: 'Balance log',      L: 160, d: 3.0, lift: u => 20 * Math.min(1, u * 10, (1 - u) * 10), pose: 'balance' },
   wall:    { name: 'Climbing wall',    L: 120, d: 2.8,
     path: u => [u < 0.08 ? 0.36 * u / 0.08 : u < 0.45 ? 0.36 : u < 0.6 ? lerp(0.36, 1.25, seg(u, 0.45, 0.6)) : u < 0.75 ? lerp(1.25, 1.75, seg(u, 0.6, 0.75)) : lerp(1.75, 3, seg(u, 0.75, 1)),
@@ -6362,7 +6362,8 @@ const G3 = (() => {
     const sw = walking ? Math.sin(time * 13) * 0.6 : 0;
     // fishing: walk down the jetty behind the road and face the water
     const fishing = R.phase === 'act' && R.ent && R.ent.kind === 'pond';
-    heroZ += ((fishing ? -3.1 : 0) - heroZ) * 0.06; heroYaw += ((fishing ? 1.35 : -0.6) - heroYaw) * 0.08;
+    heroZ += ((fishing ? -3.1 : 0) - heroZ) * 0.06; const chop = R.phase === 'act' && R.ent && R.ent.kind === 'tree';   // turn a little towards the trunk to swing at it
+    heroYaw += ((fishing ? 1.35 : chop ? 0.25 : -0.6) - heroYaw) * 0.08;
     const stepping = walking || Math.abs(heroZ - (fishing ? -3.1 : 0)) > 0.15;
     heroObj.position.set((R.worldX - R.heroHit * 5 - (dead ? 30 : 0)) / U3, stepping ? Math.abs(Math.sin(time * 13)) * 0.05 + (fishing && heroZ < -1.4 ? 0.1 : 0) : fishing && heroZ < -1.4 ? 0.1 : 0, heroZ);
     p.rotation.y = heroYaw;
@@ -6972,9 +6973,9 @@ const G3 = (() => {
       t.add(at(mk(new T.IcosahedronGeometry(0.42, 0), lam(shade(c, 0.08))), -0.15, 3.0, 0.25));
       if (e.tier === 2) for (let k = 0; k < 7; k++) t.add(box(0.1, 0.1, 0.1, '#f0a040', -0.7 + hash(k) * 1.4, 2.0 + hash(k + 3) * 1.2, 0.6 + hash(k + 5) * 0.3));
       if (e.tier === 4) { P.spark = group(); for (let k = 0; k < 6; k++) P.spark.add(mk(new T.OctahedronGeometry(0.06, 0), unlit('#f6e3ff'))); t.add(P.spark); }
-      t.position.z = -0.9;   // the trunk stands just behind the hero's swing, never in front of it
+      t.position.set(-0.45, 0, -0.6);   // the trunk stands just behind the hero, within reach of the axe, never in front of it
       g.add(t); P.t = t;
-      g.add(at(shadow(0.9), 0, 0, -0.9));
+      g.add(at(shadow(0.9), -0.45, 0, -0.6));
       fxInit(g, P, '#d8a868');
       P.prod = itemMesh('log' + e.tier); P.prod.visible = false; P.fx.add(P.prod);
       P.leaves = []; for (let k = 0; k < 10; k++) { const l = box(0.12, 0.02, 0.08, k & 1 ? c : shade(c, -0.1)); l.visible = false; P.leaves.push(l); P.fx.add(l); }
@@ -7355,8 +7356,8 @@ const G3 = (() => {
       }
       case 'wall':
         // a timber climbing wall with hand holds on the side the hero comes from
-        g.add(box(0.6, 1.7, 1.8, '#8a8478', Lu * 0.3, 0.85, 0), box(0.68, 0.08, 1.9, '#6a6458', Lu * 0.3, 1.72, 0));
-        for (let k = 0; k < 6; k++) g.add(box(0.1, 0.1, 0.22, ['#c8a060', '#d84a4a', '#4a8ad8'][k % 3], Lu * 0.3 - 0.33, 0.25 + k * 0.26, (k & 1 ? 0.25 : -0.25)));
+        g.add(box(0.6, 1.7, 1.0, '#8a8478', Lu * 0.3, 0.85, -0.25), box(0.68, 0.08, 1.1, '#6a6458', Lu * 0.3, 1.72, -0.25));
+        for (let k = 0; k < 6; k++) g.add(box(0.1, 0.1, 0.2, ['#c8a060', '#d84a4a', '#4a8ad8'][k % 3], Lu * 0.3 - 0.33, 0.25 + k * 0.26, (k & 1 ? 0.12 : -0.3)));
         break;
       case 'gap':
         pit(g, Lu, Lu * 0.2, Lu * 0.8);
