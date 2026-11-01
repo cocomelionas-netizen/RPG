@@ -358,7 +358,7 @@
 </head>
 <body>
 <header>
-  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D, first person and 2D graphics" hidden>3D</button><button id="install" data-a="install" hidden>⬇️ Install</button></h1>
+  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button><button id="install" data-a="install" hidden>⬇️ Install</button></h1>
   <span class="stat" id="gold">Gold: <b>0</b></span>
   <span class="stat" id="cmb">Combat level: <b>1</b></span>
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
@@ -3862,6 +3862,24 @@ function outlined(text, x, y, color) {
 }
 function font(weight, px) { ctx.font = `${weight} ${Math.round(px * FS)}px system-ui, sans-serif`; }
 
+// the hero's name over its head, in the bought name colour, with the chosen title under it
+const NC_HEX = { gold: '#f2c94c', ruby: '#ff5a6a', emerald: '#4ae08a', sapphire: '#5aa8ff', amethyst: '#c58bff' };
+function drawNameTag() {
+  if (R.phase === 'dead') return;
+  const name = me ? me.name : 'You', t = S.title && TITLES.find(x => x.id === S.title), nc = S.cos && S.cos.nc;
+  const y = GY - 100 - (t ? 11 * FS : 0);
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  font(700, 13); ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  let fill = NC_HEX[nc] || '#ffffff';
+  if (nc === 'rainbow') {
+    const w = ctx.measureText(name).width, g = ctx.createLinearGradient(HX - w / 2, 0, HX + w / 2, 0), sh = (time * 0.3) % 1;
+    ['#ff5a5a', '#ffb84a', '#f2e24a', '#5ae07a', '#5aa8ff', '#c58bff'].forEach((c, i) => g.addColorStop(((i / 6) + sh) % 1, c));
+    fill = g;
+  }
+  ctx.strokeText(name, HX, y); ctx.fillStyle = fill; ctx.fillText(name, HX, y);
+  if (t) { font(600, 10); ctx.lineWidth = 3; ctx.strokeText(t.name, HX, y + 12 * FS); ctx.fillStyle = '#ffe9a8'; ctx.fillText(t.name, HX, y + 12 * FS); }
+  ctx.restore();
+}
 function drawHud() {
   if (S.hp < maxHp() * 0.3 && R.phase === 'act' && R.ent && R.ent.kind === 'enemy') {
     const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.6);
@@ -3906,7 +3924,8 @@ function drawHud() {
 
   // first person: the hero's bars sit at the bottom centre of the view instead of over the head
   ctx.save(); if (G3.fp) { ctx.translate(W / 2 - HX, H - 16 - (GY - 82)); ctx.scale(1, 1); }
-  if (inWild() && S.wild.skull) { font(400, 16); ctx.textAlign = 'center'; ctx.fillText('☠️', HX, GY - 108); ctx.textAlign = 'left'; }
+  if (!G3.fp) drawNameTag();
+  if (inWild() && S.wild.skull) { font(400, 16); ctx.textAlign = 'center'; ctx.fillText('☠️', HX, GY - 124 * (FS > 1 ? 1.15 : 1)); ctx.textAlign = 'left'; }
   // hero HP + food left
   bar(HX - 25, GY - 92, 50, 6, S.hp / maxHp(), R.eatFlash > 0 ? '#b6ffb0' : '#5fd35f');
   if (S.activity === 'combat') {
@@ -4765,6 +4784,7 @@ function htmlHiscores() {
 }
 
 function applyGfx() {
+  if (S.gfx === 'fp') S.gfx = '3d';   // the third person view shows off the hero's gear and looks
   if (S.gfx !== '2d' && G3.ok === undefined) G3.ok = !!G3.init && G3.init(document.getElementById('scene3d'));
   G3.on = !!G3.ok && S.gfx !== '2d';
   G3.fp = G3.on && S.gfx === 'fp';
@@ -7903,7 +7923,7 @@ document.addEventListener('click', ev => {
     case 'rup': buyRup(id); break;
     case 'gtier': S.gsel[S.activity] = +id; resetEncounter(); break;
     case 'mute': S.muted = !S.muted; b.textContent = S.muted ? '🔇' : '🔊'; break;
-    case 'gfx': S.gfx = G3.fp ? '2d' : G3.on ? 'fp' : '3d'; applyGfx(); save(); break;
+    case 'gfx': S.gfx = G3.on ? '2d' : '3d'; applyGfx(); save(); break;
     case 'export': {
       const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
       openModal(`<h2>📤 Export save</h2><p class="muted">Copy this code and keep it somewhere safe, or paste it into the game on another device.</p>
