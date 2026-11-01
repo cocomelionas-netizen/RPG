@@ -24,3 +24,11 @@ Pasaulis (kelias, 5 zonos, medžiai, uolos, tvenkiniai) sukuriamas kodu paleidus
 - 22 įgūdžiai, XP kreivė kaip web žaidime (dabar treniruojami 3).
 - Išsaugojimas: DataStore + session lock (UpdateAsync), autosave kas 60 s, BindToClose.
 - Offline progresas: išeik **kol renki** – grįžus gausi tai, ką herojus būtų surinkęs (iki 12 val.).
+
+## 2 dalis: namas (pradžia)
+
+- **Hometown** už starto (X < 0): 12 sklypų, įėjus gauni savo (lentelė su tavo vardu). Mygtukas 🏡 Go home / 🛣️ To road.
+- **Workbench** sklype: lentos iš rąstų, vinys iš rūdos. Herojus dirba pats, veikia ir offline, kol užtenka žaliavų.
+- **Construction** įgūdis ir 6 kambariai po 5 lygius (🏠 House langas): greitesnis renkimas, ilgesnis offline, daugiau aukso pardavus.
+- Visas planas (kova, Wraith Caves PvP, Robux) – `DESIGN.md`.
+- Emoji: naudok tik senesnius (iki Unicode 12). 🪙 🪵 🪨 ✕ Roblox šriftuose rodomi kaip kvadratėliai.

@@ -9,5 +9,6 @@ These rules override the root CLAUDE.md for any work on the Roblox version:
 - Rojo project: `default.project.json`, `src/server`, `src/client`, `src/shared`. Test in Roblox Studio via `rojo serve`.
 - Never ask for passwords, tokens or API keys in chat.
 - LICENSE: all rights reserved.
-- Plan: 1) road, gathering, bag, XP, DataStore saves, offline progress (done) 2) combat, enemies, weapons, armour
-  3) crafting skills, quests, agility 4) house, pets, PvP, clans, Robux shop.
+- Plan (see DESIGN.md): 1) road, gathering, saves, offline (done) 2) house: Construction, Hometown plots, rooms (started)
+  3) combat + Wraith Caves PvP 4) Robux shop (gamepasses, boosts, gems, pets, enchants) 5) quests, agility, clans.
+- Test with the Roblox Studio MCP (start_stop_play, execute_luau, get_console_output). Use emoji up to Unicode 12 only.

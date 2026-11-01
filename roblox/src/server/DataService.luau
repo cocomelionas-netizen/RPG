@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Skills = require(Shared.Skills)
 local XP = require(Shared.XP)
 local Items = require(Shared.Items)
+local Construction = require(Shared.Construction)
 local Remotes = require(Shared.Remotes)
 
 local DataService = {}
@@ -50,6 +51,7 @@ local function defaultData()
 		inv = {},
 		gold = 0,
 		tools = { axe = 0, pick = 0, rod = 0 },
+		home = { rooms = {} }, -- [roomId] = level 1..5
 		activity = nil, -- { skill, tier } while gathering: used for offline progress
 		lastSeen = 0,
 		created = os.time(),
@@ -83,6 +85,14 @@ local function reconcile(data)
 			data.tools[t] = 0
 		end
 	end
+	if type(data.home) ~= "table" or type(data.home.rooms) ~= "table" then
+		data.home = def.home
+	end
+	for id, t in data.home.rooms do
+		if not Construction.byId[id] or type(t) ~= "number" then
+			data.home.rooms[id] = nil
+		end
+	end
 	for k, v in def.stats do
 		if data.stats[k] == nil then
 			data.stats[k] = v
@@ -112,7 +122,7 @@ end
 
 -- client view of the save (no lock / internal fields)
 function DataService.view(data)
-	return { skills = data.skills, inv = data.inv, gold = data.gold, tools = data.tools, memoryOnly = memoryOnly }
+	return { skills = data.skills, inv = data.inv, gold = data.gold, tools = data.tools, rooms = data.home.rooms, memoryOnly = memoryOnly }
 end
 
 function DataService.sync(player: Player)

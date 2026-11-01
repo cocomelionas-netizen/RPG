@@ -4,9 +4,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local G = require(Shared.Gathering)
 local Items = require(Shared.Items)
+local Construction = require(Shared.Construction)
 local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local GatherService = require(script.Parent.GatherService)
+local HomeService = require(script.Parent.HomeService)
 
 local ShopService = {}
 
@@ -16,6 +18,11 @@ local function fmt(n: number): string
 	local s = tostring(math.floor(n))
 	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
 	return (out:gsub("^,", ""))
+end
+
+-- gold for n of an item, with the Treasury bonus
+local function worth(data, it, n: number): number
+	return math.floor(n * it.value * (1 + Construction.bonus(data.home.rooms, "sell") / 100))
 end
 
 local function sell(player: Player, id, amount)
@@ -32,7 +39,7 @@ local function sell(player: Player, id, amount)
 	if n <= 0 then
 		return
 	end
-	local gold = n * Items[id].value
+	local gold = worth(data, Items[id], n)
 	DataService.addItem(player, id, -n)
 	DataService.addGold(player, gold)
 	DataService.sync(player)
@@ -48,7 +55,7 @@ local function sellAll(player: Player)
 	for id, n in data.inv do
 		local it = Items[id]
 		if it and (it.type == "Resources" or it.type == "Ores") then
-			gold += n * it.value
+			gold += worth(data, it, n)
 			count += n
 			data.inv[id] = nil
 		end
@@ -63,7 +70,7 @@ end
 
 local function upgrade(player: Player, tool)
 	local data = DataService.get(player)
-	if not data or type(tool) ~= "string" or not G.TOOL_NAMES[tool] then
+	if not data or type(tool) ~= "string" or not table.find(G.TOOL_ORDER, tool) then
 		return
 	end
 	local lvl = data.tools[tool]
@@ -96,6 +103,12 @@ function ShopService.init()
 			upgrade(player, a)
 		elseif action == "stop" then
 			GatherService.stop(player, "player")
+		elseif action == "craft" then
+			HomeService.craft(player, a)
+		elseif action == "build" then
+			HomeService.build(player, a)
+		elseif action == "home" then
+			HomeService.teleport(player, a == "road" and "road" or "home")
 		end
 	end)
 	game:GetService("Players").PlayerRemoving:Connect(function(player)

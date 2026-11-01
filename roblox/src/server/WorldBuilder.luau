@@ -342,7 +342,8 @@ local function placeNodes(parent, scenery, index, rng)
 end
 
 -- ===================== the whole road =====================
-function WorldBuilder.build()
+-- westX: where the world starts (Hometown lies between westX and 0)
+function WorldBuilder.build(westX: number)
 	for _, name in { "Baseplate", "SpawnLocation", "World" } do
 		local old = Workspace:FindFirstChild(name)
 		while old do
@@ -399,9 +400,10 @@ function WorldBuilder.build()
 	local function wall(cf, size)
 		part({ Name = "Wall", Size = size, CFrame = cf, Transparency = 1, CanCollide = true, Parent = world })
 	end
-	wall(CFrame.new(total / 2, 40, -W / 2), Vector3.new(total, 90, 2))
-	wall(CFrame.new(total / 2, 40, W / 2), Vector3.new(total, 90, 2))
-	wall(CFrame.new(-1, 40, 0), Vector3.new(2, 90, W))
+	local span = total - westX
+	wall(CFrame.new(westX + span / 2, 40, -W / 2), Vector3.new(span, 90, 2))
+	wall(CFrame.new(westX + span / 2, 40, W / 2), Vector3.new(span, 90, 2))
+	wall(CFrame.new(westX - 1, 40, 0), Vector3.new(2, 90, W))
 	wall(CFrame.new(total + 1, 40, 0), Vector3.new(2, 90, W))
 
 	-- end of the road (for now)

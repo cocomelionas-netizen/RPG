@@ -1,4 +1,5 @@
--- Woodcutting, mining and fishing: the hero keeps working a node until told to stop or walking away.
+-- Woodcutting, mining, fishing and workbench crafting: the hero keeps working a node until told to stop or walking away.
+-- Workbench recipes (skill "construction") use up inputs and stop when they run out.
 -- Also handles offline (idle) progress for whatever the hero was doing when they left.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -69,7 +70,27 @@ local function swing(tool: Tool?)
 	end
 end
 
--- reason: "player" (pressed stop), "moved", "switch", "leave", "dead"
+-- how many times the recipe's inputs are in the bag (math.huge for plain gathering)
+local function timesAffordable(data, info): number
+	if not info.inputs then
+		return math.huge
+	end
+	local n = math.huge
+	for id, need in info.inputs do
+		n = math.min(n, math.floor((data.inv[id] or 0) / need))
+	end
+	return n
+end
+
+local function missingText(info): string
+	local parts = {}
+	for id, need in info.inputs do
+		table.insert(parts, ("%d %s"):format(need, Items[id].name))
+	end
+	return table.concat(parts, " + ")
+end
+
+-- reason: "player" (pressed stop), "moved", "switch", "leave", "dead", "nomats"
 -- only "leave" keeps data.activity, so leaving while gathering keeps earning offline
 -- (dying clears it: otherwise you could die at a node, walk off and still earn offline)
 function GatherService.stop(player: Player, reason: string?)
@@ -96,8 +117,14 @@ local function grant(player: Player, st)
 	if not data then
 		return
 	end
+	if info.inputs then
+		for id, need in info.inputs do
+			DataService.addItem(player, id, -need)
+		end
+	end
+	local out = info.out or 1
 	local before, after = DataService.addXp(player, st.skill, info.xp)
-	DataService.addItem(player, info.item, 1)
+	DataService.addItem(player, info.item, out)
 	data.stats.actions += 1
 	DataService.sync(player)
 	Remotes.Gathered:FireClient(player, {
@@ -105,27 +132,36 @@ local function grant(player: Player, st)
 		skill = st.skill,
 		xp = info.xp,
 		item = info.item,
+		count = out,
 		levelUp = after > before and after or nil,
 	})
 end
 
-function GatherService.start(player: Player, node: Model)
+-- tier: only for workbenches, where the player picks the recipe; other nodes carry their own tier
+function GatherService.start(player: Player, node: Model, tier: number?)
 	local data = DataService.get(player)
 	if not data or not node or not node.Parent then
 		return
 	end
-	local skill, tier = node:GetAttribute("Skill"), node:GetAttribute("Tier")
-	local info = skill and G.node(skill, tier)
+	local skill = node:GetAttribute("Skill")
+	if skill ~= "construction" then
+		tier = node:GetAttribute("Tier")
+	end
+	local info = skill and type(tier) == "number" and G.node(skill, tier)
 	if not info then
 		return
 	end
 	local current = active[player]
-	if current and current.node == node then
+	if current and current.node == node and current.tier == tier then
 		return
 	end
 	local lvl = DataService.level(player, skill)
 	if lvl < info.req then
-		Remotes.Notify:FireClient(player, ("You need %s level %d to %s here."):format(Skills.byId[skill].name, info.req, G.VERB[skill]:lower()), "warn")
+		Remotes.Notify:FireClient(player, ("You need %s level %d to %s %s."):format(Skills.byId[skill].name, info.req, G.VERB[skill]:lower(), skill == "construction" and info.name or "here"), "warn")
+		return
+	end
+	if timesAffordable(data, info) < 1 then
+		Remotes.Notify:FireClient(player, ("You need %s to make %s."):format(missingText(info), info.name), "warn")
 		return
 	end
 	local hrp = root(player)
@@ -147,7 +183,12 @@ function GatherService.start(player: Player, node: Model)
 
 	task.spawn(function()
 		while active[player] == st do
-			local duration = G.actionTime(skill, tier, data.tools[G.TOOL_OF[skill]])
+			if timesAffordable(data, info) < 1 then
+				Remotes.Notify:FireClient(player, ("Out of materials for %s."):format(info.name), "warn")
+				GatherService.stop(player, "nomats")
+				return
+			end
+			local duration = G.actionTime(skill, tier, data.tools[G.TOOL_OF[skill]], data.home.rooms)
 			Remotes.ActionState:FireClient(player, {
 				active = true, node = node, skill = skill, tier = tier,
 				name = info.name, item = info.item, duration = duration,
@@ -199,27 +240,39 @@ local function applyOffline(player: Player, data, seconds: number)
 		data.activity = nil
 		return
 	end
-	local counted = math.min(seconds, G.OFFLINE_CAP)
-	local each = G.actionTime(act.skill, act.tier, data.tools[G.TOOL_OF[act.skill]])
-	local n = math.floor(counted / each)
+	local cap = G.offlineCap(data.home.rooms)
+	local counted = math.min(seconds, cap)
+	local each = G.actionTime(act.skill, act.tier, data.tools[G.TOOL_OF[act.skill]], data.home.rooms)
+	-- a workbench stops when the materials run out
+	local n = math.min(math.floor(counted / each), timesAffordable(data, info))
+	-- they are no longer standing at the node
+	data.activity = nil
 	if n <= 0 then
 		return
 	end
+	if info.inputs then
+		for id, need in info.inputs do
+			data.inv[id] -= need * n
+			if data.inv[id] <= 0 then
+				data.inv[id] = nil
+			end
+		end
+	end
+	local out = n * (info.out or 1)
 	local before = XP.levelFromXp(data.skills[act.skill])
 	data.skills[act.skill] = math.min(data.skills[act.skill] + n * info.xp, 200000000)
 	local after = XP.levelFromXp(data.skills[act.skill])
-	data.inv[info.item] = (data.inv[info.item] or 0) + n
+	data.inv[info.item] = (data.inv[info.item] or 0) + out
 	data.stats.actions += n
 	data.stats.offlineSeconds += counted
-	-- they are no longer standing at the node
-	data.activity = nil
 	task.delay(2, function()
 		if player.Parent then
 			Remotes.Offline:FireClient(player, {
-				seconds = seconds, counted = counted, cap = G.OFFLINE_CAP,
+				seconds = seconds, counted = counted, cap = cap,
 				skill = act.skill, verb = G.VERB_ING[act.skill], node = info.name,
-				actions = n, xp = n * info.xp, item = info.item, itemName = Items[info.item].name,
+				actions = out, xp = n * info.xp, item = info.item, itemName = Items[info.item].name,
 				levelBefore = before, levelAfter = after,
+				ranOut = info.inputs ~= nil and n < math.floor(counted / each),
 			})
 		end
 	end)

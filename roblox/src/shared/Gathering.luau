@@ -1,5 +1,7 @@
 -- Gathering numbers ported from the web game (GATHER_REQ/TIME/XP, ORES, TOOL_COST ...)
 -- Tiers are 0-based like in the web game.
+local Construction = require(script.Parent.Construction)
+
 local G = {}
 
 G.GATHER_REQ = { [0] = 1, 15, 30, 50, 70 }
@@ -26,12 +28,12 @@ G.METAL_COLORS = { [0] = "#b07a45", "#8a8f98", "#b8bec8", "#5a68b8", "#4a9a5a", 
 -- tool upgrades: level 0 (Bronze) .. 4 (Verdite); each level is 12% faster
 G.TOOL_COST = { [0] = 300, 3000, 20000, 80000 }
 G.TOOL_MAX = 4
-G.TOOL_NAMES = { axe = "Axe", pick = "Pickaxe", rod = "Fishing Rod" }
-G.TOOL_OF = { woodcutting = "axe", mining = "pick", fishing = "rod" }
+G.TOOL_NAMES = { axe = "Axe", pick = "Pickaxe", rod = "Fishing Rod", saw = "Saw" }
+G.TOOL_OF = { woodcutting = "axe", mining = "pick", fishing = "rod", construction = "saw" }
 G.TOOL_ORDER = { "axe", "pick", "rod" }
 
-G.VERB = { woodcutting = "Chop", mining = "Mine", fishing = "Fish" }
-G.VERB_ING = { woodcutting = "Chopping", mining = "Mining", fishing = "Fishing" }
+G.VERB = { woodcutting = "Chop", mining = "Mine", fishing = "Fish", construction = "Make" }
+G.VERB_ING = { woodcutting = "Chopping", mining = "Mining", fishing = "Fishing", construction = "Making" }
 
 -- idle: how much time away from the game still counts (web base cap is 12h)
 G.OFFLINE_CAP = 12 * 3600
@@ -50,13 +52,23 @@ function G.node(skill: string, tier: number)
 		return { name = G.TREE_N[tier], req = G.GATHER_REQ[tier], time = G.GATHER_TIME[tier], xp = G.GATHER_XP[tier], item = "log" .. tier }
 	elseif skill == "fishing" then
 		return { name = G.FISH_N[tier] .. " Spot", req = G.GATHER_REQ[tier], time = G.GATHER_TIME[tier], xp = G.GATHER_XP[tier], item = "fish" .. tier }
+	elseif skill == "construction" then
+		-- workbench recipes also have inputs and can make more than one item at a time
+		return Construction.RECIPES[tier]
 	end
 	return nil
 end
 
-function G.actionTime(skill: string, tier: number, toolLevel: number): number
+-- seconds per action: tools are 12% faster per level, house rooms add a speed bonus on top
+function G.actionTime(skill: string, tier: number, toolLevel: number, rooms): number
 	local n = G.node(skill, tier)
-	return n.time * (1 - 0.12 * (toolLevel or 0))
+	local roomBonus = Construction.bonus(rooms, "speed", skill)
+	return n.time * (1 - 0.12 * (toolLevel or 0)) / (1 + roomBonus / 100)
+end
+
+-- how many hours of offline progress count (12h plus the Bedroom)
+function G.offlineCap(rooms): number
+	return G.OFFLINE_CAP + Construction.bonus(rooms, "offline") * 3600
 end
 
 return G

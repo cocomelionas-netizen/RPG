@@ -77,7 +77,7 @@ end)
 Remotes.Gathered.OnClientEvent:Connect(function(g)
 	local s = Skills.byId[g.skill]
 	emit(g.node, 14)
-	UI.floatText(("+%d XP %s   +1 %s"):format(g.xp, s.icon, Items[g.item].icon), Color3.fromRGB(150, 230, 150))
+	UI.floatText(("+%d XP %s   +%d %s"):format(g.xp, s.icon, g.count or 1, Items[g.item].icon), Color3.fromRGB(150, 230, 150))
 	if g.levelUp then
 		UI.banner("Level up!", ("%s %s is now level %d"):format(s.icon, s.name, g.levelUp))
 		local sound = Instance.new("Sound")
@@ -87,6 +87,10 @@ Remotes.Gathered.OnClientEvent:Connect(function(g)
 		sound:Play()
 		game:GetService("Debris"):AddItem(sound, 3)
 	end
+end)
+
+Remotes.OpenCraft.OnClientEvent:Connect(function()
+	UI.showPanel("craft")
 end)
 
 Remotes.Offline.OnClientEvent:Connect(function(o)

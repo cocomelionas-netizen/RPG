@@ -28,7 +28,7 @@ local function attach(handle, p, offset)
 	p.Parent = handle.Parent
 end
 
--- kind: "axe" | "pick" | "rod"; level: 0..4 (metal tier)
+-- kind: "axe" | "pick" | "rod" | "saw"; level: 0..4 (metal tier)
 function ToolFactory.make(kind: string, level: number): Tool
 	local metal = Color3.fromHex(G.METAL_COLORS[level] or G.METAL_COLORS[0])
 	local wood = Color3.fromRGB(120, 80, 45)
@@ -39,12 +39,15 @@ function ToolFactory.make(kind: string, level: number): Tool
 	tool.RequiresHandle = true
 	tool:SetAttribute("EndlessRoadTool", true)
 
-	local len = kind == "rod" and 6 or 3
+	local len = kind == "rod" and 6 or kind == "saw" and 1.2 or 3
 	local handle = part("Handle", Vector3.new(0.3, len, 0.3), wood, Enum.Material.Wood)
 	handle.CFrame = CFrame.new(0, 50, 0)
 	handle.Parent = tool
 
-	if kind == "axe" then
+	if kind == "saw" then
+		attach(handle, part("Blade", Vector3.new(0.08, 0.9, 2.6), metal, Enum.Material.Metal), CFrame.new(0, 0.2, -1.4))
+		tool.Grip = CFrame.new(0, -0.3, 0)
+	elseif kind == "axe" then
 		attach(handle, part("Head", Vector3.new(0.25, 0.8, 1.1), metal, Enum.Material.Metal), CFrame.new(0, len / 2 - 0.4, -0.5))
 		tool.Grip = CFrame.new(0, -1, 0)
 	elseif kind == "pick" then

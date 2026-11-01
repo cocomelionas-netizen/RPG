@@ -8,6 +8,7 @@ local Skills = require(Shared.Skills)
 local XP = require(Shared.XP)
 local Items = require(Shared.Items)
 local G = require(Shared.Gathering)
+local Construction = require(Shared.Construction)
 
 local player = Players.LocalPlayer
 local UI = {}
@@ -127,14 +128,14 @@ local function pill(icon)
 	local f = new("Frame", { BackgroundColor3 = C.panel, BackgroundTransparency = 0.15, Size = UDim2.fromOffset(150, 36), Parent = top }, { corner(18), stroke() })
 	return text({ Text = icon .. " 0", Size = UDim2.fromScale(1, 1), Font = BOLD, TextSize = 18, Parent = f })
 end
-local goldLabel = pill("🪙")
+local goldLabel = pill("💰")
 goldLabel.TextColor3 = C.gold
 local totalLabel = pill("⭐")
 
 -- ===== bottom-left: gathering skills =====
 local hud = new("Frame", {
 	BackgroundColor3 = C.panel, BackgroundTransparency = 0.15, AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.new(0, 12, 1, -12), Size = UDim2.fromOffset(250, 118), Parent = gui,
+	Position = UDim2.new(0, 12, 1, -12), Size = UDim2.fromOffset(250, 152), Parent = gui,
 }, { corner(10), stroke(), pad(8), new("UIListLayout", { Padding = UDim.new(0, 4) }) })
 local hudRows = {}
 for _, id in Skills.GATHERING do
@@ -149,7 +150,7 @@ end
 -- ===== right side: menu buttons =====
 local menu = new("Frame", {
 	BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0),
-	Size = UDim2.fromOffset(64, 220), Parent = gui,
+	Size = UDim2.fromOffset(64, 380), Parent = gui,
 }, { new("UIListLayout", { Padding = UDim.new(0, 10), VerticalAlignment = Enum.VerticalAlignment.Center }) })
 
 -- ===== windows =====
@@ -173,7 +174,7 @@ local function showPanel(name)
 	for n, p in panels do
 		p.Visible = n == name
 	end
-	windowTitle.Text = ({ bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools" })[name]
+	windowTitle.Text = ({ bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏠 My House", craft = "🔨 Workbench" })[name]
 	window.Visible = true
 	if renderers[name] then
 		renderers[name]()
@@ -181,17 +182,54 @@ local function showPanel(name)
 end
 UI.showPanel = showPanel
 
-button({ Text = "✕", Size = UDim2.fromOffset(36, 36), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), BackgroundColor3 = C.panel2, Parent = window }, function()
+button({ Text = "X", Size = UDim2.fromOffset(36, 36), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), BackgroundColor3 = C.panel2, Parent = window }, function()
 	showPanel(nil)
 end)
 
-for _, m in { { "bag", "🎒", "Bag" }, { "skills", "📊", "Skills" }, { "tools", "🛠️", "Tools" } } do
-	local b = button({ Text = "", Size = UDim2.fromOffset(64, 64), BackgroundColor3 = C.panel, Parent = menu }, function()
+local function menuButton(icon, label, onClick)
+	local b = button({ Text = "", Size = UDim2.fromOffset(64, 64), BackgroundColor3 = C.panel, Parent = menu }, onClick)
+	stroke().Parent = b
+	local i = text({ Text = icon, Size = UDim2.new(1, 0, 0, 40), TextSize = 28, Parent = b })
+	local l = text({ Text = label, Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 18), TextSize = 12, TextColor3 = C.muted, Parent = b })
+	return b, i, l
+end
+for _, m in { { "bag", "🎒", "Bag" }, { "skills", "📊", "Skills" }, { "tools", "🛠️", "Tools" }, { "house", "🏠", "House" } } do
+	menuButton(m[2], m[3], function()
 		showPanel(m[1])
 	end)
-	stroke().Parent = b
-	text({ Text = m[2], Size = UDim2.new(1, 0, 0, 40), TextSize = 28, Parent = b })
-	text({ Text = m[3], Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 18), TextSize = 12, TextColor3 = C.muted, Parent = b })
+end
+-- travel between Hometown and the road (the button flips depending on where the hero is)
+local travelGoesHome = true
+local _, travelIcon, travelLabel = menuButton("🏡", "Go home", function()
+	request("home", travelGoesHome and "home" or "road")
+end)
+task.spawn(function()
+	while true do
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			travelGoesHome = hrp.Position.X > 0
+			travelIcon.Text = travelGoesHome and "🏡" or "🛣️"
+			travelLabel.Text = travelGoesHome and "Go home" or "To road"
+		end
+		task.wait(0.5)
+	end
+end)
+
+-- "🟫 3 Oak Planks   📌 20 Nails   💰 500" with whatever the player is short of in red
+local function costText(mats, gold)
+	local parts = {}
+	local inv = state and state.inv or {}
+	for id, n in mats do
+		local col = (inv[id] or 0) >= n and "#b4f0b4" or "#ff9a80"
+		table.insert(parts, ('<font color="%s">%s %d %s</font>'):format(col, Items[id].icon, n, Items[id].name))
+	end
+	table.sort(parts)
+	if gold then
+		local col = state and state.gold >= gold and "#f2c94c" or "#ff9a80"
+		table.insert(parts, ('<font color="%s">💰 %s</font>'):format(col, fmt(gold)))
+	end
+	return table.concat(parts, "   ")
 end
 
 -- --- Bag ---
@@ -321,9 +359,111 @@ do
 				r.buy.Active = false
 			else
 				local cost = G.TOOL_COST[lvl]
-				r.buy.Text = ("%s – 🪙 %s"):format(G.METALS[lvl + 1], fmt(cost))
+				r.buy.Text = ("%s – 💰 %s"):format(G.METALS[lvl + 1], fmt(cost))
 				r.buy.BackgroundColor3 = state.gold >= cost and C.good or Color3.fromRGB(90, 85, 100)
 				r.buy.Active = true
+			end
+		end
+	end
+end
+
+-- --- House ---
+do
+	local p = new("ScrollingFrame", {
+		Name = "house", BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Visible = false, ScrollBarThickness = 6,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), Parent = body,
+	}, { new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	panels.house = p
+	text({ Text = "Make planks and nails at the 🔨 workbench in your plot, then build rooms. Every room makes your hero better.", LayoutOrder = 0, Size = UDim2.new(1, -8, 0, 36), TextWrapped = true, TextColor3 = C.muted, TextSize = 14, Parent = p })
+	local rows = {}
+	for _, r in Construction.ROOMS do
+		local row = new("Frame", { LayoutOrder = r.order, BackgroundColor3 = C.panel2, Size = UDim2.new(1, -8, 0, 84), Parent = p }, { corner(8), pad(8) })
+		local name = text({ Text = "", Size = UDim2.new(1, -150, 0, 22), Font = BOLD, TextSize = 17, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local info = text({ Text = "", Position = UDim2.fromOffset(0, 22), Size = UDim2.new(1, -150, 0, 20), TextSize = 13, TextColor3 = C.good, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local cost = text({ Text = "", RichText = true, Position = UDim2.fromOffset(0, 44), Size = UDim2.new(1, -150, 0, 24), TextSize = 13, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Parent = row })
+		local buy = button({ Text = "", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(140, 48), TextSize = 15, TextWrapped = true, Parent = row }, function()
+			request("build", r.id)
+		end)
+		rows[r.id] = { name = name, info = info, cost = cost, buy = buy }
+	end
+	local function bonusText(r, t)
+		local b = r.bonus[t]
+		if r.kind == "speed" then
+			return ("+%d%% %s speed"):format(b, r.skill == "construction" and "workbench" or Skills.byId[r.skill].name:lower())
+		elseif r.kind == "offline" then
+			return ("+%dh offline time"):format(b)
+		end
+		return ("+%d%% gold when selling"):format(b)
+	end
+	renderers.house = function()
+		if not state then return end
+		local lvl = XP.levelFromXp(state.skills.construction or 0)
+		for _, r in Construction.ROOMS do
+			local row, t = rows[r.id], state.rooms and state.rooms[r.id] or 0
+			row.name.Text = ("%s %s  %s"):format(r.icon, r.name, t > 0 and ("· Level " .. t) or "· not built")
+			if t >= Construction.ROOM_MAX then
+				row.info.Text = "Now: " .. bonusText(r, t)
+				row.cost.Text = "Fully built!"
+				row.buy.Text = "Max level"
+				row.buy.BackgroundColor3 = C.panel
+				continue
+			end
+			local c = Construction.cost(r, t + 1)
+			row.info.Text = t > 0 and ("Now: %s  →  Next: %s"):format(bonusText(r, t), bonusText(r, t + 1)) or ("Gives: " .. bonusText(r, 1))
+			row.cost.Text = costText(c.mats, c.gold)
+			local need = r.lv[t + 1]
+			if lvl < need then
+				row.buy.Text = ("🔒 Construction %d"):format(need)
+				row.buy.BackgroundColor3 = Color3.fromRGB(90, 85, 100)
+			else
+				local ok = state.gold >= c.gold
+				for id, n in c.mats do
+					if (state.inv[id] or 0) < n then ok = false end
+				end
+				row.buy.Text = t == 0 and "Build" or ("Upgrade to " .. (t + 1))
+				row.buy.BackgroundColor3 = ok and C.good or Color3.fromRGB(90, 85, 100)
+			end
+		end
+	end
+end
+
+-- --- Workbench ---
+do
+	local p = new("ScrollingFrame", {
+		Name = "craft", BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Visible = false, ScrollBarThickness = 6,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), Parent = body,
+	}, { new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	panels.craft = p
+	text({ Text = "Pick what to make. Your hero keeps working (even offline) until the materials run out.", LayoutOrder = -1, Size = UDim2.new(1, -8, 0, 36), TextWrapped = true, TextColor3 = C.muted, TextSize = 14, Parent = p })
+	local rows = {}
+	for i = 0, Construction.RECIPE_COUNT - 1 do
+		local rc = Construction.RECIPES[i]
+		local it = Items[rc.item]
+		local row = new("Frame", { LayoutOrder = i, BackgroundColor3 = C.panel2, Size = UDim2.new(1, -8, 0, 62), Parent = p }, { corner(8), pad(8) })
+		text({ Text = ("%s %s%s"):format(it.icon, rc.name, rc.out > 1 and (" ×" .. rc.out) or ""), Size = UDim2.new(1, -130, 0, 22), Font = BOLD, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local need = text({ Text = "", RichText = true, Position = UDim2.fromOffset(0, 24), Size = UDim2.new(1, -130, 0, 20), TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local go = button({ Text = "Make", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(120, 42), Parent = row }, function()
+			request("craft", i)
+			showPanel(nil)
+		end)
+		rows[i] = { need = need, go = go, rc = rc }
+	end
+	renderers.craft = function()
+		if not state then return end
+		local lvl = XP.levelFromXp(state.skills.construction or 0)
+		for _, row in rows do
+			local rc = row.rc
+			local n = math.huge
+			for id, k in rc.inputs do
+				n = math.min(n, math.floor((state.inv[id] or 0) / k))
+			end
+			row.need.Text = costText(rc.inputs) .. ('   <font color="#aaa4b4">%d xp · can make %d</font>'):format(rc.xp, n)
+			if lvl < rc.req then
+				row.go.Text = "🔒 Lv " .. rc.req
+				row.go.BackgroundColor3 = Color3.fromRGB(90, 85, 100)
+			else
+				row.go.Text = "Make"
+				row.go.BackgroundColor3 = n > 0 and C.good or Color3.fromRGB(90, 85, 100)
 			end
 		end
 	end
@@ -411,6 +551,10 @@ function UI.offline(o)
 		("%s  %s: +%s XP%s"):format(Skills.byId[o.skill].icon, Skills.byId[o.skill].name, fmt(o.xp), o.levelAfter > o.levelBefore and ("  (Lv %d → %d)"):format(o.levelBefore, o.levelAfter) or ""),
 		("%s  %s: +%s"):format(Items[o.item].icon, o.itemName, fmt(o.actions)),
 	}
+	if o.ranOut then
+		table.insert(lines, "")
+		table.insert(lines, "Your hero ran out of materials.")
+	end
 	if o.seconds > o.cap then
 		table.insert(lines, "")
 		table.insert(lines, ("Offline progress is capped at %dh."):format(o.cap // 3600))
@@ -425,7 +569,7 @@ end
 -- ===== data refresh =====
 function UI.setData(view)
 	state = view
-	goldLabel.Text = "🪙 " .. fmt(view.gold)
+	goldLabel.Text = "💰 " .. fmt(view.gold)
 	local total = 0
 	for _, s in Skills.LIST do
 		total += XP.levelFromXp(view.skills[s.id] or 0)
