@@ -4076,14 +4076,14 @@ function drawHeroExtras() {
     ellipse(px, GY + 2, 10, 3, 'rgba(0,0,0,0.25)');
     ctx.save(); ctx.translate(px, py); ctx.scale(-1, 1);   // emoji pets face the way the hero walks
     ctx.font = `${Math.round(24 * FS)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText(p.icon, 0, 4); ctx.restore(); ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff'; ctx.fillText(p.icon, 0, 4); ctx.restore(); ctx.textAlign = 'left';
   }
   if (S.fam && FAM[S.fam.id] && !dead) {
     const px = HX - (S.pet ? 84 : 48), py = GY - 14 - (walking ? Math.abs(Math.sin(time * 13 + 2)) * 7 : Math.sin(time * 2.4) * 3);
     ellipse(px, GY + 2, 13, 4, 'rgba(0,0,0,0.25)');
     ctx.save(); ctx.translate(px, py); ctx.scale(-1, 1);
     ctx.font = `${Math.round(30 * FS)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.shadowColor = '#6af0ff'; ctx.shadowBlur = 10; ctx.fillText(FAM[S.fam.id].icon, 0, 4); ctx.restore(); ctx.textAlign = 'left';
+    ctx.shadowColor = '#6af0ff'; ctx.shadowBlur = 10; ctx.fillStyle = '#ffffff'; ctx.fillText(FAM[S.fam.id].icon, 0, 4); ctx.restore(); ctx.textAlign = 'left';
   }
   if (R.ent && R.ent.kind === 'npc' && R.ent.stun > 0) {
     for (let k = 0; k < 3; k++) { const a = time * 5 + k * 2.1; circle(HX + Math.cos(a) * 14, GY - 76 + Math.sin(a) * 4, 2.5, '#ffe14a'); }
