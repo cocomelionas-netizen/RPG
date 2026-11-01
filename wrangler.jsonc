@@ -1,0 +1,6 @@
+// Cloudflare Workers static site: `npm run build` makes dist/, `npx wrangler deploy` uploads it
+{
+  "name": "endless-road",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist" }
+}
