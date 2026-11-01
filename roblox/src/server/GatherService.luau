@@ -70,7 +70,8 @@ local function swing(tool: Tool?)
 end
 
 -- reason: "player" (pressed stop), "moved", "switch", "leave", "dead"
--- "leave" and "dead" keep data.activity, so leaving while gathering keeps earning offline
+-- only "leave" keeps data.activity, so leaving while gathering keeps earning offline
+-- (dying clears it: otherwise you could die at a node, walk off and still earn offline)
 function GatherService.stop(player: Player, reason: string?)
 	local st = active[player]
 	if not st then
@@ -79,7 +80,7 @@ function GatherService.stop(player: Player, reason: string?)
 	active[player] = nil
 	if reason ~= "leave" then
 		local data = DataService.get(player)
-		if data and reason ~= "switch" and reason ~= "dead" then
+		if data and reason ~= "switch" then
 			data.activity = nil
 		end
 		clearTools(player)

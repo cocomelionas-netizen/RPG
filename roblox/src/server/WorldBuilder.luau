@@ -298,7 +298,8 @@ local function gate(parent, index)
 	end
 end
 
-local function placeNodes(parent, index, rng)
+-- nodes go into parent, the pond they stand on into scenery
+local function placeNodes(parent, scenery, index, rng)
 	local zone = Zones.LIST[index]
 	local x0 = Zones.startX(index)
 	local nodes = {}
@@ -326,9 +327,9 @@ local function placeNodes(parent, index, rng)
 		local pond = part({
 			Name = "Pond", Size = Vector3.new(pondLen, 1, 34), CFrame = CFrame.new(pondX, -0.35, 80),
 			Color = zone.th.snow and hex("#7fb6d8") or hex("#3d8fd0"), Material = zone.th.snow and Enum.Material.Ice or Enum.Material.Glass,
-			Transparency = 0.15, Reflectance = 0.1, Parent = parent,
+			Transparency = 0.15, Reflectance = 0.1, Parent = scenery,
 		})
-		part({ Name = "Shore", Size = Vector3.new(pondLen + 6, 0.6, 40), CFrame = pond.CFrame * CFrame.new(0, 0.1, 0), Color = hex("#c9b27a"), Material = Enum.Material.Sand, Parent = parent })
+		part({ Name = "Shore", Size = Vector3.new(pondLen + 6, 0.6, 40), CFrame = pond.CFrame * CFrame.new(0, 0.1, 0), Color = hex("#c9b27a"), Material = Enum.Material.Sand, Parent = scenery })
 		local slot = pondLen / #fish
 		for i, tier in fish do
 			for j = 1, 2 do
@@ -388,7 +389,7 @@ function WorldBuilder.build()
 			decorFn(folder, Vector3.new(x, 0, z), rng, decorColor)
 		end
 
-		for _, n in placeNodes(nodesFolder, index, rng) do
+		for _, n in placeNodes(nodesFolder, folder, index, rng) do
 			table.insert(allNodes, n)
 		end
 	end
