@@ -43,6 +43,8 @@
   header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; display: flex; align-items: center; gap: 10px; }
   #mute, #gfx, #bell { padding: 2px 8px; min-height: 0; font-size: 16px; line-height: 1.2; }
   #bell { position: relative; margin-right: 6px; }
+  .copyr { text-align: center; color: var(--muted); font-size: 11px; margin: 10px 0 calc(84px + env(safe-area-inset-bottom)); opacity: .7; }
+  @media (min-width: 700px) { .copyr { margin-bottom: 16px; } }
   #bell i { position: absolute; top: -6px; right: -6px; background: #e0453a; color: #fff; font: 700 10px/16px sans-serif; min-width: 16px; height: 16px; border-radius: 8px; padding: 0 3px; font-style: normal; }
   .notes .note { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
   .notes .note span { flex: 1; }
@@ -427,6 +429,7 @@
     </aside>
   </main>
 </div>
+<p class="copyr">© 2026 Endless Road · All rights reserved</p>
 <div id="modal" hidden><div class="card" id="modal-body"></div></div>
 <div id="rotate" aria-live="polite"><span class="big">📱</span><b>Turn your phone upright</b><span class="muted">Endless Road is played in portrait.</span></div>
 
@@ -8631,7 +8634,40 @@ function init() {
   });
   requestAnimationFrame(t => { lastFrame = t; lastWall = Date.now(); requestAnimationFrame(frame); });
 }
-init();
+/* ===== Moving house: the game's home is NEW_HOME. The old address sends its local save along in the link ===== */
+const NEW_HOME = '';   // e.g. 'https://endless-road.pages.dev/' – empty: stay where we are
+const b64u = {
+  enc: buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  dec: s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+};
+async function zipStr(str, back) {
+  const cs = back ? new DecompressionStream('gzip') : new CompressionStream('gzip');
+  const w = cs.writable.getWriter(); w.write(back ? str : new TextEncoder().encode(str)); w.close();
+  const buf = await new Response(cs.readable).arrayBuffer();
+  return back ? new TextDecoder().decode(buf) : buf;
+}
+async function moveAway() {
+  if (!NEW_HOME || location.hostname !== 'cocomelionas-netizen.github.io') return false;
+  document.body.innerHTML = '<div style="font:16px sans-serif;color:#fff;text-align:center;padding:40px">🗺️ Endless Road has moved – taking your hero along…</div>';
+  let hash = '';
+  try { const raw = localStorage.getItem(SAVE_KEY); if (raw && window.CompressionStream) hash = '#move=' + b64u.enc(await zipStr(raw)); } catch (e) { }
+  location.replace(NEW_HOME + hash);
+  return true;
+}
+// a save carried over from the old address wins if this browser has none here, or a smaller one
+async function moveIn() {
+  const m = location.hash.match(/^#move=([A-Za-z0-9_-]+)/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  try {
+    const data = JSON.parse(await zipStr(b64u.dec(m[1]), true));
+    if (!data || data.v !== 1) return;
+    const xp = d => Object.values((d && d.skills) || {}).reduce((a, x) => a + (+x || 0), 0);
+    let here = null; try { here = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { }
+    if (!here || xp(data) > xp(here)) localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch (e) { }
+}
+(async () => { if (await moveAway()) return; await moveIn(); init(); })();
 </script>
 </body>
 </html>

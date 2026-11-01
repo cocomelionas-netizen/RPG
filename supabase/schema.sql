@@ -1954,3 +1954,33 @@ exception when others then return jsonb_build_object('ok', false, 'reason', 'Cou
 end $$;
 revoke execute on function public.clan_donate(bigint), public.ncolor_for(jsonb) from public, anon, authenticated;
 grant execute on function public.clan_donate(bigint) to authenticated;
+
+-- ---------- only the real game's web addresses may use the server ----------
+-- A copy of the game hosted on someone else's site sends its own address (the Origin header);
+-- every API call from such a copy is refused. Calls without an Origin (tools, scripts) still pass.
+-- To allow another address: insert into public.allowed_origins values ('https://example.com');
+create table if not exists public.allowed_origins (origin text primary key);
+alter table public.allowed_origins enable row level security;
+revoke all on public.allowed_origins from anon, authenticated;
+insert into public.allowed_origins (origin) values
+  ('https://cocomelionas-netizen.github.io'),
+  ('https://endless-road.pages.dev')
+on conflict do nothing;
+create or replace function public.check_origin() returns void
+language plpgsql stable security definer set search_path = public as $$
+declare o text;
+begin
+  o := nullif(current_setting('request.headers', true), '')::json ->> 'origin';
+  if o is null or o = '' or o = 'null' then return; end if;
+  if exists (select 1 from allowed_origins where origin = o) then return; end if;
+  if o ~ '^https://[a-z0-9-]+\.endless-road\.pages\.dev$' then return; end if;   -- Cloudflare preview builds
+  raise exception 'This copy of the game may not use the Endless Road server' using errcode = '42501';
+end $$;
+revoke execute on function public.check_origin() from public;
+grant execute on function public.check_origin() to anon, authenticated;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'authenticator') then
+    alter role authenticator set pgrst.db_pre_request = 'public.check_origin';
+  end if;
+end $$;
+notify pgrst, 'reload config';

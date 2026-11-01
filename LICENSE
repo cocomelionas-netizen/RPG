@@ -1,0 +1,9 @@
+Endless Road
+Copyright (c) 2026 cocomelionas. All rights reserved.
+
+The game's code, text, art and data are the property of the author. No permission is
+granted to copy, modify, host, publish, distribute or sell this game or any part of it,
+in whole or in part, without the author's written permission.
+
+Third-party parts keep their own licences: three.js and its loaders (MIT, in lib/),
+supabase-js (MIT), and the 3D models listed in models/LICENSE.txt.

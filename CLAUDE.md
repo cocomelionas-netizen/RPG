@@ -9,3 +9,9 @@
   it is readable as plain text at https://cocomelionas-netizen.github.io/RPG/schema.txt (copied there by the Pages workflow).
   On iPhone send them https://cocomelionas-netizen.github.io/RPG/sql.html instead: it has a one-tap "Copy all" button.
 - Never ask for or put the Supabase secret key in the game; the publishable key is fine.
+- Moving to Cloudflare Pages (project `endless-road` → https://endless-road.pages.dev, build `npm run build`, output `dist`).
+  `build.js` minifies/mangles the game into dist/ (both GitHub Pages and Cloudflare deploy dist/). Test the source, then smoke-test dist.
+  When the new address works, set `NEW_HOME` in index.html: the old github.io page then forwards players with their local save (#move=).
+  After that the repo can go private (GitHub Pages then stops).
+- The server only answers the game's own addresses: `check_origin()` + table `allowed_origins` in schema.sql. A new domain must be added there.
+- LICENSE: all rights reserved.
