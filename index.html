@@ -476,15 +476,15 @@ const ORES = [
   { id: 'coal',       name: 'Coal',           lvl: 30, xp: 30, time: 3.8, color: '#26262b', value: 10 },
   { id: 'mithril',    name: 'Cobalt Ore',    lvl: 55, xp: 50, time: 4.4, color: '#5a6ad8', value: 30 },
   { id: 'adamantite', name: 'Verdite Ore', lvl: 70, xp: 65, time: 4.9, color: '#4a9a5a', value: 55 },
-  { id: 'runite',     name: 'Skyrite Ore',     lvl: 85, xp: 85, time: 5.6, color: '#3fc6e0', value: 110 },
+  { id: 'runite',     name: 'Skyrite Ore',     lvl: 85, xp: 85, time: 5.6, color: '#3fc6e0', value: 65 },
 ];
 const BARS = [
   { lvl: 1,  xp: 6,  mats: { ore_copper: 1, ore_tin: 1 } },
   { lvl: 15, xp: 12, mats: { ore_iron: 1 } },
   { lvl: 30, xp: 17, mats: { ore_iron: 1, ore_coal: 2 } },
-  { lvl: 50, xp: 30, mats: { ore_mithril: 1, ore_coal: 4 } },
-  { lvl: 70, xp: 37, mats: { ore_adamantite: 1, ore_coal: 6 } },
-  { lvl: 85, xp: 50, mats: { ore_runite: 1, ore_coal: 8 } },
+  { lvl: 50, xp: 30, mats: { ore_mithril: 1, ore_coal: 3 } },
+  { lvl: 70, xp: 37, mats: { ore_adamantite: 1, ore_coal: 4 } },
+  { lvl: 85, xp: 50, mats: { ore_runite: 1, ore_coal: 5 } },
 ];
 // what can be smithed from each metal; off = levels above the metal's start, like OSRS
 const SMITH_ITEMS = [
@@ -576,13 +576,13 @@ for (const el of Object.keys(ELEMENT)) {
 }
 // shortbows are quick; longbows hit harder and more accurately but slower. A bow fires arrows up to one metal past its wood
 for (let t = 0; t < 5; t++) {
-  Object.assign(ITEMS['bow' + t], { name: WOOD[t] + ' Shortbow', speed: 1.5, arrowMax: t + 1 });
-  defItem('lbow' + t, { name: WOOD[t] + ' Longbow', icon: '🏹', tier: t, value: [15, 35, 70, 140, 280][t], slot: 'weapon', wtype: 'ranged', power: Math.round([3, 7, 12, 18, 26][t] * 1.75), speed: 2.0, acc: 0.12, arrowMax: t + 1, req: GATHER_REQ[t], type: 'Equipment', note: '+12% accuracy' });
+  Object.assign(ITEMS['bow' + t], { name: WOOD[t] + ' Shortbow', speed: 1.8, arrowMax: t + 1 });
+  defItem('lbow' + t, { name: WOOD[t] + ' Longbow', icon: '🏹', tier: t, value: [15, 35, 70, 140, 280][t], slot: 'weapon', wtype: 'ranged', power: Math.round([3, 7, 12, 18, 26][t] * 1.75), speed: 2.4, acc: 0.12, arrowMax: t + 1, req: GATHER_REQ[t], type: 'Equipment', note: '+12% accuracy' });
   FLETCH.push({ out: 'lbow' + t, req: GATHER_REQ[t] + 6, xp: [20, 40, 70, 112, 168][t], mats: { ['log' + t]: 4 } });
 }
 // rare Slayer drops
 defItem('whip',   { name: 'Void Lash', icon: '🪢', unique: true, color: '#b46bff', value: 2500, slot: 'weapon', wtype: 'melee', power: 38, speed: 1.6, req: 70, type: 'Equipment' });
-defItem('cbow',   { name: 'Prism Bow', icon: '🏹', unique: true, color: '#b46bff', value: 2500, slot: 'weapon', wtype: 'ranged', power: 36, speed: 1.5, req: 75, noAmmo: true, type: 'Equipment', note: 'needs no arrows' });
+defItem('cbow',   { name: 'Prism Bow', icon: '🏹', unique: true, color: '#b46bff', value: 2500, slot: 'weapon', wtype: 'ranged', power: 36, speed: 1.8, req: 75, noAmmo: true, type: 'Equipment', note: 'needs no arrows' });
 defItem('sstaff', { name: 'Shadow Staff', icon: '🪄', unique: true, color: '#b46bff', value: 2500, slot: 'weapon', wtype: 'magic', power: 28, req: 75, type: 'Equipment' });
 // amulets: acc = +hit chance, dmg = +max hit %, dr = +damage reduction, slay = bonus on Slayer task
 defItem('amu_acc',    { name: 'Amulet of Accuracy', icon: '📿', value: 200, slot: 'amulet', acc: 0.06, type: 'Equipment', note: '+6% accuracy' });
@@ -610,14 +610,14 @@ defItem('emblem',    { name: 'Wraith Emblem', icon: '🏅', color: '#c9a43a', va
 defItem('totem',     { name: 'Carved Totem', icon: '🗿', color: '#c9a43a', value: 12000, type: 'Misc', note: 'sell it for gold' });
 defItem('statuette', { name: 'Lost Statuette', icon: '🏺', color: '#f2c94c', value: 40000, type: 'Misc', note: 'sell it for gold' });
 defItem('bracelet',  { name: 'Wraithbound Bracer', icon: '⛓️', color: '#6aff8a', unique: true, value: 3000, slot: 'hands', armor: 2, req: 1, type: 'Equipment', note: 'in the Wraith Caves wraiths deal 50% less damage (1 ether per hit)' });
-defItem('craw',      { name: "Ghostwood Bow", icon: '🏹', color: '#6aff8a', unique: true, value: 15000, slot: 'weapon', wtype: 'ranged', power: 30, speed: 1.5, arrowMax: 5, req: 60, ether: true, type: 'Equipment', note: 'in the Wraith Caves: +50% damage and accuracy (1 ether per attack)' });
+defItem('craw',      { name: "Ghostwood Bow", icon: '🏹', color: '#6aff8a', unique: true, value: 15000, slot: 'weapon', wtype: 'ranged', power: 30, speed: 1.8, arrowMax: 5, req: 60, ether: true, type: 'Equipment', note: 'in the Wraith Caves: +50% damage and accuracy (1 ether per attack)' });
 defItem('viggora',   { name: "Wraithlord Mace", icon: '🔨', color: '#6aff8a', unique: true, value: 15000, slot: 'weapon', wtype: 'melee', power: 32, speed: 1.8, req: 60, ether: true, type: 'Equipment', note: 'in the Wraith Caves: +50% damage and accuracy (1 ether per attack)' });
 defItem('thammaron', { name: "Spectral Sceptre", icon: '🪄', color: '#6aff8a', unique: true, value: 15000, slot: 'weapon', wtype: 'magic', power: 24, req: 60, ether: true, type: 'Equipment', note: 'in the Wraith Caves: +50% damage and accuracy (1 ether per attack)' });
 defItem('bread',   { name: 'Bread', icon: '🍞', value: 2, heal: 15, type: 'Food' });
 defItem('burnt',   { name: 'Burnt Fish', icon: '⚫', value: 1, type: 'Misc' });
-defItem('bones',   { name: 'Bones', icon: '🦴', value: 3, bury: 15, pp: 1, type: 'Misc' });
-defItem('bigbones', { name: 'Big Bones', icon: '🦴', value: 10, bury: 45, pp: 3, type: 'Misc' });
-defItem('dragonbones', { name: 'Dragon Bones', icon: '🦴', value: 60, bury: 210, pp: 12, type: 'Misc' });
+defItem('bones',   { name: 'Bones', icon: '🦴', value: 3, bury: 35, pp: 1, type: 'Misc' });
+defItem('bigbones', { name: 'Big Bones', icon: '🦴', value: 10, bury: 110, pp: 3, type: 'Misc' });
+defItem('dragonbones', { name: 'Dragon Bones', icon: '🦴', value: 60, bury: 450, pp: 12, type: 'Misc' });
 defItem('essence', { name: 'Raw Essence', icon: '🔹', value: 2, type: 'Resources' });
 defItem('gem',     { name: 'Gem', icon: '💎', value: 150, type: 'Misc' });
 defItem('scale',   { name: 'Dragon Scale', icon: '🐉', value: 600, type: 'Misc' });
@@ -625,18 +625,18 @@ const FOOD_ORDER = ['cooked4', 'cooked3', 'cooked2', 'cooked1', 'cooked0', 'brea
 
 // OSRS runes: four elements, plus the catalysts (mind, chaos, death, blood) that set a spell's tier
 const RUNES = [
-  { id: 'air',   name: 'Air Rune',   icon: '🌀', lvl: 1,  xp: 5,   value: 2,  color: '#cfe8ff' },
-  { id: 'mind',  name: 'Mind Rune',  icon: '🧠', lvl: 2,  xp: 5.5, value: 3,  color: '#e8a040' },
-  { id: 'water', name: 'Water Rune', icon: '💧', lvl: 5,  xp: 6,   value: 3,  color: '#4fa3ff' },
-  { id: 'earth', name: 'Earth Rune', icon: '🪨', lvl: 9,  xp: 6.5, value: 3,  color: '#8bd34a' },
-  { id: 'fire',  name: 'Fire Rune',  icon: '🔥', lvl: 14, xp: 7,   value: 4,  color: '#ff7a2a' },
-  { id: 'chaos', name: 'Chaos Rune', icon: '⚡', lvl: 35, xp: 8.5, value: 6,  color: '#f2c94c', cat: true },
-  { id: 'death', name: 'Death Rune', icon: '💀', lvl: 65, xp: 10,  value: 15, color: '#d8d8e0', cat: true },
-  { id: 'blood', name: 'Blood Rune', icon: '🩸', lvl: 77, xp: 11,  value: 20, color: '#d8303a', cat: true },
+  { id: 'air',   name: 'Air Rune',   icon: '🌀', lvl: 1,  xp: 5,   value: 1,  color: '#cfe8ff' },
+  { id: 'mind',  name: 'Mind Rune',  icon: '🧠', lvl: 2,  xp: 5.5, value: 1,  color: '#e8a040' },
+  { id: 'water', name: 'Water Rune', icon: '💧', lvl: 5,  xp: 6,   value: 1,  color: '#4fa3ff' },
+  { id: 'earth', name: 'Earth Rune', icon: '🪨', lvl: 9,  xp: 6.5, value: 1,  color: '#8bd34a' },
+  { id: 'fire',  name: 'Fire Rune',  icon: '🔥', lvl: 14, xp: 7,   value: 1,  color: '#ff7a2a' },
+  { id: 'chaos', name: 'Chaos Rune', icon: '⚡', lvl: 35, xp: 8.5, value: 4,  color: '#f2c94c', cat: true },
+  { id: 'death', name: 'Death Rune', icon: '💀', lvl: 65, xp: 10,  value: 8, color: '#d8d8e0', cat: true },
+  { id: 'blood', name: 'Blood Rune', icon: '🩸', lvl: 77, xp: 11,  value: 10, color: '#d8303a', cat: true },
 ];
 for (const r of RUNES) defItem('r_' + r.id, { name: r.name, icon: r.icon, color: r.color, value: r.value, type: 'Runes' });
 // more runes per essence as Runecrafting grows past the rune's level
-const RUNECRAFT = RUNES.map(r => ({ out: 'r_' + r.id, req: r.lvl, xp: Math.round(r.xp * 1.8 * 10) / 10, mats: { essence: 1 },
+const RUNECRAFT = RUNES.map(r => ({ out: 'r_' + r.id, req: r.lvl, xp: Math.round(r.xp * 2.7 * 10) / 10, mats: { essence: 1 },
   n: () => r.cat ? 1 + Math.floor((LV.runecrafting - r.lvl) / 15) : 2 + Math.floor((LV.runecrafting - r.lvl) / 10) }));
 const CRAFT = {
   smithing:     { recipes: RECIPES,   time: 2.4, verb: 'Smith',  stat: 'smithed',  spark: '#ffd27a', place: 'furnaces and anvils' },
@@ -654,7 +654,7 @@ const NPCS = {
   merchant: { name: 'Merchant',     lvl: 40, xp: 45,  perception: 220, gold: [20, 45],   maxHit: 9,  skin: '#f1c27d', body: '#8a3a6a', drops: [['gem', .02, 1, 1], ['bar2', .05, 1, 2]] },
   guard:    { name: 'Town Guard',   lvl: 55, xp: 65,  perception: 280, gold: [30, 65],   maxHit: 14, skin: '#e8b88a', body: '#5a6a8a', drops: [['bar3', .05, 1, 2], ['cooked2', .1, 1, 2]] },
   wizard:   { name: 'Wandering Wizard', lvl: 65, xp: 80, perception: 330, gold: [40, 80], maxHit: 16, skin: '#f1d0a8', body: '#3a3a9a', drops: [['r_mind', .5, 10, 30], ['r_chaos', .3, 5, 15], ['essence', .3, 5, 15]] },
-  lord:     { name: 'Lord',         lvl: 80, xp: 110, perception: 420, gold: [100, 220], maxHit: 20, skin: '#f1c27d', body: '#8a1a2a', drops: [['gem', .05, 1, 1], ['amu_acc', .005, 1, 1]] },
+  lord:     { name: 'Lord',         lvl: 80, xp: 110, perception: 420, gold: [60, 130], maxHit: 20, skin: '#f1c27d', body: '#8a1a2a', drops: [['gem', .05, 1, 1], ['amu_acc', .005, 1, 1]] },
 };
 const PICKPOCKET_TIME = 2.0, STUN_TIME = 3;
 for (const id in NPCS) NPCS[id].id = id;
@@ -811,7 +811,7 @@ for (const [id, k] of Object.entries({ revimp: 1, revgob: 2, revknight: 4, revdr
   ENEMIES[id].drops.push(['ether', 1, k, k * 3], ['emblem', 0.005 * k, 1, 1], ['totem', 0.0025 * k, 1, 1], ['statuette', 0.00075 * k, 1, 1],
     ['bracelet', 0.004 * k, 1, 1], ['craw', 0.0006 * k, 1, 1], ['viggora', 0.0006 * k, 1, 1], ['thammaron', 0.0006 * k, 1, 1]);
 // normal monsters pay three times their listed gold, so fighting keeps up with skilling
-for (const d of Object.values(ENEMIES)) if (!d.boss && !d.ghost) d.gold = d.gold.map(g => g * 3);
+for (const d of Object.values(ENEMIES)) if (!d.boss && !d.ghost) d.gold = d.gold.map(g => g * 5);
 // unique drops: [item, chance, min, max]
 const BOSS_UNIQUES = {
   kingslime: [['slimegloves', 1 / 8]], gobchief: [['gobboots', 1 / 10]], bonelord: [['bonering', 1 / 14]], frosttroll: [['frostcape', 1 / 14]],
@@ -880,7 +880,7 @@ const SHOP = [
   { id: 'r_air', n: 50, cost: 125 },
   { id: 'r_mind', n: 50, cost: 175 },
   { id: 'r_chaos', n: 25, cost: 175 },
-  { id: 'essence', n: 50, cost: 125 },
+  { id: 'essence', n: 50, cost: 250 },
   { id: 'gloves0', n: 1, cost: 40 },
   { id: 'boots0', n: 1, cost: 40 },
   { id: 'cape0', n: 1, cost: 60 },
@@ -895,9 +895,9 @@ const SLAYER_SHOP = [
 /* ===== Quests ===== */
 // objective types: kill/smith/cook/fletch/rc/gather/bury/tasks count from when the quest starts; boss/level check the current state
 const QUESTS = [
-  { id: 'q1',  name: 'First Steps', desc: 'Prove yourself against the meadow slimes.', obj: [{ t: 'kill', id: 'slime', n: 10 }], rew: { gold: 50, items: { bread: 10 } } },
+  { id: 'q1',  name: 'First Steps', early: true, desc: 'Prove yourself against the meadow slimes.', obj: [{ t: 'kill', id: 'slime', n: 10 }], rew: { gold: 50, items: { bread: 10 } } },
   { id: 'q2',  name: 'Forged in Bronze', req: 'q1', desc: 'Smelt bronze bars and hammer out a blade.', obj: [{ t: 'smith', n: 3 }], rew: { gold: 100, xp: { smithing: 200 } } },
-  { id: 'q3',  name: 'Rat Catcher', req: 'q1', desc: 'The farmers want their barns back.', obj: [{ t: 'kill', id: 'rat', n: 25 }], rew: { gold: 120, items: { cooked0: 10 } } },
+  { id: 'q3',  name: 'Rat Catcher', req: 'q1', early: true, desc: 'The farmers want their barns back.', obj: [{ t: 'kill', id: 'rat', n: 25 }], rew: { gold: 120, items: { cooked0: 10 } } },
   { id: 'q4',  name: "A Fisherman's Tale", desc: 'Catch and cook a proper meal.', obj: [{ t: 'gather', skill: 'fishing', n: 40 }, { t: 'cook', n: 20 }], rew: { xp: { fishing: 300 }, items: { cooked1: 15 } } },
   { id: 'q5',  name: "The Archer's Path", req: 'q2', desc: 'Fletch your first arrows and bow.', obj: [{ t: 'fletch', n: 5 }], rew: { xp: { ranged: 300 }, items: { arrow0: 150 } } },
   { id: 'q6',  name: 'Runes of Power', req: 'q2', desc: 'Mine Raw Essence and bind it into runes.', obj: [{ t: 'gather', skill: 'essence', n: 20 }, { t: 'rc', n: 5 }], rew: { xp: { magic: 300 }, items: { r_air: 200, r_mind: 200, staff0: 1 } } },
@@ -1193,9 +1193,11 @@ function playerMaxHit() {
   const m = attackMode(), p = weaponPower();
   const base = m === 'ranged' ? 4 + (LV.ranged + (S.styles.ranged === 'accurate' ? 8 : 0)) * 0.7 + p * 0.8 + (noAmmo() ? 12 : ITEMS[bestArrow()].power)
     : m === 'magic' ? curSpell().max + LV.magic * 0.35 + p
-    : 4 + (LV.strength + (S.styles.melee === 'strength' ? 8 : 0)) * 0.7 + p;
+    : (4 + (LV.strength + (S.styles.melee === 'strength' ? 8 : 0)) * 0.7) * meleeSpeedK() + p;
   return Math.floor(base * (1 + amu('dmg') + pray('dmg') + petB('dmg') + potB('dmg') + trophyPct()));
 }
+// slow weapons hit harder per swing, so damage over time stays even between daggers and 2h swords
+function meleeSpeedK() { const w = weaponItem(); return attackMode() === 'melee' && w && w.speed ? w.speed / 1.8 : 1; }
 function accuracyLevel() {
   const m = attackMode();
   return (m === 'ranged' ? LV.ranged : m === 'magic' ? LV.magic : LV.attack + (S.styles.melee === 'attack' ? 8 : 0)) + weaponPower() * 0.5;
@@ -1212,8 +1214,8 @@ function triangle(e) { const p = combatType(), t = etype(e); return BEATS[p] ===
 function onTask(e) { return !!(S.task && e.id === S.task.id); }
 // ranged styles: Accurate aims better and hits harder, Rapid trades some accuracy for speed
 function rangedStyleAcc() { return attackMode() === 'ranged' && S.styles.ranged === 'accurate' ? 0.08 : 0; }
-function playerHitChance(e) { return clamp(0.6 + (accuracyLevel() - e.def) * 0.03 + amu('acc') + pray('acc') + petB('acc') + potB('acc') + rangedStyleAcc(), 0.1, 0.97) * (attackMode() === 'ranged' && S.styles.ranged === 'rapid' ? 0.92 : 1); }
-function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue()) * 0.02, 0.15, 0.95); }
+function playerHitChance(e) { return clamp(0.5 + (accuracyLevel() - e.def) * 0.02 + amu('acc') + pray('acc') + petB('acc') + potB('acc') + rangedStyleAcc(), 0.1, 0.97) * (attackMode() === 'ranged' && S.styles.ranged === 'rapid' ? 0.92 : 1); }
+function enemyHitChance(e) { return clamp(0.6 + (e.atk - LV.defence - armorValue() * 0.5) * 0.02, 0.15, 0.95); }
 function damageReduction() { return Math.min(0.6, armorValue() * 0.012 + LV.defence * 0.002 + amu('dr') + potB('dr') + pray('dr') + petB('dr')); }
 
 function tierReq(skill, t) { return skill === 'mining' ? ORES[t].lvl : GATHER_REQ[t]; }
@@ -1453,7 +1455,7 @@ function startAct() {
 
 function tick(dt) {
   time += dt;
-  if (S.spec < 100) { const was = Math.floor(S.spec / 5); S.spec = Math.min(100, S.spec + dt / 3); if (Math.floor(S.spec / 5) !== was && tab === 'activity') uiDirty = true; }
+  if (S.spec < 100) { const was = Math.floor(S.spec / 5); S.spec = Math.min(100, S.spec + dt); if (Math.floor(S.spec / 5) !== was && tab === 'activity') uiDirty = true; }
   homeTick(dt); wbTick(dt);
   if (inWild() && !S.wild.in) { S.wild.in = true; log('☠️ You enter the Wraith Caves. Loot stays in your loot sack until you leave – die here and you lose it, and most of your gear.', 'lg-bad'); }
   else if (!inWild() && S.wild.in) bankWild('You left the caves');
@@ -1599,7 +1601,7 @@ function enemyHit(e) {
 }
 
 function combatXp(dmg) {
-  const xp = dmg * 4;
+  const xp = dmg * 2.5;
   switch (styleOf()) {
     case 'strength': addXp('strength', xp); break;
     case 'defence': addXp('defence', xp); break;
@@ -1609,7 +1611,7 @@ function combatXp(dmg) {
     case 'defensive': addXp('magic', xp / 2); addXp('defence', xp / 2); break;
     default: addXp('attack', xp);
   }
-  addXp('hitpoints', dmg * 1.33);
+  addXp('hitpoints', dmg * 0.83);
 }
 
 function playerHit(e, shot) {
@@ -1638,7 +1640,7 @@ function playerHit(e, shot) {
   if (crit && !SIM) { R.shake = Math.max(R.shake, 5); R.freeze = 0.06; }
 }
 
-/* --- special attacks: each weapon class has three, paid with special energy (refills 10% every 30 s) --- */
+/* --- special attacks: each weapon class has three, paid with special energy (refills 10% every 10 s) --- */
 const SPECS = {
   blade: { name: 'Blades', skill: 'attack', list: [
     { id: 'twin', name: 'Twin Strike', icon: '⚔️', lvl: 1, cost: 25, desc: 'Two quick hits, each +20% accuracy', hits: 2, acc: 0.2 },
@@ -1732,6 +1734,7 @@ function killEnemy(e) {
   if (inWild()) S.wild.gold += g; else S.gold += g;
   S.kills++; R.deathStreak = 0;
   S.kc[e.id] = (S.kc[e.id] || 0) + 1;
+  if (!S.quests.q1) startQuest('q1');   // the first kill starts the first quest
   const got = [`${g} gold`];
   const ex = entScreenX(e), ey = GY - entHeight(e) * 0.5;
   for (const [id, ch, mn, mx] of e.d.drops) {
@@ -2132,7 +2135,7 @@ function enchMul(l) { return l <= ENCH_SAFE ? l * 0.03 : ENCH_SAFE * 0.03 + (l -
 function effPower(id) { const it = ITEMS[id], l = enchLv(id); return (it.power || 0) + (l ? Math.max(l, Math.round((it.power || 0) * enchMul(l))) : 0); }
 function effArmor(id) { const it = ITEMS[id], l = enchLv(id); return (it.armor || 0) + (l && it.armor ? Math.max(l, Math.round(it.armor * enchMul(l))) : 0); }
 function enchChance(l) { return l < ENCH_SAFE ? 1 : l < 6 ? 0.7 : l < 9 ? 0.6 : l < 12 ? 0.5 : 0.4; }
-function enchCost(id, l, blessed) { const v = Math.max(200, (ITEMS[id].value || 100) * 0.5); return Math.round(v * (l + 1) * (l + 1) / 10) * 10 * (blessed ? 4 : 1); }
+function enchCost(id, l, blessed) { const v = Math.max(200, (ITEMS[id].value || 100) * 0.5); return Math.round(v * (l + 1) * (l + 1) / 10) * 10 * (blessed ? 2 : 1); }
 // the colour of the glow: blue from +4, violet from +7, purple from +10, red from +13
 function enchGlow(l) { return l >= 13 ? '#ff4a6a' : l >= 10 ? '#c060ff' : l >= 7 ? '#8a7aff' : l >= 4 ? '#6ab0ff' : null; }
 // a full +6 body and legs gives the whole hero a soft glow
@@ -2152,8 +2155,8 @@ function enchant(sl, blessed) {
     return 'ok';
   }
   if (blessed) {
-    delete S.ench[id];
-    log(`💨 The blessed scroll failed: ${it.name} fell back to +0.`, 'lg-bad'); sfx('hurt');
+    if (l > 1) S.ench[id] = l - 1; else delete S.ench[id];
+    log(`💨 The blessed scroll failed: ${it.name} dropped to +${l - 1}.`, 'lg-bad'); sfx('hurt');
     return 'reset';
   }
   delete S.ench[id]; S.equip[sl] = null; uiDirty = true;
@@ -2169,7 +2172,7 @@ function enchHtml(sl) {
   const ch = enchChance(l), c = enchCost(id, l, false), cb = enchCost(id, l, true);
   const nextStat = it.slot === 'weapon' ? `power ${effPower(id)} → ${(it.power || 0) + Math.max(l + 1, Math.round((it.power || 0) * enchMul(l + 1)))}` : `armour ${effArmor(id)} → ${(it.armor || 0) + Math.max(l + 1, Math.round(it.armor * enchMul(l + 1)))}`;
   return `<div class="ench-box"><b>✨ Enchant to +${l + 1}</b> <small class="muted">· ${nextStat} · ${Math.round(ch * 100)}% success</small><br>
-    <small class="${l < ENCH_SAFE ? 'muted' : 'need'}">${l < ENCH_SAFE ? `Safe up to +${ENCH_SAFE}: it cannot fail.` : `If it fails, the item crystallizes and is lost. A blessed scroll only drops it back to +0.`}</small>
+    <small class="${l < ENCH_SAFE ? 'muted' : 'need'}">${l < ENCH_SAFE ? `Safe up to +${ENCH_SAFE}: it cannot fail.` : `If it fails, the item crystallizes and is lost. A blessed scroll only drops it one level.`}</small>
     <div class="opts"><button data-a="ench" data-id="${sl}" ${S.gold < c ? 'disabled' : ''}>📜 Enchant – ${fmt(c)} 🪙</button>
     ${l >= ENCH_SAFE ? `<button data-a="ench" data-id="${sl}" data-n="1" ${S.gold < cb ? 'disabled' : ''}>🌟 Blessed – ${fmt(cb)} 🪙</button>` : ''}</div></div>`;
 }
@@ -2178,10 +2181,10 @@ function enchHtml(sl) {
 const BOOST_PCT = 0.1, BOOST_MAX = 6 * 3600;
 const BOOSTS = {
   boost_xp: { name: 'XP Boost', icon: '📗', desc: '+10% XP from everything' },
-  boost_gold: { name: 'Gold Boost', icon: '💰', desc: '+10% gold from monsters' },
+  boost_gold: { name: 'Gold Boost', icon: '💰', desc: '+10% gold from monsters, thieving, chests and road events' },
 };
 // an hour costs more the stronger the hero is
-function boostCost() { const t = totalLevel(); return Math.round((2000 + t * t * 0.1) / 100) * 100; }
+function boostCost() { const t = totalLevel(); return Math.round((2000 + t * t * 0.02) / 100) * 100; }
 function buyBoost(id) {
   const c = boostCost(), left = S.buffs[id] || 0;
   if (!BOOSTS[id] || S.gold < c || left + 3600 > BOOST_MAX) return;
@@ -2381,7 +2384,8 @@ function questsDone() { return QUESTS.filter(q => questState(q) === 'done').leng
 function startQuest(id) {
   const q = QUESTS.find(x => x.id === id);
   if (!q || questState(q) !== 'open') return;
-  S.quests[id] = { s: 'active', base: q.obj.map(objVal) };
+  // the first quests count the kills made before they were started
+  S.quests[id] = { s: 'active', base: q.obj.map(o => q.early && o.t === 'kill' ? 0 : objVal(o)) };
   log(`📜 Quest started: ${q.name}`, 'lg-xp');
 }
 function claimQuest(id) {
@@ -2782,7 +2786,7 @@ const FAM = {};
 const SUMMON = FAMS.map(f => {
   FAM[f.id] = f;
   defItem('pouch_' + f.id, { name: f.name + ' Pouch', icon: f.icon, tier: FAMS.indexOf(f), value: Math.round(ITEMS['charm_' + f.charm].value + (5 + f.lvl / 2) * 3 + ITEMS[f.sec].value), type: 'Potions', note: 'summon: ' + f.desc, pouch: f.id });
-  return { out: 'pouch_' + f.id, req: f.lvl, xp: Math.round(4 + f.lvl * 0.9), mats: { ['charm_' + f.charm]: 1, shard: Math.round(5 + f.lvl / 2), [f.sec]: 1 } };
+  return { out: 'pouch_' + f.id, req: f.lvl, xp: Math.round((4 + f.lvl * 0.9) * 4), mats: { ['charm_' + f.charm]: 1, shard: Math.round(5 + f.lvl / 2), [f.sec]: 1 } };
 });
 CRAFT.summoning = { recipes: SUMMON, time: 2.4, verb: 'Infuse', stat: 'pouches', spark: '#6af0ff', place: 'summoning obelisks' };
 CRAFTING.add('summoning');
@@ -2830,9 +2834,9 @@ CLUE_UNIQ.forEach((list, t) => list.forEach(([id, name, icon, slot, st]) => defI
     if (t >= 3) d.drops.push(['clue_hard', 1 / 250, 1, 1]);
     if (t >= 4) d.drops.push(['clue_elite', 1 / 800, 1, 1]);
     // summoning charms
-    d.drops.push([t <= 1 ? 'charm_gold' : 'charm_green', 0.08, 1, 1]);
-    if (t >= 2) d.drops.push(['charm_crimson', 0.05, 1, 1]);
-    if (t >= 3) d.drops.push(['charm_blue', 0.04, 1, 1]);
+    d.drops.push([t <= 1 ? 'charm_gold' : 'charm_green', 0.25, 1, 1]);
+    if (t >= 2) d.drops.push(['charm_crimson', 0.15, 1, 1]);
+    if (t >= 3) d.drops.push(['charm_blue', 0.12, 1, 1]);
   }));
   for (const n of Object.values(NPCS)) n.drops.push([n.lvl < 30 ? 'clue_easy' : n.lvl < 60 ? 'clue_medium' : 'clue_hard', 1 / 300, 1, 1]);
 }
@@ -4284,7 +4288,7 @@ function useCloud(data, msg) {
   applySave(data);
   R.phase = 'walk'; R.ent = null; R.events = [];
   const away = (Date.now() - (S.last || Date.now())) / 1000;
-  if (away > 60) catchUp(away); else if (S.kills) weekNews();
+  if (away > 60) catchUp(away); else if (S.kills) weekNews(); else pathInit();   // new heroes: the Road counts from the very start
   save(); uiDirty = true; lastHero = '';
   log(msg, 'lg-xp');
 }
@@ -7212,7 +7216,7 @@ function htmlCombatPanel() {
   h += `<h3>Style</h3><div class="chips">` + STYLES[ct].map(([id, n, xp]) =>
     `<button class="${S.styles[ct] === id ? 'sel' : ''}" data-a="style" data-id="${id}">${n}<small>${xp}</small></button>`).join('') + '</div>';
   const sc = specClass();
-  h += `<h3>⚡ Special attacks <small class="muted">${Math.floor(S.spec)}% energy · +10% every 30 s</small></h3>`
+  h += `<h3>⚡ Special attacks <small class="muted">${Math.floor(S.spec)}% energy · +10% every 10 s</small></h3>`
     + (sc ? `<p class="muted">${SPECS[sc].name}: tap a special on the game view to use it on your next attack, or ⟳ to use one by itself.</p><div class="chips">` + SPECS[sc].list.map(x => {
       const ok = specOk(x, sc);
       return `<span class="tag">${ok ? x.icon : '🔒'} <b>${x.name}</b> ${x.cost}% – ${x.desc}${ok ? '' : ` <span class="need">(${SKILLS[SPECS[sc].skill].name} ${x.lvl})</span>`}</span>`;
@@ -8286,7 +8290,7 @@ function init() {
   mapInput();
   load();
   const away = (Date.now() - (S.last || Date.now())) / 1000;
-  if (away > 60) catchUp(away); else if (S.kills) weekNews();
+  if (away > 60) catchUp(away); else if (S.kills) weekNews(); else pathInit();   // new heroes: the Road counts from the very start
   log('Welcome! Your hero sets off on the endless road.');
   // the game moved to GitHub Pages; the old Netlify copy points players there
   if (location.hostname.endsWith('netlify.app')) {
