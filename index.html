@@ -5538,10 +5538,289 @@ const G3 = (() => {
     const g = group(c); for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; g.add(mk(new T.ConeGeometry(0.05 * s, 0.14 * s, 4), '#f2c94c', Math.cos(a) * 0.2 * s, y + 0.13 * s, Math.sin(a) * 0.2 * s)); }
     return g;
   }
+  /* --- hand-made creature models: each builds into g facing -x, fills P and may set P.anim(e) --- */
+  const ico = (r, c, x, y, z, sx = 1, sy = 1, sz = 1, det = 1) => { const m = mk(new T.IcosahedronGeometry(r, det), c, x, y, z); m.scale.set(sx, sy, sz); return m; };
+  const cone = (r, h, c, x, y, z, rz = 0, rx = 0, seg = 5) => { const m = mk(new T.ConeGeometry(r, h, seg), c, x, y, z); m.rotation.set(rx, 0, rz); return m; };
+  const shine = (c, op) => unlit(c, { opacity: op, depthWrite: false });
+  // a chain of tapering segments (tails, tendrils); returns the root, segments in userData.segs
+  function chain(n, len, r0, r1, c, tip) {
+    const root = new T.Group(), segs = []; let par = root;
+    for (let k = 0; k < n; k++) {
+      const s = new T.Group(); if (k) s.position.x = len; const r = r0 + (r1 - r0) * k / (n - 1);
+      s.add(box(len * 1.05, r, r, typeof c === 'function' ? c(k) : c, len / 2, 0, 0)); par.add(s); segs.push(s); par = s;
+    }
+    if (tip) { tip.position.x += len; par.add(tip); }
+    root.userData.segs = segs; return root;
+  }
+  function swayChain(ch, t, amp, bend = 0, axis = 'z') { ch.userData.segs.forEach((s, i) => { s.rotation[axis] = bend + Math.sin(t - i * 0.7) * amp; }); }
+  // a bat-like membrane wing spreading along +z (mirror with scale.z = -1), chord along +x
+  function memWing(c, span = 1, bone) {
+    const s = new T.Shape(); s.moveTo(0, 0.12);
+    const pts = [[0.35, 0.3], [0.75, 0.42], [1.1, 0.3], [0.98, 0.02], [0.78, 0.12], [0.62, -0.12], [0.42, 0.0], [0.22, -0.18], [0, -0.08]];
+    for (const [u, v] of pts) s.lineTo(u * span, v * span);
+    const geo = new T.ShapeGeometry(s); geo.rotateX(-Math.PI / 2); geo.rotateY(-Math.PI / 2);
+    const pv = new T.Group(), m = new T.Mesh(geo, lam(c, { side: T.DoubleSide })); pv.add(m);
+    for (const [u, v] of [[0.75, 0.42], [1.1, 0.3], [0.62, -0.12], [0.22, -0.18]]) {   // finger bones
+      const L = Math.hypot(u, v) * span, b = box(0.03, 0.03, L, bone || shadeC(c, -0.25), 0, 0.01, 0);
+      const ang = Math.atan2(v, u); b.position.set(Math.sin(ang) * L / 2, 0.01, Math.cos(ang) * L / 2); b.rotation.y = ang; pv.add(b);
+    }
+    return pv;
+  }
+  function jellyGeo(r) {
+    const geo = new T.SphereGeometry(r, 22, 16), p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y < -r * 0.15) { const k = 1 + (-r * 0.15 - y) / r * 0.7; p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); p.setY(i, -r * 0.15 + (y + r * 0.15) * 0.5); } }
+    geo.computeVertexNormals(); return geo;
+  }
+  const MOBS = {
+    slime(g, P, d) {
+      const c = d.color, r = 0.62, b = new T.Group(), inner = new T.Group();
+      // see-through jelly: everything inside is drawn first, the shell on top without hiding it
+      const jm = new T.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.55, shininess: 100, specular: '#ffffff', depthWrite: false, side: T.DoubleSide });
+      const shell = new T.Mesh(jellyGeo(r), jm); shell.renderOrder = 3; shell.userData.noCast = true;
+      inner.add(ico(0.22, shade(c, -0.35), 0.08, -0.02, 0.02, 1, 0.9, 1, 1));
+      for (let k = 0; k < 6; k++) { const bb = mk(new T.IcosahedronGeometry(0.03 + hash(k) * 0.04, 1), shine('#ffffff', 0.5), (hash(k + 3) - 0.5) * 0.6, (hash(k + 5) - 0.4) * 0.5, (hash(k + 9) - 0.5) * 0.6); inner.add(bb); }
+      const ey = 0.12, ex = -0.5;
+      for (const z of [0.17, -0.17]) inner.add(ico(0.1, '#ffffff', ex, ey, z, 0.7, 1.1, 1), ico(0.055, '#111111', ex - 0.07, ey - 0.01, z * 0.95, 0.6, 1, 1), mk(new T.IcosahedronGeometry(0.02, 0), unlit('#ffffff'), ex - 0.1, ey + 0.03, z * 0.9));
+      inner.add(box(0.03, 0.035, 0.16, shade(c, -0.5), -0.55, -0.08, 0));
+      const hl = mk(new T.SphereGeometry(0.13, 10, 8), shine('#ffffff', 0.6), -0.22, 0.38, 0.22); hl.scale.set(1.2, 0.5, 1); hl.renderOrder = 4;
+      // the squashed bottom sits on the ground
+      const lift = r * 0.15 + (r - r * 0.15) * 0.5;
+      b.add(inner, shell, hl); inner.position.y = shell.position.y = lift; hl.position.y = lift + 0.38;
+      g.add(b); P.body = b;
+      if (d.boss) { const cr = crown(0.62 + lift - 0.05); b.add(cr); }
+      g.scale.setScalar(d.size); g.add(shadow(0.85));
+      P.anim = e => {
+        const q = 1 + 0.07 * Math.sin(time * 5) + e.lunge * 0.25;
+        b.scale.set(q, 1 / q / q * (1 + e.lunge * 0.3), q); b.position.x = -e.lunge * 0.15;
+      };
+    },
+    mud(g, P, d) {
+      const c = d.color, dk = shade(c, -0.3), lt = shade(c, 0.15), b = new T.Group();
+      b.add(ico(0.62, c, 0, 0.4, 0, 1.2, 0.8, 1.05, 0));
+      for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; b.add(ico(0.2 + hash(k * 7) * 0.16, k % 3 ? c : dk, Math.cos(a) * 0.5, 0.25 + hash(k) * 0.45, Math.sin(a) * 0.48, 1, 0.85, 1, 0)); }
+      for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + 0.3, dr = cone(0.06, 0.25, dk, Math.cos(a) * 0.62, 0.32, Math.sin(a) * 0.6, Math.PI); b.add(dr); }
+      // moss, reeds and a sunken skull
+      for (let k = 0; k < 6; k++) b.add(box(0.16, 0.05, 0.14, '#5f8a2a', -0.2 + hash(k + 20) * 0.5, 0.86 + hash(k + 30) * 0.05, (hash(k + 40) - 0.5) * 0.7));
+      for (let k = 0; k < 5; k++) { const rd = box(0.025, 0.5 + hash(k + 50) * 0.3, 0.025, '#7a8a3a', 0.1 + hash(k + 60) * 0.3, 1.05, (hash(k + 70) - 0.5) * 0.5); rd.rotation.z = (hash(k) - 0.5) * 0.5; b.add(rd); }
+      b.add(box(0.16, 0.14, 0.16, '#d8d0b8', 0.3, 0.65, 0.5));
+      for (const z of [0.16, -0.16]) b.add(mk(new T.IcosahedronGeometry(0.075, 1), unlit('#f6e04a'), -0.7, 0.62, z), at(glow('#f6e04a', 0.35, 0.6), -0.74, 0.62, z));
+      b.add(box(0.06, 0.12, 0.34, '#1a140a', -0.72, 0.36, 0));
+      for (let k = 0; k < 4; k++) b.add(cone(0.03, 0.08, '#e8e0c8', -0.73, 0.4, -0.12 + k * 0.08, 0, Math.PI));
+      P.arms = [];
+      for (const z of [0.55, -0.55]) { const t = chain(5, 0.2, 0.17, 0.07, k => k & 1 ? c : lt); t.position.set(-0.2, 0.5, z); t.rotation.y = Math.PI + (z > 0 ? -0.5 : 0.5); b.add(t); P.arms.push(t); }
+      g.add(b); P.body = b;
+      if (d.boss) b.add(crown(1.05));
+      g.scale.setScalar(d.size * 0.85); g.add(shadow(0.95));
+      P.anim = e => {
+        const q = 1 + 0.04 * Math.sin(time * 3); b.scale.set(q, 1 / q, q);
+        P.arms.forEach((t, i) => swayChain(t, time * 3 + i * 1.7, 0.25, 0.25 - e.lunge * 0.6));
+      };
+    },
+    rat(g, P, d) {
+      const c = d.color, pink = '#e4a6a6', lt = shade(c, 0.25), dk = shade(c, -0.18);
+      g.add(ico(0.5, c, 0.05, 0.38, 0, 1.2, 0.62, 0.72), ico(0.42, lt, 0.0, 0.3, 0, 1.05, 0.48, 0.62), ico(0.32, c, 0.38, 0.4, 0, 1, 0.95, 1.15));
+      for (let k = 0; k < 5; k++) g.add(cone(0.05, 0.14, dk, -0.2 + k * 0.14, 0.66 - Math.abs(k - 2) * 0.02, 0, -0.5));   // scruffy back
+      const h = new T.Group(); h.position.set(-0.55, 0.46, 0);
+      h.add(ico(0.24, c, 0, 0, 0, 1.15, 0.85, 0.85), cone(0.15, 0.4, c, -0.32, -0.05, 0, Math.PI / 2, 0, 7), ico(0.055, pink, -0.52, -0.05, 0));
+      for (const z of [0.13, -0.13]) {
+        h.add(ico(0.045, '#0a0a0a', -0.13, 0.08, z), mk(new T.IcosahedronGeometry(0.014, 0), unlit('#ffffff'), -0.165, 0.1, z * 1.05));
+        const ear = mk(new T.CylinderGeometry(0.14, 0.14, 0.03, 10), c, 0.04, 0.2, z * 1.15); ear.rotation.set(z > 0 ? 0.4 : -0.4, 0, Math.PI / 2 - 0.3);
+        const inn = mk(new T.CylinderGeometry(0.1, 0.1, 0.02, 10), pink, 0.025, 0.2, z * 1.15); inn.rotation.copy(ear.rotation); h.add(ear, inn);
+        for (const a of [-0.25, 0, 0.25]) { const w = box(0.006, 0.006, 0.3, '#f0f0f0', -0.44, -0.04 + a * 0.1, z * 1.2); w.rotation.y = a * 0.4 * Math.sign(z); h.add(w); }
+      }
+      h.add(box(0.025, 0.07, 0.03, '#fffbe8', -0.43, -0.16, 0.022), box(0.025, 0.07, 0.03, '#fffbe8', -0.43, -0.16, -0.022));
+      g.add(h); P.head = h;
+      for (const [x, z] of [[-0.32, 0.17], [-0.32, -0.17], [0.4, 0.22], [0.4, -0.22]]) g.add(box(0.08, 0.2, 0.08, dk, x, 0.12, z), box(0.14, 0.04, 0.09, pink, x - 0.03, 0.02, z));
+      const tl = chain(9, 0.13, 0.055, 0.02, pink); tl.position.set(0.68, 0.34, 0); tl.rotation.z = 0.2; g.add(tl); P.tail = tl;
+      g.scale.setScalar(d.size * 1.25); g.add(shadow(0.7));
+      P.anim = e => {
+        h.position.y = 0.46 + Math.sin(time * 9) * 0.015; h.rotation.z = -e.lunge * 0.4; h.position.x = -0.55 - e.lunge * 0.2;
+        h.children[2].scale.setScalar(1 + 0.25 * Math.max(0, Math.sin(time * 14)));   // sniffing nose
+        swayChain(tl, time * 4, 0.18, -0.12, 'y');
+      };
+    },
+    wolf(g, P, d) {
+      const c = d.color, dk = shade(c, -0.22), lt = shade(c, 0.32);
+      g.add(ico(0.42, c, -0.32, 0.98, 0, 1.15, 1, 0.9), ico(0.36, c, 0.38, 0.98, 0, 1.35, 0.8, 0.8), ico(0.3, lt, -0.1, 0.78, 0, 1.7, 0.5, 0.62));
+      g.add(ico(0.36, lt, -0.58, 1.08, 0, 0.75, 1.1, 1.1, 0));   // neck ruff
+      const leg = (x, z, back) => {
+        const l = new T.Group(); l.position.set(x, 0.92, z);
+        l.add(box(0.16, 0.42, 0.15, z < 0 ? dk : c, 0, -0.2, 0), box(0.11, 0.42, 0.11, z < 0 ? dk : c, back ? 0.08 : 0, -0.58, 0), box(0.17, 0.07, 0.13, dk, back ? 0.05 : -0.03, -0.82, 0));
+        g.add(l); return l;
+      };
+      P.legs = [leg(-0.48, 0.18), leg(-0.48, -0.18), leg(0.55, 0.19, 1), leg(0.55, -0.19, 1)];
+      const h = new T.Group(); h.position.set(-0.85, 1.32, 0);
+      h.add(box(0.36, 0.32, 0.34, c, 0, 0, 0), box(0.34, 0.15, 0.2, c, -0.3, -0.08, 0), box(0.08, 0.08, 0.1, '#111111', -0.48, -0.03, 0), box(0.3, 0.06, 0.17, dk, -0.27, -0.18, 0), box(0.2, 0.08, 0.3, lt, -0.05, -0.15, 0));
+      for (const z of [0.1, -0.1]) {
+        h.add(cone(0.075, 0.24, c, 0.06, 0.26, z * 1.1, 0, 0, 4), mk(new T.IcosahedronGeometry(0.035, 0), unlit('#ffd24a'), -0.18, 0.06, z * 1.55));
+        h.add(cone(0.018, 0.07, '#ffffff', -0.4, -0.14, z * 0.5, 0, Math.PI));
+      }
+      g.add(h); P.head = h;
+      const tl = new T.Group(); tl.position.set(0.85, 1.08, 0); tl.add(ico(0.16, c, 0.25, -0.08, 0, 2.1, 0.85, 0.85), ico(0.1, lt, 0.55, -0.16, 0, 1.4, 0.8, 0.8)); tl.rotation.z = -0.55; g.add(tl); P.tail = tl;
+      g.scale.setScalar(d.size * 0.9); g.add(shadow(0.95));
+      P.anim = e => {
+        h.position.y = 1.32 + Math.sin(time * 3) * 0.02 - e.lunge * 0.15; h.rotation.z = e.lunge * 0.35; h.position.x = -0.85 - e.lunge * 0.15;
+        tl.rotation.y = Math.sin(time * 7) * 0.3; g.children[0].scale.y = 1 + Math.sin(time * 3) * 0.03;
+      };
+    },
+    yeti(g, P, d) {
+      const fur = d.color, face = '#7d8ea6', sh = shade(fur, -0.12);
+      for (const z of [0.25, -0.25]) g.add(box(0.32, 0.55, 0.3, z < 0 ? sh : fur, 0.05, 0.3, z), box(0.4, 0.1, 0.3, face, -0.03, 0.04, z));
+      g.add(ico(0.62, fur, 0, 1.2, 0, 0.9, 1.0, 1.0, 0), ico(0.45, '#cfd8e2', -0.25, 1.1, 0, 0.55, 0.9, 0.9, 0), ico(0.5, fur, 0.12, 1.66, 0, 1, 0.7, 1.35, 0));
+      for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; g.add(cone(0.08, 0.22, k & 1 ? fur : sh, Math.cos(a) * 0.45, 0.7 + hash(k) * 0.1, Math.sin(a) * 0.5, Math.PI)); }   // shaggy fringe
+      const h = new T.Group(); h.position.set(-0.32, 1.92, 0);
+      h.add(ico(0.32, fur, 0, 0, 0, 1, 1, 1, 0), box(0.1, 0.3, 0.34, face, -0.24, -0.05, 0), box(0.06, 0.08, 0.26, '#2a2a3a', -0.3, -0.14, 0));
+      for (const z of [0.09, -0.09]) h.add(box(0.04, 0.05, 0.06, '#101018', -0.3, 0.04, z), cone(0.03, 0.09, '#ffffff', -0.31, -0.12, z * 1.2, 0, Math.PI), cone(0.06, 0.24, '#c8bca8', 0.05, 0.3, z * 2.6, z > 0 ? -0.5 : 0.5, z > 0 ? 0.4 : -0.4));
+      g.add(h); P.head = h;
+      const arm = z => {
+        const a = new T.Group(); a.position.set(-0.05, 1.75, z);
+        a.add(ico(0.21, fur, 0, -0.3, 0, 1, 1.8, 1, 0), ico(0.21, z < 0 ? sh : fur, -0.05, -0.8, 0, 1, 1.7, 1, 0), box(0.28, 0.24, 0.28, face, -0.05, -1.18, 0));
+        for (let k = 0; k < 3; k++) a.add(cone(0.03, 0.1, '#f0ece0', -0.2, -1.28, -0.08 + k * 0.08, Math.PI));
+        g.add(a); return a;
+      };
+      P.armF = arm(0.62); P.armB = arm(-0.62);
+      g.scale.setScalar(d.size * 0.72); g.add(shadow(1.0));
+      P.anim = e => {
+        const br = Math.sin(time * 2.5);
+        P.armF.rotation.z = -(0.15 + br * 0.05 + 1.9 * e.lunge); P.armB.rotation.z = -(0.1 - br * 0.05 + 1.2 * e.lunge);
+        h.rotation.z = -e.lunge * 0.3; h.position.y = 1.92 + br * 0.02;
+      };
+    },
+    lizard(g, P, d) {
+      const c = d.color, dk = shade(c, -0.25), belly = '#f0b060';
+      g.add(ico(0.4, c, 0, 0.4, 0, 1.6, 0.5, 0.75), ico(0.32, belly, 0, 0.28, 0, 1.6, 0.3, 0.6));
+      const h = new T.Group(); h.position.set(-0.78, 0.45, 0);
+      h.add(box(0.42, 0.2, 0.32, c, 0, 0, 0), box(0.3, 0.13, 0.24, c, -0.32, -0.03, 0), box(0.28, 0.05, 0.22, dk, -0.28, -0.11, 0));
+      for (const z of [0.13, -0.13]) h.add(box(0.1, 0.09, 0.07, '#ffd84a', -0.06, 0.1, z * 1.1), box(0.11, 0.07, 0.02, '#111111', -0.06, 0.1, z * 1.4), box(0.03, 0.03, 0.03, '#111111', -0.47, 0.02, z * 0.4));
+      g.add(h); P.head = h;
+      for (const [x, z] of [[-0.42, 1], [-0.42, -1], [0.42, 1], [0.42, -1]]) {
+        const l = new T.Group(); l.position.set(x, 0.38, z * 0.25);
+        l.add(box(0.12, 0.11, 0.26, dk, 0, 0, z * 0.13), box(0.1, 0.32, 0.1, dk, 0, -0.16, z * 0.27), box(0.2, 0.05, 0.14, dk, -0.04, -0.33, z * 0.29));
+        for (let k = 0; k < 3; k++) l.add(cone(0.02, 0.07, '#f0e0c0', -0.15, -0.34, z * 0.29 + (k - 1) * 0.04, Math.PI / 2));
+        g.add(l);
+      }
+      const spine = unlit('#ffb04a');
+      for (let k = 0; k < 7; k++) g.add(mk(new T.ConeGeometry(0.06, 0.2 - Math.abs(k - 3) * 0.02, 4), spine, -0.55 + k * 0.18, 0.62, 0));
+      const tl = chain(7, 0.22, 0.24, 0.06, k => k & 1 ? dk : c); tl.position.set(0.62, 0.4, 0); g.add(tl); P.tail = tl;
+      P.fire = breath(1.8); P.fire.position.set(-1.25, 0.45, 0); g.add(P.fire);
+      g.scale.setScalar(d.size * 0.95); g.add(shadow(1.0));
+      P.anim = e => {
+        swayChain(tl, time * 3, 0.15, 0.04, 'y'); h.rotation.z = e.lunge * 0.3; h.position.y = 0.45 + Math.sin(time * 4) * 0.02;
+        spine.color.setHSL(0.08, 1, 0.55 + 0.1 * Math.sin(time * 6));
+      };
+    },
+    bat(g, P, d) {
+      const c = d.color, fl = new T.Group(); fl.position.y = 1.9; g.add(fl); P.fly = fl;
+      fl.add(ico(0.24, c, 0.04, 0, 0, 1.1, 1.15, 0.9), ico(0.19, c, -0.22, 0.14, 0));
+      for (const z of [0.09, -0.09]) {
+        fl.add(cone(0.08, 0.3, c, -0.2, 0.36, z, 0, z > 0 ? 0.3 : -0.3, 4), cone(0.05, 0.2, '#c08a9a', -0.22, 0.34, z, 0, z > 0 ? 0.3 : -0.3, 4));
+        fl.add(mk(new T.IcosahedronGeometry(0.04, 0), unlit('#ff3b3b'), -0.38, 0.2, z * 0.9), cone(0.018, 0.08, '#ffffff', -0.37, 0.02, z * 0.5, 0, Math.PI));
+        fl.add(box(0.05, 0.12, 0.05, shadeC(c, -0.3), 0.15, -0.3, z));
+      }
+      fl.add(box(0.06, 0.05, 0.07, '#d8a0b0', -0.4, 0.12, 0));
+      P.wingR = memWing(shadeC(c, -0.05), 1.0); P.wingR.position.set(0, 0.05, 0.12);
+      P.wingL = memWing(shadeC(c, -0.05), 1.0); P.wingL.position.set(0, 0.05, -0.12); P.wingL.scale.z = -1;
+      fl.add(P.wingR, P.wingL);
+      g.scale.setScalar(d.size); g.add(shadow(0.45));
+      P.anim = e => { const f = Math.sin(time * 14); fl.position.y = 1.9 + Math.sin(time * 4) * 0.15 - e.lunge * 0.5; fl.position.x = -e.lunge * 0.4; P.wingR.rotation.x = -(0.85 + f * 0.6); P.wingL.rotation.x = 0.85 + f * 0.6; };
+    },
+    imp(g, P, d) {
+      const c = d.color, dk = shade(c, -0.3), fl = new T.Group(); fl.position.y = 1.5; g.add(fl); P.fly = fl;
+      fl.add(ico(0.2, c, 0, 0, 0, 0.9, 1.25, 0.85), ico(0.13, shade(c, 0.2), -0.1, -0.03, 0, 0.6, 1, 0.8));
+      const h = new T.Group(); h.position.set(-0.04, 0.36, 0); fl.add(h);
+      h.add(ico(0.17, c, 0, 0, 0), box(0.04, 0.03, 0.14, '#2a0a0a', -0.16, -0.07, 0));
+      for (const z of [0.07, -0.07]) {
+        h.add(mk(new T.IcosahedronGeometry(0.035, 0), unlit('#ffe04a'), -0.15, 0.03, z));
+        const hn = cone(0.04, 0.2, '#2a1a1a', 0.02, 0.18, z * 1.6, 0.4, z > 0 ? 0.4 : -0.4, 4); h.add(hn);
+        h.add(cone(0.04, 0.14, c, 0.02, 0.02, z * 2.6, 0, z > 0 ? 1.4 : -1.4, 4));
+        fl.add(box(0.07, 0.24, 0.07, c, 0.02, -0.3, z * 1.2), box(0.09, 0.05, 0.08, '#2a1a1a', -0.01, -0.44, z * 1.2));
+      }
+      const armF = new T.Group(); armF.position.set(0, 0.12, 0.17); armF.add(box(0.06, 0.22, 0.06, c, 0, -0.1, 0)); armF.rotation.z = -1.2; fl.add(armF);
+      const ball = new T.Group(); ball.position.set(-0.3, 0.02, 0.22); ball.add(mk(new T.IcosahedronGeometry(0.08, 1), unlit('#fff0a0')), glow(d.orb || '#ff7a2a', 0.6, 0.9)); fl.add(ball); P.ball = ball;
+      const tl = chain(6, 0.1, 0.04, 0.025, dk, cone(0.06, 0.12, dk, 0.04, 0, 0, -Math.PI / 2, 0, 4)); tl.position.set(0.15, -0.2, 0); tl.rotation.z = -0.6; fl.add(tl); P.tail = tl;
+      P.wingR = memWing(dk, 0.55); P.wingR.position.set(0.12, 0.15, 0.08); P.wingL = memWing(dk, 0.55); P.wingL.position.set(0.12, 0.15, -0.08); P.wingL.scale.z = -1;
+      fl.add(P.wingR, P.wingL);
+      g.scale.setScalar(d.size * 1.1); g.add(shadow(0.35));
+      P.anim = e => {
+        const f = Math.sin(time * 18); fl.position.y = 1.5 + Math.sin(time * 3) * 0.12; P.wingR.rotation.x = -(0.8 + f * 0.5); P.wingL.rotation.x = 0.8 + f * 0.5;
+        swayChain(tl, time * 5, 0.25, 0.15); ball.scale.setScalar(1 + 0.15 * Math.sin(time * 10) + e.lunge * 0.8); ball.position.x = -0.3 - e.lunge * 0.4;
+      };
+    },
+    wisp(g, P, d) {
+      const fl = new T.Group(); fl.position.y = 1.4; g.add(fl); P.fly = fl;
+      const core = mk(new T.IcosahedronGeometry(0.16, 2), unlit('#ffffff')), mid = mk(new T.IcosahedronGeometry(0.28, 2), shine(d.color, 0.45));
+      fl.add(core, mid, glow(d.orb || d.color, 2.0, 0.55), glow('#ffffff', 0.7, 0.8));
+      for (const z of [0.05, -0.05]) fl.add(box(0.02, 0.05, 0.03, '#204050', -0.155, 0.03, z));
+      P.trail = [];
+      for (let k = 0; k < 6; k++) { const s = mk(new T.IcosahedronGeometry(0.11 - k * 0.015, 1), shine(d.color, 0.5 - k * 0.07)); fl.add(s); P.trail.push(s); }
+      g.scale.setScalar(d.size); g.add(shadow(0.3));
+      P.anim = e => {
+        fl.position.y = 1.4 + Math.sin(time * 2.5) * 0.2; fl.position.x = -e.lunge * 0.4; const p = 1 + 0.12 * Math.sin(time * 7);
+        core.scale.setScalar(p); mid.scale.setScalar(2 - p);
+        P.trail.forEach((s, k) => s.position.set(0.12 + k * 0.1, 0.05 + k * 0.06 + Math.sin(time * 4 - k) * 0.04, Math.cos(time * 3 - k * 0.8) * 0.06 * k));
+      };
+    },
+    shade(g, P, d) {
+      const c = d.color, dk = shade(c, -0.4), fl = new T.Group(); g.add(fl); P.fly = fl;
+      const cloak = mk(new T.ConeGeometry(0.55, 1.7, 8, 1, true), lam(c, { side: T.DoubleSide, opacity: 0.92 }), 0, 1.05, 0);
+      fl.add(cloak, mk(new T.ConeGeometry(0.42, 1.4, 8, 1, true), lam(dk, { side: T.DoubleSide }), 0, 1.0, 0));
+      fl.add(ico(0.3, c, 0.03, 1.82, 0, 1, 1.05, 0.95), box(0.1, 0.3, 0.32, '#050308', -0.22, 1.76, 0));
+      for (const z of [0.07, -0.07]) fl.add(mk(new T.IcosahedronGeometry(0.035, 0), unlit(d.orb || '#b06bff'), -0.27, 1.8, z), at(glow(d.orb || '#b06bff', 0.25, 0.9), -0.29, 1.8, z));
+      P.rags = [];
+      for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, r = box(0.32, 0.3 + hash(k) * 0.25, 0.03, k & 1 ? c : dk, Math.cos(a) * 0.5, 0.12, Math.sin(a) * 0.5); r.rotation.y = -a + Math.PI / 2; fl.add(r); P.rags.push(r); }
+      const arm = z => { const a = new T.Group(); a.position.set(0, 1.45, z); a.add(mk(new T.ConeGeometry(0.11, 0.5, 6, 1, true), lam(c, { side: T.DoubleSide }), 0, -0.25, 0)); a.add(box(0.05, 0.16, 0.05, '#d8d0c0', 0, -0.55, 0)); fl.add(a); return a; };
+      P.armF = arm(0.42); P.armB = arm(-0.42);
+      const orb = new T.Group(); orb.add(mk(new T.IcosahedronGeometry(0.07, 1), unlit('#ffffff')), glow(d.orb || '#b06bff', 0.6, 0.9)); orb.position.y = -0.68; P.armF.add(orb);
+      g.scale.setScalar(d.size); g.add(shadow(0.6));
+      P.anim = e => {
+        fl.position.y = 0.25 + Math.sin(time * 2) * 0.1; fl.rotation.z = Math.sin(time * 1.3) * 0.04;
+        P.rags.forEach((r, k) => { r.rotation.z = Math.sin(time * 4 + k) * 0.25; });
+        P.armF.rotation.z = -(0.5 + 0.9 * e.lunge); P.armB.rotation.z = -(0.3 + Math.sin(time * 2) * 0.1);
+      };
+    },
+    golem(g, P, d) {
+      const rock = '#7d8b96', rk2 = '#66737e', cr = d.color, crys = lam(cr, { opacity: 0.85 }), glw = unlit('#e0ffff');
+      for (const z of [0.3, -0.3]) g.add(box(0.42, 0.62, 0.42, z < 0 ? rk2 : rock, 0.05, 0.31, z));
+      const t = box(0.95, 0.85, 1.05, rock, 0, 1.08, 0); t.rotation.z = 0.08; g.add(t, box(0.75, 0.42, 0.85, rk2, 0.08, 1.62, 0), box(0.5, 0.3, 0.6, rock, -0.3, 0.9, 0));
+      g.add(mk(new T.OctahedronGeometry(0.16, 0), glw, -0.5, 1.15, 0));   // crystal heart
+      const h = new T.Group(); h.position.set(-0.22, 1.98, 0); h.add(box(0.42, 0.36, 0.42, rock, 0, 0, 0), box(0.12, 0.08, 0.4, rk2, -0.2, 0.1, 0));
+      for (const z of [0.1, -0.1]) h.add(mk(new T.IcosahedronGeometry(0.045, 0), unlit('#9ff8ff'), -0.22, 0.0, z), at(glow('#9ff8ff', 0.3, 0.8), -0.24, 0, z));
+      g.add(h); P.head = h;
+      P.cr = [];
+      for (let k = 0; k < 9; k++) {
+        const s = 0.12 + hash(k + 3) * 0.12, m = mk(new T.OctahedronGeometry(s, 0), crys, 0.25 + hash(k) * 0.3, 1.5 + hash(k + 1) * 0.55, (hash(k + 2) - 0.5) * 0.9);
+        m.scale.y = 2.2; m.rotation.set((hash(k + 4) - 0.5) * 0.9, 0, (hash(k + 5) - 0.2) * 0.8); g.add(m); P.cr.push(m);
+      }
+      const arm = z => {
+        const a = new T.Group(); a.position.set(0, 1.6, z);
+        a.add(box(0.36, 0.52, 0.36, rock, 0, -0.25, 0), box(0.44, 0.58, 0.44, rk2, -0.02, -0.78, 0), box(0.52, 0.42, 0.52, rock, -0.04, -1.2, 0));
+        for (let k = 0; k < 3; k++) { const m = mk(new T.OctahedronGeometry(0.08, 0), crys, -0.3, -1.2 + (k - 1) * 0.14, 0); m.scale.x = 1.8; a.add(m); }
+        const sp = mk(new T.OctahedronGeometry(0.14, 0), crys, 0, 0.05, z > 0 ? 0.15 : -0.15); sp.scale.y = 2; a.add(sp);
+        g.add(a); return a;
+      };
+      P.armF = arm(0.72); P.armB = arm(-0.72);
+      g.scale.setScalar(d.size * 0.68); g.add(shadow(1.1));
+      P.anim = e => {
+        P.armF.rotation.z = -(0.12 + 2.0 * e.lunge); P.armB.rotation.z = -(0.08 + Math.sin(time * 1.5) * 0.04 + 0.6 * e.lunge);
+        h.rotation.y = Math.sin(time * 0.8) * 0.15; glw.color.setHSL(0.5, 1, 0.75 + 0.15 * Math.sin(time * 4));
+      };
+    },
+  };
+  MOBS.kingslime = MOBS.slime; MOBS.bog = MOBS.bogmother = MOBS.mud; MOBS.revimp = MOBS.imp;
+  // demon wings and a barbed tail for the Void Rift's demons, added to a hero-style body
+  function demonParts(p, c) {
+    const P = p.userData.P, wc = shadeC(c, -0.2);
+    for (const z of [1, -1]) {
+      const w = memWing(wc, 1.25, '#1a0a14'); w.position.set(-0.3, 1.2, z * 0.18); w.rotation.x = -z * 0.75; w.position.x -= 0.5;
+      if (z < 0) w.scale.z = -1; p.add(w); (P.wings = P.wings || []).push(w);
+    }
+    const tl = chain(7, 0.16, 0.08, 0.04, wc, cone(0.08, 0.18, '#1a0a14', 0.06, 0, 0, -Math.PI / 2, 0, 4)); tl.position.set(-0.18, 0.7, 0); tl.rotation.z = Math.PI + 0.5; p.add(tl); P.tailD = tl;
+  }
   function buildEnemy(e) {
     const d = e.d, id = e.id, g = new T.Group(), P = {};
     // models are built facing -x (toward the hero); people reuse the hero builder and get turned round
-    if (d.shape === 'blob') {
+    if (MOBS[id]) MOBS[id](g, P, d);
+    else if (d.shape === 'blob') {
       P.body = mk(new T.IcosahedronGeometry(0.62, 1), lam(d.color), 0, 0.5, 0); P.body.scale.set(1.05, 0.85, 0.9);
       g.add(P.body);
       const f = group(); eyes(f, -0.62, 0.62, 0.18, 0.16, '#ffffff'); eyes(f, -0.66, 0.6, 0.2, 0.08, '#111111'); g.add(f); P.face = f;
@@ -5578,13 +5857,23 @@ const G3 = (() => {
     } else if (d.shape === 'humanoid') {
       const sk = id === 'skeleton' || id === 'bonelord', gob = id.startsWith('gob');
       let tool;
-      if (d.type === 'ranged') tool = weapon('bow', id === 'sentry' ? '#9fe8f5' : '#8a6a4a');
-      else if (d.type === 'magic') tool = weapon('staff', d.orb || '#c58bff');
-      else if (id === 'orc' || id === 'gobchief') { tool = new T.Group(); tool.add(mk(new T.CylinderGeometry(0.035, 0.035, 0.8, 5), '#5a3a22', 0, -0.9, 0), box(0.3, 0.26, 0.05, '#888888', 0.15, -1.15, 0)); }
-      else if (sk) { tool = new T.Group(); tool.add(box(0.07, 0.75, 0.07, '#8b7d6b', 0, -0.95, 0)); }
-      else { tool = new T.Group(); tool.add(mk(new T.CylinderGeometry(0.1, 0.04, 0.8, 5), '#6b4a2a', 0, -0.95, 0)); }
+      const axe = (bl, L) => { const a = new T.Group(); a.add(mk(new T.CylinderGeometry(0.035, 0.04, L, 6), '#5a3a22', 0, 0.1 - L / 2, 0), box(0.08, 0.2, 0.07, '#3a3a3a', -0.02, 0.18 - L, 0), box(0.26, 0.34, 0.04, bl, -0.16, 0.18 - L, 0), box(0.04, 0.38, 0.05, shade(bl, 0.35), -0.3, 0.18 - L, 0)); return grip(a, 1.3); };
+      const club = (c, L, spikes) => { const a = new T.Group(); a.add(mk(new T.CylinderGeometry(0.14, 0.045, L, 7), c, 0, 0.1 - L / 2, 0)); for (let k = 0; k < (spikes ? 6 : 3); k++) a.add(mk(new T.ConeGeometry(0.05, 0.16, 4), spikes || shade(c, -0.2), Math.cos(k * 2.1) * 0.15, 0.1 - L * (0.7 + (k % 3) * 0.1), Math.sin(k * 2.1) * 0.15)); return grip(a, -0.3); };
+      if (d.type === 'ranged') tool = weapon('bow', id === 'sentry' || id === 'warden' ? '#9fe8f5' : '#c0c4cc', id === 'sentry' || id === 'warden' ? '#6fc8dc' : id === 'skeleton' ? '#d8d0b8' : '#7a5a3a');
+      else if (d.type === 'magic') tool = weapon('staff', d.orb || '#c58bff', id === 'bonelord' ? '#d8d0b8' : '#4a3a2a');
+      else if (id === 'goblin') tool = weapon('dagger', '#a8acb4');
+      else if (id === 'gobchief') tool = weapon('scimitar', '#c8ccd4');
+      else if (id === 'orc') tool = axe('#8a8f98', 1.0);
+      else if (id === 'troll') tool = club('#6b4a2a', 1.0);
+      else if (id === 'frosttroll') tool = club('#5a6a7a', 1.1, '#c8f0ff');
+      else if (id === 'drakeknight' || id === 'revknight') tool = weapon('sword', id === 'revknight' ? '#b8f0b0' : '#d84a2a');
+      else if (id === 'abyssal' || id === 'overlord') tool = weapon('whip', '#5a1a4a');
+      else if (sk) tool = weapon('sword', '#d8d0b8');
+      else tool = club('#6b4a2a', 0.9);
       const p = person({
         body: d.body, leg: sk ? '#d8d3c0' : shade(d.body, -0.2), skin: d.color, ribs: sk, tool,
+        shield: id === 'drakeknight' ? '#7a1e14' : id === 'revknight' ? '#3a4a3a' : null, kite: true, plate: id === 'drakeknight' || id === 'revknight' || id === 'warden',
+        cape: id === 'bonelord' || id === 'overlord' ? shade(d.body, -0.3) : null,
         eye: sk ? '#111111' : id === 'orc' ? '#ffdd33' : '#331',
         hat: hd => {
           if (gob) hd.add(mk(new T.ConeGeometry(0.07, 0.3, 4), d.color, -0.02, 0.05, 0.25), mk(new T.ConeGeometry(0.07, 0.3, 4), d.color, -0.02, 0.05, -0.25));
@@ -5597,6 +5886,8 @@ const G3 = (() => {
           if (d.boss) { const c = crown(0.28); hd.add(c); }
         },
       });
+      if (id === 'abyssal' || id === 'overlord') demonParts(p, d.body);
+      if (id === 'warden') for (const z of [0.3, -0.3]) { const m = mk(new T.OctahedronGeometry(0.14, 0), lam('#c8f6ff', { opacity: 0.85 }), 0, 1.42, z); m.scale.y = 2; p.add(m); }
       p.rotation.y = Math.PI + 0.6;
       g.add(p); P.p = p;
       g.scale.setScalar(d.size * 1.1);
@@ -5627,7 +5918,7 @@ const G3 = (() => {
       g.add(D2);
       g.add(at(shadow(2.4), 1, 0, 0));
     }
-    if (d.shape !== 'humanoid') g.rotation.y = d.shape === 'dragon' ? 0.25 : 0.45;
+    if (d.shape !== 'humanoid' || MOBS[id]) g.rotation.y = d.shape === 'dragon' ? 0.25 : 0.45;
     if (d.ghost) g.traverse(n => { if (n.material && n.material.emissive) { n.material.opacity = 0.7; n.material.emissive.setRGB(0.05, 0.18, 0.06); } });
     g.userData.P = P;
     g.userData.mats = mats(g);
@@ -6133,10 +6424,17 @@ const G3 = (() => {
       const d = e.d;
       x += e.lunge * (d.type === 'melee' ? -18 : -5);
       if (e.hit > 0.5) flash(g, 0.6, 0.6, 0.6); else flash(g, 0, e.d.ghost ? 0.18 : 0, 0);
-      if (d.shape === 'blob') { const q = 1 + 0.08 * Math.sin(time * 5); P.body.scale.set(1.05 * q, 0.85 / q, 0.9 * q); P.body.position.y = 0.5 / q; }
+      if (P.anim) P.anim(e);
+      else if (d.shape === 'blob') { const q = 1 + 0.08 * Math.sin(time * 5); P.body.scale.set(1.05 * q, 0.85 / q, 0.9 * q); P.body.position.y = 0.5 / q; }
       else if (d.shape === 'quad') { P.head.position.y = (d.id === 'lizard' ? 0.45 : 0.75) + Math.sin(time * 4) * 0.025; P.tail.rotation.z = 0.4 + Math.sin(time * 6) * 0.15; }
       else if (d.shape === 'flyer') { const fl = Math.sin(time * 16); P.fly.position.y = 1.9 + Math.sin(time * 4) * 0.2; P.wingR.rotation.y = fl * 0.5; P.wingL.rotation.y = -fl * 0.5; P.wingR.rotation.z = fl * 0.35; P.wingL.rotation.z = -fl * 0.35; }
-      else if (d.shape === 'humanoid') { const PP = P.p.userData.P; PP.armF.rotation.z = -(d.type === 'melee' ? -0.5 - 1.6 * e.lunge : -1.5 - 0.25 * e.lunge); PP.armB.rotation.z = 0.15; }
+      else if (d.shape === 'humanoid') {
+        const PP = P.p.userData.P; PP.armF.rotation.z = -(d.type === 'melee' ? -0.5 - 1.6 * e.lunge : -1.5 - 0.25 * e.lunge); PP.armB.rotation.z = PP.armB.children.length > 2 ? 0.5 : 0.15;
+        const tl = PP.armF.children[2]; if (tl && tl.userData.segs) tl.userData.segs.forEach((sg, i) => { sg.rotation.z = Math.sin(time * 6 - i * 0.7) * 0.15 + e.lunge * (i ? 0.35 : -0.6); });
+        if (tl && tl.userData.draw) tl.userData.draw(d.type === 'ranged' ? 1 - e.lunge : 0);
+        if (PP.wings) PP.wings.forEach((w, i) => { w.rotation.x = (i ? 1 : -1) * (0.75 + Math.sin(time * 3) * 0.15); });
+        if (PP.tailD) swayChain(PP.tailD, time * 3, 0.2, 0.1);
+      }
       else if (d.shape === 'dragon') { const fl = Math.sin(time * 3) * 0.35; P.wingB.rotation.z = fl; P.wingF.rotation.z = fl; P.tail.rotation.z = Math.sin(time * 2) * 0.08; P.neck.rotation.z = e.lunge * 0.15; }
       if (P.fire) { P.fire.userData.m.opacity = e.lunge > 0.3 && etype(e) === 'magic' ? e.lunge * 0.65 : 0; P.fire.scale.y = 1 + Math.sin(time * 30) * 0.1; }
     } else if (e.kind === 'npc') {
