@@ -70,6 +70,8 @@
   #specbar button.q { border-color: #ffe27a; box-shadow: 0 0 6px #ffe27a; }
   #specbar button.auto { border-color: #6fd27a; }
   #specbar button:disabled { opacity: 0.4; }
+  #specbar button.brace { min-width: 90px; font-size: 14px; background: #a8402a; border-color: #ffd04a; animation: pulse 0.5s infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.08); } }
   @media (max-width: 700px) { #specbar { right: 4px; bottom: 4px; gap: 2px; } #specbar .en { height: 4px; } #specbar button { min-width: 28px; padding: 1px 3px; font-size: 8px; border-radius: 6px; } #specbar button b { font-size: 12px; } }
   #view.g3 #scene3d { display: block; }
   #stage { position: relative; }
@@ -78,6 +80,7 @@
     background: #2b2540; border: 1px solid #4a3f6e; display: flex; gap: 8px; align-items: center;
   }
   #goal b { color: var(--accent); white-space: nowrap; }
+  #goal em.go { margin-left: auto; font-style: normal; background: var(--accent); color: #222; padding: 3px 10px; border-radius: 6px; font-weight: 700; white-space: nowrap; animation: pulse 0.8s infinite alternate; }
   #ticker { display: none; }
   #toast {
     position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%); z-index: 3; pointer-events: none;
@@ -692,7 +695,7 @@ const TYPE_ICON = { melee: '⚔️', ranged: '🏹', magic: '✨' };
 const TYPE_NAME = { melee: 'Melee', ranged: 'Ranged', magic: 'Magic' };
 const BEATS = { melee: 'ranged', ranged: 'magic', magic: 'melee' };   // Melvor's combat triangle
 const STYLES = {
-  melee:  [['attack', 'Accurate', 'Attack XP · +8 accuracy'], ['strength', 'Aggressive', 'Strength XP · +8 strength'], ['defence', 'Defensive', 'Defence XP']],
+  melee:  [['balanced', 'Balanced', 'XP to your lowest of Attack, Strength, Defence'], ['attack', 'Accurate', 'Attack XP · +8 accuracy'], ['strength', 'Aggressive', 'Strength XP · +8 strength'], ['defence', 'Defensive', 'Defence XP']],
   ranged: [['accurate', 'Accurate', 'Ranged XP · +8% hit, +8 strength'], ['rapid', 'Rapid', 'Ranged XP · faster, −8% hit chance'], ['longrange', 'Longrange', 'Ranged + Defence XP']],
   magic:  [['standard', 'Standard', 'Magic XP'], ['defensive', 'Defensive', 'Magic + Defence XP']],
 };
@@ -991,8 +994,8 @@ function newState() {
   return {
     v: 1, gold: 25, skills: Object.fromEntries(Object.keys(SKILLS).map(k => [k, 0])),
     inv: { bread: 5 }, equip: { weapon: null, shield: null, helm: null, body: null, legs: null, amulet: null, cape: null, hands: null, feet: null, ring: null }, tools: { axe: 0, pick: 0, rod: 0 },
-    activity: 'combat', zone: 0, hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
-    styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: 'auto', spec: 100, specAuto: {}, prayer: null, pp: 0, autoBury: true,
+    activity: 'mining', zone: 0, hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
+    styles: { melee: 'balanced', ranged: 'accurate', magic: 'standard' }, spell: 'auto', spec: 100, specAuto: {}, prayer: null, pp: 0, autoBury: true,
     zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0, herblore: 0, construction: 0, summoning: 0 }, cookSel: -1, tipEvent: false,
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, brewed: 0, planks: 0, built: 0, planted: 0, harvested: 0, tended: 0, laps: 0, pouches: 0, clues: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
@@ -1009,6 +1012,7 @@ function save() {
 function load() {
   let data = null;
   try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { data = null; }
+  R.fresh = !data;
   applySave(data);
 }
 // saves from before OSRS smithing: old ores become the new ones, the single armour slot becomes the body slot
@@ -1234,7 +1238,10 @@ function chosenTier(skill) {
   const ok = locTiers(skill).filter(t => LV[skill] >= tierReq(skill, t));
   const sel = S.gsel[skill];
   if (sel >= 0 && ok.includes(sel)) return sel;
-  return ok.length ? ok[ok.length - 1] : -1;
+  if (!ok.length) return -1;
+  // copper and tin open together: mine whichever the bag has less of, so bronze always has both
+  if (skill === 'mining') { const top = ok.filter(t => ORES[t].lvl === ORES[ok[ok.length - 1]].lvl); return top.reduce((a, t) => has('ore_' + ORES[t].id) < has('ore_' + ORES[a].id) ? t : a, top[0]); }
+  return ok[ok.length - 1];
 }
 function gatherKey(skill, tier) { return skill === 'mining' ? ORES[tier].id : 't' + tier; }
 function gatherTime(skill, tier) {
@@ -1255,8 +1262,9 @@ function recalcBonuses() {
   BON.xp = BON.gold = BON.gather = 0;
   for (const a of ACH) if (S.ach[a.id]) BON[a.bonus[0]] += a.bonus[1];
 }
-function xpMult() { return 1 + BON.xp / 100 + 0.15 * S.rup.wisdom + (S.buffs.boost_xp > 0 ? BOOST_PCT : 0) + clanPerk('xp'); }
-function goldMult() { return 1 + BON.gold / 100 + 0.1 * S.rup.fortune + petB('gold') / 100 + (S.buffs.boost_gold > 0 ? BOOST_PCT : 0) + clanPerk('gold') + [0, 0.03, 0.06, 0.1, 0.13, 0.16][room('treasury')]; }
+function momentum() { return !SIM && R.mom && R.mom.t > 0 ? R.mom.n * 0.05 : 0; }
+function xpMult() { return 1 + momentum() + BON.xp / 100 + 0.15 * S.rup.wisdom + (S.buffs.boost_xp > 0 ? BOOST_PCT : 0) + clanPerk('xp'); }
+function goldMult() { return 1 + momentum() + BON.gold / 100 + 0.1 * S.rup.fortune + petB('gold') / 100 + (S.buffs.boost_gold > 0 ? BOOST_PCT : 0) + clanPerk('gold') + [0, 0.03, 0.06, 0.1, 0.13, 0.16][room('treasury')]; }
 function petFor(skill) { return PETS.some(p => p.skill === skill && S.pets[p.id]); }
 function rollPet(id, chance) {
   if (S.pets[id] || Math.random() >= chance) return;
@@ -1282,8 +1290,8 @@ const UNLOCKS = [
   { id: 'thieving', icon: '🥷', name: 'Thieving', act: 'thieving', need: 'Finish the quest "First Steps"', test: () => qDone('q1') },
   { id: 'slayer', icon: '💀', name: 'Slayer', tab: 'slayer', need: 'Combat level 10', test: () => combatLevel() >= 10 },
   { id: 'runecrafting', icon: '🔮', name: 'Runeweaving & magic', sub: ['craft', 'runecrafting'], act: 'runecrafting', need: 'Finish the quest "Forged in Bronze"', test: () => qDone('q2') },
-  { id: 'home', icon: '🏡', name: 'My Home: Construction & Farming', acts: ['farming', 'construction'], sub: ['craft', 'construction'], need: 'Total level 35', test: () => totalLevel() >= 35 },
-  { id: 'agility', icon: '🏃', name: 'Agility courses', act: 'agility', need: 'Total level 30', test: () => totalLevel() >= 30 },
+  { id: 'home', icon: '🏡', name: 'My Home: Construction & Farming', acts: ['farming', 'construction'], sub: ['craft', 'construction'], need: 'Total level 75', test: () => totalLevel() >= 75 },
+  { id: 'agility', icon: '🏃', name: 'Agility courses', act: 'agility', need: 'Total level 50', test: () => totalLevel() >= 50 },
   { id: 'herblore', icon: '🧪', name: 'Herbalism & potions', act: 'herblore', sub: ['craft', 'herblore'], need: 'Farming level 3', test: () => LV.farming >= 3 },
   { id: 'daily', icon: '📅', name: 'Daily & weekly tasks', sub: ['quests', 'daily'], need: 'Defeat your first enemy', test: () => S.kills >= 1 || totalLevel() >= 40 },
   { id: 'queue', icon: '📋', name: 'Action queue (on the Map)', need: 'Finish the quest "Forged in Bronze"', test: () => qDone('q2') || totalLevel() >= 60 },
@@ -1303,12 +1311,15 @@ function lockFor(tab, sub) {
 const actLock = a => { const u = UNLOCKS.find(u => u.act === a || (u.acts && u.acts.includes(a))); return u && !S.unlocked[u.id] ? u : null; };
 function lockedMsg(u) { showBanner(`🔒 ${u.name}: ${u.need}`); }
 const freshTabs = new Set();
+// unlock banners come one at a time (at most one a minute); several waiting ones are shown together
+const unlockNews = []; let unlockAt = -1e9;
 function checkUnlocks() {
+  if (unlockNews.length && time - unlockAt > 60 && !SIM) { unlockAt = time; showBanner(`🔓 New: ${unlockNews.splice(0).join(' · ')}`); sfx('level'); }
   for (const u of UNLOCKS) {
     if (S.unlocked[u.id] || !u.test()) continue;
     S.unlocked[u.id] = true;
     log(`🔓 Unlocked: ${u.icon} ${u.name}`, 'lg-xp');
-    showBanner(`🔓 New: ${u.icon} ${u.name}`); sfx('level');
+    unlockNews.push(`${u.icon} ${u.name}`);
     const t = u.tab || (u.sub ? u.sub[0] : u.act ? 'activity' : u.id === 'mastery' ? 'skills' : null);
     if (t) freshTabs.add(t);
     uiDirty = true; lastHtml = '';
@@ -1423,6 +1434,9 @@ function collectEvent(ev) {
   R.events.splice(R.events.indexOf(ev), 1);
   const { x, y } = evScreen(ev);
   S.tipEvent = true; S.stats.events++;
+  // momentum: every event you tap adds +5% XP and gold (up to +25%) for 90 s
+  R.mom = { n: Math.min(5, (R.mom && R.mom.t > 0 ? R.mom.n : 0) + 1), t: 90 };
+  floatText(HX, GY - 150, `🔥 Momentum +${R.mom.n * 5}%`, '#ffb04a', 1.3, 1, true);
   if (ev.type === 'chest') {
     const g = Math.round(rand(15, 30) * (1 + ZONES[S.zone].tier) ** 2 * goldMult());
     S.gold += g;
@@ -1430,9 +1444,9 @@ function collectEvent(ev) {
     floatText(x, y - 30, `+${g} 🪙`, '#f2c94c', 1.4, 1.2);
     log(`🎁 Opened a chest: ${fmt(g)} gold`, 'lg-gold'); sfx('chest');
   } else if (ev.type === 'shrine') {
-    R.buff = 60; sfx('magic');
+    R.buff = 60; sfx('magic'); S.spec = Math.min(100, S.spec + 25);
     burst(x, y - 30, '#c9a0ff', 18);
-    showBanner('✨ Blessing: +50% XP for 60s');
+    showBanner('✨ Blessing: +50% XP for 60s, +25% special energy');
     log('✨ Shrine blessing: +50% XP for 60 seconds', 'lg-xp');
   } else {
     burst(x, y, '#fff1a8', 16); sfx('magic');
@@ -1455,6 +1469,7 @@ function startAct() {
 
 function tick(dt) {
   time += dt;
+  if (R.mom && R.mom.t > 0 && (R.mom.t -= dt) <= 0) { R.mom = null; uiDirty = true; }
   if (S.spec < 100) { const was = Math.floor(S.spec / 5); S.spec = Math.min(100, S.spec + dt); if (Math.floor(S.spec / 5) !== was && tab === 'activity') uiDirty = true; }
   homeTick(dt); wbTick(dt);
   if (inWild() && !S.wild.in) { S.wild.in = true; log('☠️ You enter the Wraith Caves. Loot stays in your loot sack until you leave – die here and you lose it, and most of your gear.', 'lg-bad'); }
@@ -1541,7 +1556,13 @@ function combatTick(dt) {
   if (R.pendingHit > 0) { R.pendingHit -= dt; if (R.pendingHit <= 0) playerHit(e, R.shot); }
   specTick(e, dt);
   if (e.hp <= 0) { killEnemy(e); return; }
+  // every 4th boss attack is a heavy hit, shown 2 s ahead: tap Brace to take much less
+  if (e.d.boss && !e.tele && (e.heavyN || 0) % 4 === 3 && e.atkT < 2 && !SIM) {
+    e.tele = true; R.brace = { braced: false, t: 2.5 };
+    floatText(entScreenX(e), GY - entHeight(e) - 50, '⚠️ Heavy hit!', '#ff7a5a', 1.6, 1.2); sfx('boss');
+  }
   if (e.atkT <= 0) {
+    e.heavyN = (e.heavyN || 0) + 1; if (e.tele) { e.tele = false; e.heavy = true; }
     bossMechanics(e);
     e.atkT += e.d.speed * (e.enraged ? 0.7 : 1);
     e.lunge = 1;
@@ -1584,10 +1605,13 @@ function bossMechanics(e) {
 }
 
 function enemyHit(e) {
+  const heavy = e.heavy, braced = heavy && R.brace && R.brace.braced;
+  e.heavy = false; if (heavy) R.brace = null;
+  if (braced) floatText(HX, GY - 140, '🛡️ Braced!', '#9dffa0', 1.3, 1.1, true);
   if (Math.random() >= enemyHitChance(e)) { hitsplat(HX, GY - 42, 0, 'miss', true); return; }
   const tri = triangle(e);
   const raw = 1 + Math.floor(Math.random() * e.d.maxHit);
-  let mult = (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === etype(e) ? 0.5 : 1);
+  let mult = (heavy ? braced ? 0.4 : 1.6 : 1) * (1 - damageReduction()) * (tri > 0 ? 0.85 : tri < 0 ? 1.15 : 1) * (pray('protect') === etype(e) ? 0.5 : 1);
   if (etype(e) === 'magic') mult *= 1 - potB('ward');
   if (inWild() && e.d.ghost && S.equip.hands === 'bracelet' && has('ether')) { take('ether'); mult *= 0.5; }
   const dmg = Math.max(1, Math.round(raw * mult));
@@ -1603,6 +1627,7 @@ function enemyHit(e) {
 function combatXp(dmg) {
   const xp = dmg * 2.5;
   switch (styleOf()) {
+    case 'balanced': addXp(['attack', 'strength', 'defence'].reduce((a, k) => (S.skills[k] || 0) < (S.skills[a] || 0) ? k : a, 'attack'), xp); break;
     case 'strength': addXp('strength', xp); break;
     case 'defence': addXp('defence', xp); break;
     case 'accurate': case 'rapid': addXp('ranged', xp); break;
@@ -1672,7 +1697,9 @@ function specOk(sp, c) { return LV[SPECS[c].skill] >= sp.lvl; }
 function specPick() {
   const c = specClass();
   if (!c) { R.specQ = null; return null; }
-  const id = R.specQ || (S.specAuto || {})[c], sp = id && SPECS[c].list.find(x => x.id === id);
+  const manual = !!R.specQ, id = R.specQ || (S.specAuto || {})[c], sp0 = id && SPECS[c].list.find(x => x.id === id);
+  // a special you tap yourself hits 15% harder than one fired by itself
+  const sp = sp0 && manual ? { ...sp0, mult: (sp0.mult || 1) * 1.15, manual: true } : sp0;
   if (!sp) { R.specQ = null; return null; }
   if (!specOk(sp, c) || S.spec < sp.cost) return null;
   R.specQ = null; S.spec -= sp.cost; uiDirty = true;
@@ -3162,6 +3189,26 @@ function showOfflineSummary(sec, before) {
     ${pathActive() ? `<p><small>🛣️ <b>Road to Adventure</b> – day ${pathDay()}: ${PATH[pathDay() - 1].name}${pathReady() >= 0 ? ' · 🎁 a reward is waiting!' : ''} <span class="muted">(Quests → Road)</span></small></p>` : ''}
     ${streakBtn}
     <button data-a="close">Continue</button>`);
+}
+function welcome() {
+  openModal(`<h2>🛣️ Welcome to Endless Road</h2>
+    <p>🚶 <b>Your hero plays by itself.</b> It walks the road, fights, mines, fishes and crafts – even while the game is closed (up to 12 hours).</p>
+    <p>🎯 <b>Follow the Goal bar</b> under the road. Tap it – <b>▶ Go</b> takes your hero straight there.</p>
+    <p>✨ <b>Tap glowing things on the road</b> – chests, shrines and finds. Each one also builds 🔥 Momentum: more XP and gold while you play.</p>
+    <p>🗺️ Pick what to do on the <b>Map</b>. New skills and tabs open as you level up.</p>
+    <button data-a="close">Let's go!</button>`);
+}
+// once: protect the hero with an account (iPhones can wipe a site's storage) – a reward for linking
+function accountNudge() {
+  if (me && !S.linkRew) {
+    S.linkRew = true; S.gold += 1000; S.cos.own.hat_bandana = true;
+    log('☁️ Your hero is safe in the cloud. Reward: 1,000 gold and the 🏴‍☠️ Bandana hat (Bag → Luxury).', 'lg-gold'); showBanner('☁️ Hero protected! +1,000 gold and a Bandana'); return;
+  }
+  if (me || !sb || S.askedLink || SIM || !document.getElementById('modal').hidden) return;
+  if (totalLevel() < 60 && time < 1200) return;
+  S.askedLink = true;
+  openModal(`<h2>☁️ Protect your hero</h2><p>Your progress is only saved on this device – a phone can clear it. Make a free account and your hero is kept safe in the cloud, on any device.</p>
+    <p>🎁 Reward: <b>1,000 gold</b> and the <b>🏴‍☠️ Bandana</b> hat.</p><button data-a="acct">👤 Make an account</button> <button data-a="close">Later</button>`);
 }
 function openModal(html) {
   document.getElementById('modal-body').innerHTML = html;
@@ -7929,6 +7976,7 @@ let lastSpec = '';
 function renderSpec() {
   const el = document.getElementById('specbar'), c = S.activity === 'combat' && R.ent && R.ent.kind === 'enemy' && !R.ent.replay ? specClass() : null;
   let h = '';
+  if (R.brace && !R.brace.braced && R.ent && R.ent.tele) h = `<div class="row"><button data-a="brace" class="brace"><b>🛡️</b>Brace!</button></div>`;
   if (c) {
     const auto = (S.specAuto || {})[c], sp = SPECS[c].list;
     h = `<div class="en" title="Special energy"><i style="width:${Math.floor(S.spec)}%"></i></div><div class="row">`
@@ -7966,15 +8014,15 @@ function nextGoal() {
   if (!S.equip.weapon) {
     const w = Object.keys(S.inv).find(id => ITEMS[id].slot === 'weapon' && canEquip(id));
     if (w) return { t: `Equip your ${ITEMS[w].name}`, tab: 'inventory' };
-    if (has('bar0')) return { t: S.activity === 'smithing' ? 'Your hero is smithing…' : 'Smith a Bronze Dagger at the 🔨 anvil', tab: 'smithing' };
-    if (!has('ore_copper')) return { t: 'Mine Copper Ore in the Green Meadow (Map → ⛏️ Mining)', tab: 'activity' };
-    if (!has('ore_tin')) return { t: 'Mine Tin Ore too – bronze needs both', tab: 'activity' };
-    return { t: S.activity === 'smithing' ? 'Your hero is smelting a Bronze Bar…' : 'Smelt a Bronze Bar at the 🔥 furnace', tab: 'smithing' };
+    if (has('bar0')) return { t: S.activity === 'smithing' ? 'Your hero is smithing…' : 'Smith a Bronze Dagger at the 🔨 anvil', tab: 'smithing', go: 'smithing', cs: 'dagger0' };
+    if (!has('ore_copper')) return { t: S.activity === 'mining' ? 'Your hero is mining Copper Ore…' : 'Mine Copper Ore in the Green Meadow', tab: 'activity', go: 'mining' };
+    if (!has('ore_tin')) return { t: 'Mine Tin Ore too – bronze needs both', tab: 'activity', go: 'mining' };
+    return { t: S.activity === 'smithing' ? 'Your hero is smelting a Bronze Bar…' : 'Smelt a Bronze Bar at the 🔥 furnace', tab: 'smithing', go: 'smithing', cs: 'bar0' };
   }
   if (R.ent && R.ent.blocked) {
-    if (S.activity === 'firemaking') return { t: 'No logs to burn – go 🪓 Woodcutting', tab: 'activity' };
+    if (S.activity === 'firemaking') return { t: 'No logs to burn – go 🪓 Woodcutting', tab: 'activity', go: 'woodcutting' };
     if (S.activity === 'farming') return { t: 'Build a 🌱 Garden at home and get seeds', tab: 'activity' };
-    return S.activity === 'cooking' ? { t: 'No fish to cook – go 🎣 Fishing', tab: 'activity' }
+    return S.activity === 'cooking' ? { t: 'No fish to cook – go 🎣 Fishing', tab: 'activity', go: 'fishing' }
       : { t: `Out of materials for ${ITEMS[CRAFT[S.activity].recipes[S.csel[S.activity]].out].name} – gather more or pick another recipe`, tab: S.activity };
   }
   if (S.activity === 'combat' && attackMode() === 'unarmed' && wtype() !== 'melee')
@@ -7987,11 +8035,11 @@ function nextGoal() {
   if (upg) return { t: `Equip your ${ITEMS[upg].name}`, tab: 'inventory' };
   if (foodCount() < 5) {
     const raw = [0, 1, 2, 3, 4].some(t => has('fish' + t) && LV.cooking >= GATHER_REQ[t]);
-    return raw ? { t: 'Low on food – cook your fish', tab: 'cooking' } : { t: 'Low on food – go 🎣 Fishing, or buy Bread', tab: 'activity' };
+    return raw ? { t: 'Low on food – cook your fish', tab: 'cooking' } : { t: 'Low on food – go 🎣 Fishing, or buy Bread', tab: 'activity', go: 'fishing' };
   }
   const best = bestZone();
-  if (S.activity === 'combat' && S.zone < best) return { t: `${ZONES[best].name} is open – travel there`, tab: 'activity' };
-  if (!questsDone() && !Object.keys(S.quests).length) return { t: 'Open 📜 Quests and start "First Steps"', tab: 'quests' };
+  if (S.activity === 'combat' && S.zone < best) return { t: `${ZONES[best].name} is open – travel there`, tab: 'activity', go: 'combat', z: best };
+  if (!questsDone() && !Object.keys(S.quests).length) return { t: 'Fight the meadow slimes – your first kill starts "First Steps"', tab: 'activity', go: 'combat', z: 0 };
   if (!S.bosses[best]) {
     const b = bossOf(ZONES[best].boss), q = QUESTS.find(x => x.id === b.quest), st = questState(q), bn = ENEMIES[b.id].name;
     if (bossOpen(b)) return { t: S.ctarget === b.id ? `Defeat ${bn} in its lair` : `Enter ${bn}'s lair (Map → ${ZONES[best].name} → ⚔️ Combat)`, tab: 'activity' };
@@ -8005,16 +8053,21 @@ function nextGoal() {
   return { t: `You beat the Dragon! Start a 🌟 New Journey for ${renownGain()} Renown`, tab: 'progress' };
 }
 let lastGoal = '';
+// the nearest open place where the hero can do this
+function goalZone(act) { for (let z = 0; z < ZONES.length; z++) if (locOpen(z) && locHas(z, act) && (act !== 'combat' || zoneOpen(z))) return z; return null; }
 let clogT = 0;
 function renderGoal() {
-  checkAch(); checkUnlocks();
+  checkAch(); checkUnlocks(); accountNudge();
   if (++clogT % 8 === 0) clogSweep();
   if (isOpen('daily')) dailyCheck();
   const g = nextGoal();
-  const html = `<b>🎯 Goal</b><span>${g.t}</span>`;
+  // a goal the hero can just go and do gets a ▶ button that takes it there
+  const goZ = g.go && (g.z !== undefined ? g.z : S.activity === g.go ? -1 : goalZone(g.go));
+  const doIt = g.go && goZ !== -1 && goZ != null && !(S.activity === g.go && S.zone === goZ);
+  const html = `<b>🎯 Goal</b><span>${g.t}</span>${doIt ? '<em class="go">▶ Go</em>' : ''}`;
   const el = document.getElementById('goal');
   if (html !== lastGoal) { el.innerHTML = html; lastGoal = html; }
-  el.dataset.goto = g.tab;
+  el.dataset.goto = g.tab; el.dataset.go = doIt ? g.go : ''; el.dataset.z = doIt ? goZ : ''; el.dataset.cs = g.cs || '';
   const alerts = {
     craft: !CRAFTING.has(S.activity) && (Object.keys(CRAFT).some(sk => CRAFT[sk].recipes.some((r, i) => canCraft(sk, i) && ITEMS[r.out].slot && isUpgrade(r.out)))
       || [0, 1, 2, 3, 4].some(t => has('fish' + t) >= 10 && LV.cooking >= GATHER_REQ[t])),
@@ -8026,8 +8079,10 @@ function renderGoal() {
   };
   document.querySelectorAll('nav.tabs [data-tab]').forEach(b => {
     const lk = !!lockFor(b.dataset.tab);
-    b.classList.toggle('locked', lk);
-    b.classList.toggle('alert', !lk && (!!alerts[b.dataset.tab] || freshTabs.has(b.dataset.tab)) && b.dataset.tab !== tab);
+    b.classList.toggle('locked', lk); b.hidden = lk;   // tabs appear when they unlock
+    // early on only the tab the goal points to gets a dot, so a new player is not pulled five ways
+    const early = totalLevel() < 100, gt = (TAB_ALIAS[g.tab] || [g.tab])[0];
+    b.classList.toggle('alert', !lk && (early ? gt === b.dataset.tab || freshTabs.has(b.dataset.tab) : !!alerts[b.dataset.tab] || freshTabs.has(b.dataset.tab)) && b.dataset.tab !== tab);
   });
 }
 // old tab names (used by goals and buttons) map to a tab plus its sub-view
@@ -8059,7 +8114,12 @@ document.addEventListener('click', ev => {
   const tb = ev.target.closest('[data-tab]');
   if (tb) { openTab(tb.dataset.tab, true); return; }
   const goal = ev.target.closest('#goal');
-  if (goal) { openTab(goal.dataset.goto, true); return; }
+  if (goal) {
+    if (goal.dataset.go) {
+      if (goal.dataset.cs) { const i = CRAFT[goal.dataset.go].recipes.findIndex(r => r.out === goal.dataset.cs); if (i >= 0) S.csel[goal.dataset.go] = i; }
+      travel(+goal.dataset.z, goal.dataset.go); R.ent = null; R.phase = 'walk'; uiDirty = true; lastGoal = ''; }
+    openTab(goal.dataset.goto, true); return;
+  }
   const b = ev.target.closest('[data-a]');
   if (!b || b.disabled) return;
   const id = b.dataset.id, n = +b.dataset.n || 1;
@@ -8099,6 +8159,7 @@ document.addEventListener('click', ev => {
     case 'syncnow': netSync().then(accountModal); break;
     case 'progsub': progSub = id; break;
     case 'hsk': hsSkill = id; break;
+    case 'brace': if (R.brace) { R.brace.braced = true; sfx('clink'); renderSpec(); } break;
     case 'spec': { const c = specClass(), sp = c && SPECS[c].list.find(x => x.id === id);
       if (sp) { R.specQ = R.specQ === id ? null : id; if (S.spec < sp.cost) showBanner(`⚡ ${sp.name} needs ${sp.cost}% special energy – it fires when there is enough.`); }
       renderSpec(); break; }
@@ -8292,6 +8353,7 @@ function init() {
   const away = (Date.now() - (S.last || Date.now())) / 1000;
   if (away > 60) catchUp(away); else if (S.kills) weekNews(); else pathInit();   // new heroes: the Road counts from the very start
   log('Welcome! Your hero sets off on the endless road.');
+  if (R.fresh) setTimeout(welcome, 600);
   // the game moved to GitHub Pages; the old Netlify copy points players there
   if (location.hostname.endsWith('netlify.app')) {
     const d = document.createElement('div');
