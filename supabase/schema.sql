@@ -15,6 +15,12 @@ create table if not exists public.xp_table (lvl int primary key, xp bigint not n
 alter table public.item_values enable row level security;
 alter table public.xp_table enable row level security;
 insert into public.item_values (id, value) values
+  ('warhammer0', 26),
+  ('warhammer1', 40),
+  ('warhammer2', 99),
+  ('warhammer3', 198),
+  ('warhammer4', 396),
+  ('warhammer5', 858),
   ('2h0', 26),
   ('2h1', 40),
   ('2h2', 99),
@@ -422,6 +428,12 @@ create table if not exists public.item_stats (
 );
 alter table public.item_stats enable row level security;
 insert into public.item_stats (id, name, slot, wtype, power, armor, speed, acc, dmg, dr, heal) values
+  ('warhammer0', 'Bronze Warhammer', 'weapon', 'melee', 4, 0, '2.4', 0, 0, 0, 0),
+  ('warhammer1', 'Iron Warhammer', 'weapon', 'melee', 9, 0, '2.4', 0, 0, 0, 0),
+  ('warhammer2', 'Steel Warhammer', 'weapon', 'melee', 15, 0, '2.4', 0, 0, 0, 0),
+  ('warhammer3', 'Cobalt Warhammer', 'weapon', 'melee', 22, 0, '2.4', 0, 0, 0, 0),
+  ('warhammer4', 'Verdite Warhammer', 'weapon', 'melee', 30, 0, '2.4', 0, 0, 0, 0),
+  ('warhammer5', 'Skyrite Warhammer', 'weapon', 'melee', 41, 0, '2.4', 0, 0, 0, 0),
   ('2h0', 'Bronze 2h Sword', 'weapon', 'melee', 5, 0, '2.6', 0, 0, 0, 0),
   ('2h1', 'Iron 2h Sword', 'weapon', 'melee', 11, 0, '2.6', 0, 0, 0, 0),
   ('2h2', 'Steel 2h Sword', 'weapon', 'melee', 18, 0, '2.6', 0, 0, 0, 0),

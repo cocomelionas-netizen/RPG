@@ -60,6 +60,17 @@
   }
   #view canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   #scene3d { display: none; }
+  #specbar { position: absolute; right: 6px; bottom: 6px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; z-index: 2; }
+  #specbar[hidden] { display: none; }
+  #specbar .en { width: 100%; height: 6px; border-radius: 3px; background: rgba(0,0,0,0.5); overflow: hidden; }
+  #specbar .en i { display: block; height: 100%; background: linear-gradient(90deg, #4ab0ff, #8ae0ff); }
+  #specbar .row { display: flex; gap: 4px; }
+  #specbar button { min-width: 40px; padding: 3px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); background: rgba(20,18,30,0.75); color: #fff; font: 600 11px system-ui, sans-serif; line-height: 1.1; }
+  #specbar button b { display: block; font-size: 17px; }
+  #specbar button.q { border-color: #ffe27a; box-shadow: 0 0 6px #ffe27a; }
+  #specbar button.auto { border-color: #6fd27a; }
+  #specbar button:disabled { opacity: 0.4; }
+  @media (max-width: 700px) { #specbar { right: 4px; bottom: 4px; gap: 2px; } #specbar .en { height: 4px; } #specbar button { min-width: 28px; padding: 1px 3px; font-size: 8px; border-radius: 6px; } #specbar button b { font-size: 12px; } }
   #view.g3 #scene3d { display: block; }
   #stage { position: relative; }
   #goal {
@@ -368,7 +379,7 @@
 </header>
 <div class="wrap">
   <div id="stage">
-    <div id="view"><canvas id="scene3d"></canvas><canvas id="scene"></canvas></div>
+    <div id="view"><canvas id="scene3d"></canvas><canvas id="scene"></canvas><div id="specbar" hidden></div></div>
     <div id="goal"></div>
     <div id="ticker"></div>
     <div id="toast" hidden></div>
@@ -485,6 +496,7 @@ const SMITH_ITEMS = [
   { key: 'fullhelm',   name: 'Full Helm',  off: 7,  bars: 2, slot: 'helm',   arm: 0.25, icon: '⛑️' },
   { key: 'chainbody',  name: 'Chainbody',  off: 11, bars: 3, slot: 'body',   arm: 0.4,  icon: '🥋' },
   { key: 'kiteshield', name: 'Kiteshield', off: 12, bars: 3, slot: 'shield', arm: 0.3,  icon: '🛡️' },
+  { key: 'warhammer',  name: 'Warhammer',  off: 9,  bars: 3, slot: 'weapon', pw: 1.45, speed: 2.4, icon: '🔨' },
   { key: '2h',         name: '2h Sword',   off: 14, bars: 3, slot: 'weapon', pw: 1.8,  speed: 2.6, twoHanded: true, icon: '⚔️' },
   { key: 'platelegs',  name: 'Platelegs',  off: 16, bars: 3, slot: 'legs',   arm: 0.35, icon: '👖' },
   { key: 'platebody',  name: 'Platebody',  off: 18, bars: 5, slot: 'body',   arm: 0.6,  icon: '🥋' },
@@ -980,7 +992,7 @@ function newState() {
     v: 1, gold: 25, skills: Object.fromEntries(Object.keys(SKILLS).map(k => [k, 0])),
     inv: { bread: 5 }, equip: { weapon: null, shield: null, helm: null, body: null, legs: null, amulet: null, cape: null, hands: null, feet: null, ring: null }, tools: { axe: 0, pick: 0, rod: 0 },
     activity: 'combat', zone: 0, hp: 50, kills: 0, deaths: 0, dist: 0, last: Date.now(),
-    styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: 'auto', prayer: null, pp: 0, autoBury: true,
+    styles: { melee: 'attack', ranged: 'accurate', magic: 'standard' }, spell: 'auto', spec: 100, specAuto: {}, prayer: null, pp: 0, autoBury: true,
     zk: [0, 0, 0, 0, 0], bosses: [false, false, false, false, false], csel: { smithing: 0, fletching: 0, runecrafting: 0, herblore: 0, construction: 0, summoning: 0 }, cookSel: -1, tipEvent: false,
     ach: {}, stats: { events: 0, smithed: 0, cooked: 0, dragonGear: 0, fletched: 0, rc: 0, buried: 0, tasks: 0, uniques: 0, stolen: 0, burned: 0, brewed: 0, planks: 0, built: 0, planted: 0, harvested: 0, tended: 0, laps: 0, pouches: 0, clues: 0, g: {} }, renown: 0, journeys: 0,
     rup: { wisdom: 0, fortune: 0, boots: 0, patience: 0, headstart: 0 },
@@ -1441,6 +1453,7 @@ function startAct() {
 
 function tick(dt) {
   time += dt;
+  if (S.spec < 100) { const was = Math.floor(S.spec / 5); S.spec = Math.min(100, S.spec + dt / 3); if (Math.floor(S.spec / 5) !== was && tab === 'activity') uiDirty = true; }
   homeTick(dt); wbTick(dt);
   if (inWild() && !S.wild.in) { S.wild.in = true; log('☠️ You enter the Wraith Caves. Loot stays in your loot sack until you leave – die here and you lose it, and most of your gear.', 'lg-bad'); }
   else if (!inWild() && S.wild.in) bankWild('You left the caves');
@@ -1494,6 +1507,13 @@ function combatTick(dt) {
     // work the hit out before using up ammo, so the last arrow still counts
     const spell = mode === 'magic' ? curSpell() : null;
     R.shot = { mode, maxHit: playerMaxHit(), chance: playerHitChance(e), color: spell ? spell.color : null, weak: !!spell && spell.el === e.d.weak };
+    const sp = specPick();
+    if (sp) {
+      R.shot.spec = sp; R.shot.chance = sp.sure ? 1 : Math.min(0.97, R.shot.chance + (sp.acc || 0));
+      if (sp.color) R.shot.color = sp.color;
+      if (!SIM) { floatText(HX, GY - 135, `${sp.icon} ${sp.name}!`, '#ffe27a', 1.3, 1.1, true); R.specFlash = 1; }
+      if (sp.hits > 1) e.extra = Array.from({ length: sp.hits - 1 }, (_, i) => ({ t: (mode === 'ranged' ? 0.28 : 0.12) + 0.16 * (i + 1), shot: R.shot }));
+    }
     // wraith weapons burn ether for +50% damage and accuracy in the caves
     if (inWild() && weaponItem() && weaponItem().ether && has('ether')) { take('ether'); R.shot.maxHit = Math.floor(R.shot.maxHit * 1.5); R.shot.chance = Math.min(0.97, R.shot.chance * 1.5); }
     if (mode === 'ranged' && !noAmmo()) take(bestArrow());
@@ -1511,11 +1531,13 @@ function combatTick(dt) {
     R.pendingHit = mode === 'ranged' ? 0.28 : mode === 'magic' ? 0.34 : 0.12;
     if (mode === 'ranged' || mode === 'magic') {
       shoot(HX + 18, GY - 48, entScreenX(e), GY - entHeight(e) * 0.55, mode === 'ranged' ? 'arrow' : 'orb', R.shot.color || '#fff', R.pendingHit);
+      if (e.extra && mode === 'ranged') e.extra.forEach((x, i) => shoot(HX + 18, GY - 52 - i * 4, entScreenX(e), GY - entHeight(e) * 0.55, 'arrow', '#fff', x.t));
       sfx(mode === 'ranged' ? 'bow' : 'zap');
     }
   }
   // damage lands when the swing or projectile connects, not when it starts
   if (R.pendingHit > 0) { R.pendingHit -= dt; if (R.pendingHit <= 0) playerHit(e, R.shot); }
+  specTick(e, dt);
   if (e.hp <= 0) { killEnemy(e); return; }
   if (e.atkT <= 0) {
     bossMechanics(e);
@@ -1568,6 +1590,7 @@ function enemyHit(e) {
   if (inWild() && e.d.ghost && S.equip.hands === 'bracelet' && has('ether')) { take('ether'); mult *= 0.5; }
   const dmg = Math.max(1, Math.round(raw * mult));
   S.hp -= dmg;
+  if (R.retri > 0 && e.hp > 0) bonusDmg(e, dmg * 0.75, '#c58bff');
   addXp('defence', dmg * 0.5);
   hitsplat(HX, GY - 42, dmg, 'hit', true);
   burst(HX + 4, GY - 40, '#c22', 5);
@@ -1595,9 +1618,17 @@ function playerHit(e, shot) {
   const roll = 1 + Math.floor(Math.random() * shot.maxHit);
   const crit = roll >= Math.max(3, shot.maxHit * 0.9);
   const tri = triangle(e);
-  const mult = (tri > 0 ? 1.2 : tri < 0 ? 0.85 : 1) * (onTask(e) ? 1 + amu('slay') : 1) * (shot.weak ? WEAK_BONUS : 1) * (1 - (e.d.dr || 0));
+  const sp = shot.spec;
+  const mult = (tri > 0 ? 1.2 : tri < 0 ? 0.85 : 1) * (onTask(e) ? 1 + amu('slay') : 1) * (shot.weak ? WEAK_BONUS : 1) * (sp && sp.pierce ? 1 : 1 - (e.d.dr || 0)) * (sp && sp.mult || 1);
   const dmg = Math.min(e.hp, Math.max(1, Math.round(roll * mult)));
   e.hp -= dmg; e.hit = 1;
+  if (sp) {
+    if (sp.heal) { const h = Math.round(dmg * sp.heal); S.hp = Math.min(maxHp(), S.hp + h); if (h) floatText(HX + 18, GY - 120, '+' + h, '#6fd27a', 1, 1, true); }
+    if (sp.bleed && e.hp > 0) e.bleed = { n: 3, t: 1, dmg: Math.max(1, shot.maxHit * sp.bleed) };
+    if (sp.defDown && !e.shattered) { e.shattered = true; e.def = Math.round(e.def * (1 - sp.defDown)); floatText(ex, ey - 30, '🛡️ Defence down', '#ffb070', 1.1); }
+    if (sp.stun && e.hp > 0) { e.atkT += sp.stun; floatText(ex, ey - 30, sp.id === 'frost' ? '❄️ Frozen' : '💫 Stunned', '#bfe6ff', 1.1); }
+    if (sp.retri) R.retri = sp.retri;
+  }
   if (e.d.world && !SIM) WB.pend += dmg;
   combatXp(dmg);
   if (pray('heal')) S.hp = Math.min(maxHp(), S.hp + maxHp() * pray('heal'));
@@ -1605,6 +1636,64 @@ function playerHit(e, shot) {
   hitsplat(ex, ey, dmg, crit ? 'max' : 'hit');
   burst(ex, GY - entHeight(e) * 0.55, crit ? '#ffe14a' : shot.color || '#ff5a5a', crit ? 12 : 6);
   if (crit && !SIM) { R.shake = Math.max(R.shake, 5); R.freeze = 0.06; }
+}
+
+/* --- special attacks: each weapon class has three, paid with special energy (refills 10% every 30 s) --- */
+const SPECS = {
+  blade: { name: 'Blades', skill: 'attack', list: [
+    { id: 'twin', name: 'Twin Strike', icon: '⚔️', lvl: 1, cost: 25, desc: 'Two quick hits, each +20% accuracy', hits: 2, acc: 0.2 },
+    { id: 'lacerate', name: 'Lacerate', icon: '🩸', lvl: 40, cost: 50, desc: 'A sure hit that makes the enemy bleed 3 times', sure: true, bleed: 0.3 },
+    { id: 'siphon', name: 'Soul Siphon', icon: '💜', lvl: 70, cost: 50, desc: '+25% damage, and you heal half the damage dealt', mult: 1.25, heal: 0.5 } ] },
+  heavy: { name: 'Heavy weapons', skill: 'strength', list: [
+    { id: 'crush', name: 'Crushing Blow', icon: '💥', lvl: 1, cost: 50, desc: 'One hit with +60% damage', mult: 1.6 },
+    { id: 'shatter', name: 'Shatter Guard', icon: '🛡️', lvl: 40, cost: 50, desc: 'A sure hit; the enemy loses 30% defence for the rest of the fight', sure: true, mult: 1.1, defDown: 0.3 },
+    { id: 'quake', name: 'Earthshaker', icon: '🌋', lvl: 70, cost: 100, desc: 'A sure hit with +120% damage that stuns the enemy for 3 s', sure: true, mult: 2.2, stun: 3 } ] },
+  bow: { name: 'Bows', skill: 'ranged', list: [
+    { id: 'double', name: 'Double Shot', icon: '🏹', lvl: 1, cost: 50, desc: 'Two arrows at once', hits: 2 },
+    { id: 'pierce', name: 'Piercing Arrow', icon: '🎯', lvl: 40, cost: 50, desc: 'A sure hit with +40% damage that ignores armour', sure: true, mult: 1.4, pierce: true },
+    { id: 'storm', name: 'Arrow Storm', icon: '🌧️', lvl: 70, cost: 75, desc: 'Four arrows, each with 80% damage', hits: 4, mult: 0.8 } ] },
+  magic: { name: 'Magic', skill: 'magic', list: [
+    { id: 'frost', name: 'Frost Bind', icon: '❄️', lvl: 1, cost: 40, desc: '+20% damage and freezes the enemy for 4 s', mult: 1.2, stun: 4, color: '#9fe0ff' },
+    { id: 'blood', name: 'Blood Siphon', icon: '🩸', lvl: 40, cost: 50, desc: '+15% damage, and you heal 40% of the damage dealt', mult: 1.15, heal: 0.4, color: '#e04a5a' },
+    { id: 'retri', name: 'Retribution', icon: '🔮', lvl: 70, cost: 60, desc: 'For 10 s the enemy takes back 75% of the damage it deals you', retri: 10, color: '#c58bff' } ] },
+};
+function specClass() {
+  const m = attackMode();
+  if (m === 'ranged') return 'bow';
+  if (m === 'magic') return 'magic';
+  const w = m === 'melee' ? weaponItem() : null;
+  if (!w) return null;
+  return w.twoHanded || /mace|hammer|maul/i.test(w.name) ? 'heavy' : 'blade';
+}
+function specOk(sp, c) { return LV[SPECS[c].skill] >= sp.lvl; }
+// the special to use on this attack: one you tapped, or your auto pick for this weapon class
+function specPick() {
+  const c = specClass();
+  if (!c) { R.specQ = null; return null; }
+  const id = R.specQ || (S.specAuto || {})[c], sp = id && SPECS[c].list.find(x => x.id === id);
+  if (!sp) { R.specQ = null; return null; }
+  if (!specOk(sp, c) || S.spec < sp.cost) return null;
+  R.specQ = null; S.spec -= sp.cost; uiDirty = true;
+  return sp;
+}
+// damage that is not a normal swing: bleeding, reflected hits
+function bonusDmg(e, dmg, color) {
+  dmg = Math.min(e.hp, Math.max(1, Math.round(dmg)));
+  if (dmg <= 0) return;
+  e.hp -= dmg; e.hit = 1;
+  if (e.d.world && !SIM) WB.pend += dmg;
+  combatXp(dmg);
+  hitsplat(entScreenX(e), GY - entHeight(e) * 0.5, dmg, 'hit');
+  burst(entScreenX(e), GY - entHeight(e) * 0.55, color, 6);
+}
+function specTick(e, dt) {
+  if (e.extra) for (const x of e.extra) if ((x.t -= dt) <= 0 && !x.done) { x.done = true; playerHit(e, x.shot); }
+  if (e.extra && e.extra.every(x => x.done)) e.extra = null;
+  if (e.bleed) {
+    e.bleed.t -= dt;
+    if (e.bleed.t <= 0) { e.bleed.t = 1; bonusDmg(e, e.bleed.dmg, '#c22'); if (--e.bleed.n <= 0) e.bleed = null; }
+  }
+  if (R.retri > 0) R.retri -= dt;
 }
 
 function foodCount() { return FOOD_ORDER.reduce((a, id) => a + has(id), 0); }
@@ -3312,6 +3401,7 @@ function heroTool() {
 function bladeTool(w) {
     if (!w) return null;
     const kind = w.kind || 'sword', blade = w.color || TIER_COLORS[w.tier] || '#c0c4cc';
+    if (kind === 'warhammer') return () => { rr(-1.5, 12, 3, 30, 1, '#5a3a22'); rr(-9, 38, 18, 9, 2, blade); rr(-9, 38, 3, 9, 1, shade(blade, -0.2)); };
     // blade length and shape follow the weapon type
     const len = { dagger: 16, sword: 28, scimitar: 28, '2h': 44 }[kind] || 30, wide = kind === '2h' ? 3.6 : 2.5;
     return () => {
@@ -5486,6 +5576,11 @@ const G3 = (() => {
       t.userData.segs = segs;
       return grip(t, 1.9);
     }
+    if (kind === 'warhammer') {
+      t.add(box(0.045, 0.85, 0.045, '#5a3a22', 0, -0.25, 0), box(0.3, 0.17, 0.17, blade, -0.03, -0.66, 0), box(0.05, 0.19, 0.19, shadeC(blade, -0.2), 0.12, -0.66, 0));
+      const sp = mk(new T.ConeGeometry(0.05, 0.14, 4), shadeC(blade, 0.25), 0.2, -0.66, 0); sp.rotation.z = -Math.PI / 2; t.add(sp);
+      return grip(t, 1.6);
+    }
     if (kind === 'mace') {
       t.add(box(0.045, 0.75, 0.045, '#4a3a2a', 0, -0.2, 0), mk(new T.IcosahedronGeometry(0.12, 0), blade, 0, -0.62, 0));
       for (const [x, z] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const sp = mk(new T.ConeGeometry(0.03, 0.12, 4), shadeC(blade, 0.2), x * 0.13, -0.62, z * 0.13); sp.rotation.set(z * Math.PI / 2, 0, -x * Math.PI / 2); t.add(sp); }
@@ -7116,6 +7211,12 @@ function htmlCombatPanel() {
   if (mode === 'unarmed' && wt !== 'melee') h += `<p class="need">${wt === 'ranged' ? `No arrows this bow can fire (up to ${METALS[weaponItem().arrowMax ?? 5]})` : `No runes for any spell you know${staffRune() && staffRune() !== 'air' ? ' (your staff still needs Air runes for most spells)' : ''}`} – your hero is punching. Fletch or buy ${wt === 'ranged' ? 'arrows' : 'runes (Craft → Runecrafting, or the Shop)'}.</p>`;
   h += `<h3>Style</h3><div class="chips">` + STYLES[ct].map(([id, n, xp]) =>
     `<button class="${S.styles[ct] === id ? 'sel' : ''}" data-a="style" data-id="${id}">${n}<small>${xp}</small></button>`).join('') + '</div>';
+  const sc = specClass();
+  h += `<h3>⚡ Special attacks <small class="muted">${Math.floor(S.spec)}% energy · +10% every 30 s</small></h3>`
+    + (sc ? `<p class="muted">${SPECS[sc].name}: tap a special on the game view to use it on your next attack, or ⟳ to use one by itself.</p><div class="chips">` + SPECS[sc].list.map(x => {
+      const ok = specOk(x, sc);
+      return `<span class="tag">${ok ? x.icon : '🔒'} <b>${x.name}</b> ${x.cost}% – ${x.desc}${ok ? '' : ` <span class="need">(${SKILLS[SPECS[sc].skill].name} ${x.lvl})</span>`}</span>`;
+    }).join('') + '</div>' : '<p class="muted">Hold a weapon (with arrows or runes) to use special attacks.</p>');
   if (wt === 'magic') {
     const sr = staffRune(), cur = curSpell(), tgt = R.ent && R.ent.kind === 'enemy' ? R.ent.d : null;
     h += `<h3>📖 Spellbook</h3><div class="chips">` + RUNES.map(r => `<span class="tag">${r.icon} ${r.name.replace(' Rune', '')} <b>${sr === r.id ? '∞' : fmt(has('r_' + r.id))}</b></span>`).join('') + '</div>'
@@ -7819,6 +7920,20 @@ function renderTab(force) {
   if (html !== lastHtml) { $('#tab-content').innerHTML = html; lastHtml = html; if (tab === 'activity') drawMap(); }
 }
 
+// special attack buttons on the game view: tap one to use it on your next attack, ⟳ picks the one used by itself
+let lastSpec = '';
+function renderSpec() {
+  const el = document.getElementById('specbar'), c = S.activity === 'combat' && R.ent && R.ent.kind === 'enemy' && !R.ent.replay ? specClass() : null;
+  let h = '';
+  if (c) {
+    const auto = (S.specAuto || {})[c], sp = SPECS[c].list;
+    h = `<div class="en" title="Special energy"><i style="width:${Math.floor(S.spec)}%"></i></div><div class="row">`
+      + sp.map(x => { const ok = specOk(x, c);
+        return `<button data-a="spec" data-id="${x.id}" class="${R.specQ === x.id ? 'q' : ''} ${auto === x.id ? 'auto' : ''}" ${ok ? '' : 'disabled'} title="${x.name}: ${x.desc}">${ok ? `<b>${x.icon}</b>${x.cost}%` : `<b>🔒</b>${SKILLS[SPECS[c].skill].name.slice(0, 3)} ${x.lvl}`}</button>`; }).join('')
+      + `<button data-a="specauto" title="Use a special by itself whenever there is energy"><b>${auto ? sp.find(x => x.id === auto).icon : '⟳'}</b>${auto ? 'auto' : 'off'}</button></div>`;
+  }
+  if (h !== lastSpec) { lastSpec = h; el.innerHTML = h; el.hidden = !h; }
+}
 function renderHero() {
   const mh = maxHp();
   const ammo = wtype() === 'ranged' ? (bestArrow() ? `${ITEMS[bestArrow()].name} ×${fmt(has(bestArrow()))}` : '<span class="need">none</span>')
@@ -7980,6 +8095,15 @@ document.addEventListener('click', ev => {
     case 'syncnow': netSync().then(accountModal); break;
     case 'progsub': progSub = id; break;
     case 'hsk': hsSkill = id; break;
+    case 'spec': { const c = specClass(), sp = c && SPECS[c].list.find(x => x.id === id);
+      if (sp) { R.specQ = R.specQ === id ? null : id; if (S.spec < sp.cost) showBanner(`⚡ ${sp.name} needs ${sp.cost}% special energy – it fires when there is enough.`); }
+      renderSpec(); break; }
+    case 'specauto': { const c = specClass(); if (!c) break;
+      // cycle: off → each special you have unlocked → off
+      const open = SPECS[c].list.filter(x => specOk(x, c)).map(x => x.id), cur = (S.specAuto = S.specAuto || {})[c], i = open.indexOf(cur);
+      S.specAuto[c] = i + 1 < open.length ? open[i + 1] : null;
+      const sp = S.specAuto[c] && SPECS[c].list.find(x => x.id === S.specAuto[c]);
+      showBanner(sp ? `⟳ Auto special: ${sp.icon} ${sp.name} (${sp.cost}%)` : '⟳ Auto special off'); renderSpec(); save(); break; }
     case 'insp': inspectHero(Array.isArray(hsRows) && hsRows[+id]); break;
     case 'pvpfind': pvpFind(); break;
     case 'pvpfight': pvpFight(id); break;
@@ -8150,7 +8274,7 @@ function frame(now) {
   else tick(dt);
   draw();
   uiTimer += dt; saveTimer += dt;
-  if (uiTimer > 0.25) { uiTimer = 0; renderHero(); renderGoal(); if (uiDirty) { uiDirty = false; renderTab(); } }
+  if (uiTimer > 0.25) { uiTimer = 0; renderHero(); renderGoal(); renderSpec(); if (uiDirty) { uiDirty = false; renderTab(); } }
   if (saveTimer > 10) { saveTimer = 0; save(); }
   if (me && (NET.timer += dt) > 60) { NET.timer = 0; netSync(); }
   requestAnimationFrame(frame);
