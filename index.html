@@ -72,7 +72,7 @@
   #specbar button:disabled { opacity: 0.4; }
   #specbar button.brace { min-width: 90px; font-size: 14px; background: #a8402a; border-color: #ffd04a; animation: pulse 0.5s infinite alternate; }
   @keyframes pulse { to { transform: scale(1.08); } }
-  @media (max-width: 700px) { #specbar { right: 4px; bottom: 4px; gap: 2px; } #specbar .en { height: 4px; } #specbar button { min-width: 28px; padding: 1px 3px; font-size: 8px; border-radius: 6px; } #specbar button b { font-size: 12px; } }
+  @media (max-width: 700px) { #specbar { right: 4px; bottom: 4px; gap: 2px; } #specbar .en { height: 4px; } #specbar button { min-width: 28px; padding: 1px 3px; font-size: 8px; border-radius: 6px; background: rgba(20,18,30,0.55); } #specbar button b { font-size: 12px; } }
   #view.g3 #scene3d { display: block; }
   #stage { position: relative; }
   #goal {
@@ -179,6 +179,8 @@
     display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10;
   }
   #modal[hidden] { display: none; }
+  .luxprev { text-align: center; margin: 6px 0 10px; }
+  .luxprev canvas { width: 180px; height: 150px; display: block; margin: 0 auto 4px; background: radial-gradient(#3a3550, #1b1925); border-radius: 10px; }
   a.insp { cursor: pointer; text-decoration: underline dotted rgba(255,255,255,0.35); }
   #modal .card { max-width: 440px; width: 100%; padding: 18px; max-height: 80vh; max-height: 80dvh; overflow-y: auto; overscroll-behavior: contain; }
   #modal textarea { width: 100%; min-height: 110px; font: 12px/1.4 ui-monospace, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
@@ -465,7 +467,7 @@ const TIER_COLORS = ['#c87533', '#9aa0a8', '#dfe3ee', '#f2c94c', '#4fd6e8', '#e0
 const CANOPY = ['#8ccf6b', '#3f8f3a', '#d0702f', '#2f6b45', '#b06be0'];
 // OSRS metals: bronze -> rune, plus Dragon from drops
 const METALS = ['Bronze', 'Iron', 'Steel', 'Cobalt', 'Verdite', 'Skyrite', 'Wyrmsteel'];
-const METAL_COLORS = ['#b07a45', '#8a8f98', '#b8bec8', '#5a6ad8', '#4a9a5a', '#3fc6e0', '#c0392b'];
+const METAL_COLORS = ['#b07a45', '#8a8f98', '#b8bec8', '#5a68b8', '#4a9a5a', '#4aa8c0', '#c0392b'];
 const METAL_LVL = [1, 15, 30, 50, 70, 85];          // Smithing level each metal starts at
 const METAL_EQUIP = [1, 1, 5, 20, 30, 40, 60];       // Attack/Defence needed to wear it, as in OSRS
 const METAL_POWER = [3, 6, 10, 15, 21, 28, 34];      // base weapon power
@@ -735,7 +737,7 @@ const ENEMIES = {
   gobarcher: { name: 'Goblin Archer', type: 'ranged', hp: 50,   maxHit: 8,  atk: 12, def: 8,  speed: 2.2, gold: [4, 10],    shape: 'humanoid', size: .8,  color: '#6fae46', body: '#3f5a2a', drops: [['bones', .6, 1, 1], ['arrow0', .4, 3, 8]] },
   wolf:     { name: 'Wolf',           type: 'melee',  hp: 75,   maxHit: 9,  atk: 13, def: 12, speed: 2.0, gold: [3, 8],     shape: 'quad',     size: .95, color: '#6b6f78', drops: [['bones', 1, 1, 2]] },
   bat:      { name: 'Bat',            type: 'melee',  hp: 180,  maxHit: 16, atk: 27, def: 25, speed: 1.6, gold: [6, 14],    shape: 'flyer',    size: 1,   color: '#4a3a5a', drops: [['gem', .02, 1, 1]] },
-  skeleton: { name: 'Skeleton Archer', type: 'ranged', hp: 260, maxHit: 20, atk: 31, def: 30, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#e6e2d3', body: '#d8d3c0', drops: [['bones', 1, 2, 3], ['arrow1', .3, 5, 12]] },
+  skeleton: { name: 'Skeleton Archer', type: 'ranged', hp: 260, maxHit: 20, atk: 31, def: 30, speed: 2.4, gold: [10, 22],   shape: 'humanoid', size: 1,   color: '#eeeadf', body: '#e2ddcc', drops: [['bones', 1, 2, 3], ['arrow1', .3, 5, 12]] },
   cultist:  { name: 'Dark Cultist',   type: 'magic',  hp: 220,  maxHit: 22, atk: 30, def: 26, speed: 2.6, gold: [10, 20],   shape: 'humanoid', size: 1,   color: '#d8c0a0', body: '#3a2050', orb: '#b06bff', drops: [['bones', 1, 1, 1], ['r_chaos', .6, 5, 12], ['essence', .5, 2, 5]] },
   orc:      { name: 'Orc',            type: 'melee',  hp: 520,  maxHit: 32, atk: 48, def: 47, speed: 2.6, gold: [20, 40],   shape: 'humanoid', size: 1.15, color: '#7f9a3e', body: '#4a3a2c', drops: [['bigbones', 1, 1, 1], ['ore_coal', .4, 3, 6], ['gem', .03, 1, 1]] },
   icemage:  { name: 'Ice Mage',       type: 'magic',  hp: 600,  maxHit: 36, atk: 50, def: 44, speed: 2.6, gold: [20, 45],   shape: 'humanoid', size: 1,   color: '#e0eaff', body: '#4a6aa8', orb: '#9fe0ff', drops: [['bones', 1, 1, 1], ['r_water', .8, 10, 20], ['gem', .04, 1, 1]] },
@@ -1383,7 +1385,7 @@ function spawnEntity() {
     if (z.wboss) {
       const id = WB_BOSSES[(WB.st && WB.st.kind) || 0], d = ENEMIES[id];
       R.ent = { kind: 'enemy', id, food: 0, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x,
-        stop: (d.shape === 'dragon' ? 130 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0), hit: 0, lunge: 0, pend: 0, style: d.styles[0], swap: randi(3, 5) };
+        stop: (d.shape === 'dragon' ? 150 : 80 + 30 * d.size) + (wtype() !== 'melee' ? 60 : 0), hit: 0, lunge: 0, pend: 0, style: d.styles[0], swap: randi(3, 5) };
       return;
     }
     const lair = S.ctarget && S.ctarget === z.boss && bossOpen(bossOf(z.boss));
@@ -1391,7 +1393,8 @@ function spawnEntity() {
     const pk = z.wild && (S.ctarget === 'pvp' || Math.random() < PK_CHANCE);
     const d = pk ? makePker() : ENEMIES[id];
     // archers and mages keep their distance
-    const stop = (d.shape === 'dragon' ? 130 : d.shape === 'flyer' ? 70 : 55 + 25 * d.size) + (wtype() !== 'melee' ? 60 : 0);
+    // melee monsters stop a step away so they don't stand inside the hero; bosses are bigger
+    const stop = (d.shape === 'dragon' ? 150 : d.shape === 'flyer' ? 80 : 80 + 30 * d.size) + (d.boss ? 30 : 0) + (wtype() !== 'melee' ? 60 : 0);
     R.ent = { kind: 'enemy', id: pk ? 'pker' : id, food: d.food || 0, d, hp: d.hp, maxHp: d.hp, atk: d.atk, def: d.def, atkT: d.speed * 0.7, x, stop, hit: 0, lunge: 0, pend: 0, style: d.styles ? d.styles[0] : d.type, swap: randi(3, 5) };
   } else if (act === 'thieving') {
     const list = (ZONES[S.zone].npcs || []).filter(id => LV.thieving >= NPCS[id].lvl);
@@ -2267,6 +2270,7 @@ function htmlLux() {
   }).join('') + '</div>';
   const dot = (id, t) => `<span class="sw" style="background:${t[1]}"></span>`;
   const ico = (id, t) => `<span class="sw emo">${t[3]}</span>`;
+ h += `<div class="luxprev"><canvas id="lux-cv" width="360" height="300"></canvas><small class="muted">Your hero as others see it</small></div>`;
   h += `<p><button data-a="hidehelm" class="${S.cos.hideHelm ? 'sel' : ''}">🪖 ${S.cos.hideHelm ? 'Helmet hidden – your hair and hat show' : 'Hide my helmet (keeps its stats)'}</button></p>`;
   h += row('hair', '💇 Hair colour', dot) + row('style', '✂️ Hairstyle', ico) + row('beard', '🧔 Beard', ico) + row('skin', '🧑 Skin', dot) + row('eyes', '👁️ Eyes', dot)
     + row('shirt', '👕 Shirt (shows without body armour)', dot) + row('pants', '👖 Trousers (show without leg armour)', dot)
@@ -3313,6 +3317,7 @@ function entScreenX(e) { return e.x - R.worldX + HX; }
 function entHeight(e) {
   const d = e.d;
   if (!d) return 100;
+  if (e.h3 && G3.on) return e.h3;
   return { blob: 50, quad: 50, flyer: 110, humanoid: 80, dragon: 170 }[d.shape] * (d.shape === 'dragon' ? 1 : d.size);
 }
 
@@ -3516,6 +3521,7 @@ function drawHumanoid(o) {
     ctx.moveTo(-16, -48); ctx.lineTo(-2, -48); ctx.lineTo(-2, -30); ctx.lineTo(-9, -20); ctx.lineTo(-16, -30); ctx.closePath(); ctx.fill();
     ctx.fillStyle = shade(o.shield, 0.12); ctx.fillRect(-10, -46, 2, 20);
   }
+  if (o.cape) { rr(-15, -51, 9, 33, 3, shade(o.cape, -0.12)); rr(-15, -21, 9, 3, 1, shade(o.cape, -0.3)); }
   rr(-10, -50, 20, 27, 5, o.body);
   if (o.ribs) { ctx.fillStyle = '#9a9483'; for (let k = 0; k < 3; k++) ctx.fillRect(-7, -44 + k * 6, 14, 2); }
   rr(-10, -27, 20, 4, 1, shade(o.body, -0.3));
@@ -3580,7 +3586,8 @@ function drawLookHead(look, helm) {
 // the drawHumanoid options for a hero wearing these looks and this gear (sl -> item or null)
 function lookFig(look, gear, hit) {
   const bodyIt = gear('body'), helm = gear('helm'), legs = gear('legs');
-  return { body: hit ? '#d84a4a' : bodyIt ? bodyIt.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.08) : look.pants, skin: hit ? '#ff9a8a' : look.skin,
+  const capeIt = gear('cape');
+  return { cape: capeIt ? capeIt.color : look.cape, body: hit ? '#d84a4a' : bodyIt ? bodyIt.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.18) : look.pants, skin: hit ? '#ff9a8a' : look.skin,
     eye: look.eyes, headExtra: () => drawLookHead(look, helm) };
 }
 function drawHero() {
@@ -3943,6 +3950,16 @@ function chips(e) {
 /* --- effects --- */
 let coins = [], projs = [];
 function shoot(x0, y0, x1, y1, kind, color, dur) { if (!SIM) projs.push({ x0, y0, x1, y1, kind, color, t: 0, dur: Math.max(0.1, dur) }); }
+// a melee swing leaves a bright crescent in front of the hero
+function drawSwingArc() {
+  if (R.swing < 0.35 || S.activity !== 'combat' || R.phase !== 'act' || !R.ent || R.ent.kind !== 'enemy' || R.ent.replay || combatType() !== 'melee' || G3.fp) return;
+  const a = (R.swing - 0.35) / 0.65, cx = HX + 14, cy = GY - 48, r = 42 * FS;
+  ctx.save(); ctx.globalAlpha = a * 0.85; ctx.lineCap = 'round';
+  const sp = R.shot && R.shot.spec;
+  ctx.strokeStyle = sp ? '#ffe27a' : '#ffffff'; ctx.lineWidth = (sp ? 7 : 4) * a + 1;
+  ctx.beginPath(); ctx.arc(cx, cy, r, -1.6 + (1 - a) * 1.4, 0.5 + (1 - a) * 0.6); ctx.stroke();
+  ctx.restore();
+}
 function drawProjs() {
   for (const p of projs) {
     const t = p.t, lift = p.kind === 'arrow' ? 22 : 8;
@@ -3956,13 +3973,18 @@ function drawProjs() {
     }
     if (p.kind === 'arrow') {
       ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan2(dy, dx));
+      const tr = ctx.createLinearGradient(-44, 0, -12, 0); tr.addColorStop(0, 'rgba(255,255,255,0)'); tr.addColorStop(1, 'rgba(255,255,255,0.55)');
+      ctx.fillStyle = tr; ctx.fillRect(-44, -1.5, 32, 3);   // a short white streak behind the arrow
       rr(-14, -1, 14, 2, 1, '#d8c8a8'); poly([0, -3, 6, 0, 0, 3], '#c8ccd4'); poly([-14, -3, -10, 0, -14, 3], '#e86a6a');
       ctx.restore();
     } else {
-      const g = ctx.createRadialGradient(x, y, 1, x, y, 14);
+      // a bigger bolt with a fading tail, easy to follow
+      for (let k = 3; k >= 1; k--) { const u = Math.max(0, t - k * 0.07); ctx.globalAlpha = 0.25 * (4 - k) / 3; circle(p.x0 + (p.x1 - p.x0) * u, p.y0 + (p.y1 - p.y0) * u - Math.sin(u * Math.PI) * lift, 7 - k, p.color); }
+      ctx.globalAlpha = 1;
+      const g = ctx.createRadialGradient(x, y, 1, x, y, 22);
       g.addColorStop(0, p.color); g.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = g; ctx.fillRect(x - 14, y - 14, 28, 28);
-      circle(x, y, 4.5, '#ffffff'); circle(x, y, 3.5, p.color);
+      ctx.fillStyle = g; ctx.fillRect(x - 22, y - 22, 44, 44);
+      circle(x, y, 6, '#ffffff'); circle(x, y, 4.5, p.color);
       if (!G3.fp && Math.random() < 0.5) particles.push({ wx: R.worldX + x - HX, y, vx: rand(-20, 20), vy: rand(-30, 10), life: 0.3, color: p.color });
     }
   }
@@ -4234,7 +4256,7 @@ function draw() {
     drawEvents();
     drawHero();
   }
-  drawProjs();
+  drawProjs(); drawSwingArc();
   if (R.ring > 0) {
     ctx.strokeStyle = `rgba(242,201,76,${R.ring})`; ctx.lineWidth = 4 * R.ring;
     const rx = G3.fp ? W / 2 : HX, ry = G3.fp ? H * 0.55 : GY - 40, k = G3.fp ? 2.2 : 1;
@@ -5005,11 +5027,17 @@ function inspectHero(r) {
     <p class="muted" style="text-align:center">Combat ${r.combat} · total level ${fmt(r.total_level)}${r.rating ? ` · PvP rating ${fmt(r.rating)}` : ''}</p>
     ${r.look ? `<p><small>${worn.length ? worn.map(it => `${it.icon || ''} ${it.name}`).join(' · ') : 'No gear worn.'}</small></p>` : '<p class="muted"><small>This hero has not saved since looks were shared – they will show after their next save.</small></p>'}
     <button data-a="close">Close</button>`);
-  const cv = document.getElementById('insp-cv'), main = ctx;
+  drawHeroPreview(document.getElementById('insp-cv'), look, gear);
+}
+// a still picture of a hero (yours or another player's) on a small canvas, drawn with the game's 2D figure
+function drawHeroPreview(cv, look, gear) {
+  if (!cv) return;
+  const w = gear('weapon'), sh = gear('shield'), main = ctx;
   ctx = cv.getContext('2d');
   try {
-    ctx.scale(2, 2); ellipse(90, 132, 22, 5, 'rgba(0,0,0,0.3)');
-    if (look.aura) { ctx.shadowColor = look.aura; ctx.shadowBlur = 14; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.scale(cv.width / 180, cv.height / 150); ellipse(90, 132, 22, 5, 'rgba(0,0,0,0.3)');
+    if (look.aura) { ellipse(90, 132, 30, 7, look.aura + '55'); ctx.shadowColor = look.aura; ctx.shadowBlur = 14; }
     const wt = w ? w.wtype || 'melee' : 'melee';
     drawHumanoid({ x: 90, y: 130, s: 1.25, face: 1, walk: 0, arm: wt === 'melee' ? -0.45 : -1.4, shield: sh ? sh.color : null, ...lookFig(look, gear, false),
       tool: wt === 'ranged' ? () => drawBow(w.tier !== undefined ? TIER_COLORS[w.tier] : '#8a6a4a', true) : wt === 'magic' ? () => drawStaff('#c58bff') : bladeTool(w) });
@@ -5074,7 +5102,7 @@ const G3 = (() => {
   function shadow(r) { const s = new T.Mesh(shadowGeo, shadowMat); s.scale.set(r, r * 0.55, 1); s.rotation.x = -Math.PI / 2; s.position.y = 0.02; s.renderOrder = -1; return s; }
   // every material of a model, for hit flashes and fading out
   function mats(o) { const list = []; o.traverse(n => { if (n.material && n.material !== shadowMat && !n.isSprite) list.push(n.material); }); return list; }
-  function flash(o, r, g, b) { for (const m of o.userData.mats) if (m.emissive) m.emissive.setRGB(r, g, b); }
+  function flash(o, r, g, b) { for (const m of o.userData.mats) if (m.emissive) { const e = m.userData.em; m.emissive.setRGB(r + (e ? e.r : 0), g + (e ? e.g : 0), b + (e ? e.b : 0)); } }
   function fade(o, a) {
     o.traverse(n => {
       const m = n.material; if (!m || m === shadowMat) return;
@@ -5157,11 +5185,17 @@ const G3 = (() => {
     for (let tx = 0; tx < CH; tx++) for (let tz = -BACK; tz < 4; tz++) {
       const x = x0 + tx, k = x * 131 + tz * 17;
       const pts = [[x, hgt(x, tz), tz], [x, hgt(x, tz + 1), tz + 1], [x + 1, hgt(x + 1, tz + 1), tz + 1], [x + 1, hgt(x + 1, tz), tz]];
-      if (th.lava && Math.abs(tz + 0.5) > 2.5 && hash(k + 9) > 0.93) quad(g, pts, '#d8571e');
+      // lava gathers in pools and rivers with a dark crust round them, not scattered single tiles
+      const lv = th.lava && Math.abs(tz + 0.5) > 2.5 ? Math.sin(x * 0.17 + 1.3) * Math.sin(tz * 0.45 - x * 0.05) + Math.sin(x * 0.05 + tz * 0.11) * 0.25 : -9;
+      if (lv > 0.55) quad(g, pts, null, false, pts.map(([px, , pz]) => { const c = C(hash(px * 31 + pz * 7) > 0.6 ? '#ffa040' : '#e0601e'); return [c.r, c.g, c.b]; }));
+      else if (lv > 0.4) quad(a, pts, '#3a1c12');
       else quad(a, pts, null, false, pts.map(([px, , pz]) => corner(px, pz)));
       if (th.cave && tz < 2) {
-        const cy = 6.3 - hash(k + 5) * 0.5;
-        quad(a, [[x, cy, tz], [x, cy, tz + 1], [x + 1, cy, tz + 1], [x + 1, cy, tz]], mix(th.near, '#000000', 0.2 + hash(k) * 0.2), true);
+        // one smooth rocky ceiling: each corner is shared with the next tile, and it darkens into the fog
+        const cy = (px, pz) => 6.2 - 0.3 * (0.5 + 0.5 * Math.sin(px * 0.45 + pz * 0.9)) - hash(px * 131 + pz * 17 + 5) * 0.25;
+        const cc = (px, pz) => { const c = C(mix(th.near, '#000000', 0.45 + hash(px * 131 + pz * 17) * 0.1)); return [c.r, c.g, c.b]; };
+        const cp = [[x, cy(x, tz), tz], [x, cy(x, tz + 1), tz + 1], [x + 1, cy(x + 1, tz + 1), tz + 1], [x + 1, cy(x + 1, tz), tz]];
+        quad(a, cp, null, true, cp.map(([px, , pz]) => cc(px, pz)));
       }
     }
     if (z.home) buildHome(a, g, x0);
@@ -5539,9 +5573,14 @@ const G3 = (() => {
     if (o.plate) {
       // shoulder plates and a ridge down the chest
       g.add(box(0.26, 0.12, 0.2, shadeC(o.body, 0.1), 0, 1.24, 0.3), box(0.26, 0.12, 0.2, shadeC(o.body, -0.05), 0, 1.24, -0.3));
+      g.add(box(0.27, 0.03, 0.21, shadeC(o.body, -0.35), 0, 1.18, 0.3), box(0.27, 0.03, 0.21, shadeC(o.body, -0.4), 0, 1.18, -0.3));   // darker pauldron edges
       g.add(box(0.03, 0.4, 0.08, shadeC(o.body, 0.18), 0.17, 0.98, 0));
     } else if (o.chain) for (let k = 0; k < 4; k++) g.add(box(0.02, 0.025, 0.5, shadeC(o.body, -0.2), 0.175, 0.8 + k * 0.1, 0));
-    if (o.cape) { const c = box(0.05, 0.92, 0.5, o.cape, -0.2, 0.78, 0); c.rotation.z = -0.06; g.add(c, box(0.08, 0.06, 0.56, shadeC(o.cape, -0.15), -0.17, 1.24, 0)); }
+    if (o.cape) {
+      // hung from the shoulders so it can sway as the hero walks
+      const c = new T.Group(); c.position.set(-0.18, 1.24, 0); c.add(box(0.05, 0.95, 0.62, o.cape, -0.02, -0.47, 0), box(0.06, 0.08, 0.62, shadeC(o.cape, -0.25), -0.02, -0.92, 0));
+      c.rotation.z = -0.06; P.cape = c; g.add(c, box(0.08, 0.06, 0.6, shadeC(o.cape, -0.15), -0.17, 1.24, 0));
+    }
     if (o.ribs) for (let k = 0; k < 3; k++) g.add(box(0.02, 0.05, 0.38, '#7a7466', 0.17, 0.82 + k * 0.13, 0));
     const head = new T.Group(); head.position.y = 1.48;
     head.add(box(0.36, 0.38, 0.36, o.skin, 0, 0, 0));
@@ -5713,11 +5752,24 @@ const G3 = (() => {
   }
 
   let heroObj = null, heroKey = '', petKey = '', heroZ = 0, heroYaw = -0.6, fpYaw = 0, fpBack = 0, fpPitch = -0.06, vm = null, vmKey = '';
+  // a cosmetic aura: a glowing ring under the feet and motes rising round the hero
+  function auraRing(parent, c) {
+    const r = new T.Group();
+    const ring = mk(new T.TorusGeometry(0.55, 0.035, 6, 28), unlit(c, { opacity: 0.85 })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.04;
+    const disc = mk(new T.CircleGeometry(0.55, 24), unlit(c, { opacity: 0.18 })); disc.rotation.x = -Math.PI / 2; disc.position.y = 0.03;
+    r.add(ring, disc); r.userData.motes = [];
+    for (let k = 0; k < 6; k++) { const m = mk(new T.OctahedronGeometry(0.045, 0), unlit(shade(c, 0.35))); r.add(m); r.userData.motes.push(m); }
+    parent.add(r); return r;
+  }
+  function animRing(r) {
+    r.children[0].rotation.z = time * 0.8;
+    r.userData.motes.forEach((m, k) => { const u = (time * 0.35 + k / 6) % 1, a = k * 1.05 + time * 0.6; m.position.set(Math.cos(a) * 0.45, 0.1 + u * 1.7, Math.sin(a) * 0.45); m.scale.setScalar(1 - u * 0.7); });
+  }
   // person() options for a hero with these looks and this gear (sl -> item or null): you, or another player
   function lookOpts(look, gear, fight) {
     const body = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield'), cape = gear('cape'), hands = gear('hands'), feet = gear('feet');
     return {
-      body: body ? body.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.08) : look.pants, skin: look.skin, hair: look.hair,
+      body: body ? body.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.2) : look.pants, skin: look.skin, hair: look.hair,
       helm: helm && !look.hideHelm && shade(helm.color, -0.05), fullhelm: helm && !look.hideHelm && helm.kind === 'fullhelm',
       shield: shield && fight ? shield.color : null, kite: shield && shield.kind === 'kiteshield',
       plate: body && (body.kind === 'platebody' || /plate/i.test(body.name)), chain: body && body.kind === 'chainbody', plateLegs: legs && legs.kind === 'platelegs',
@@ -5740,6 +5792,7 @@ const G3 = (() => {
       heroObj = group(p, shadow(0.45)); heroObj.userData.p = p; heroObj.userData.mats = mats(p); cast(p);
       const al = armorAura(), ac = look.aura || (al ? enchGlow(al) : null);
       if (ac) { const au = glow(ac, 2.6, 0.35); au.position.y = 1.0; heroObj.add(au); heroObj.userData.aura = au; }
+      if (look.aura) heroObj.userData.ring = auraRing(heroObj, look.aura);
       scene.add(heroObj);
     }
     const p = heroObj.userData.p, P = p.userData.P;
@@ -5776,6 +5829,8 @@ const G3 = (() => {
     }
     animTool(P.armF.children[2]);
     if (heroObj.userData.aura) heroObj.userData.aura.material.opacity = 0.28 + 0.1 * Math.sin(time * 2.5);
+    if (heroObj.userData.ring) animRing(heroObj.userData.ring);
+    if (P.cape) P.cape.rotation.z = -0.06 - (walking ? 0.22 + Math.sin(time * 13) * 0.08 : 0.03 + Math.sin(time * 2) * 0.03);
     const h = R.heroHit > 0.5 ? 0.45 : 0; flash(heroObj, h, 0, 0);
     fpYaw += ((fishing ? 1.35 : 0) - fpYaw) * 0.08;
     if (api.fp) { heroObj.visible = false; syncViewModel(body ? body.color || '#9aa0a8' : heroLook().shirt, hands && hands.color, shield && S.activity === 'combat' && wtype() === 'melee' ? shield : null, walking, dead); }
@@ -6110,16 +6165,16 @@ const G3 = (() => {
   const GLB = {
     bog: { f: 'spikyblob', k: 0.75, lit: 1.6, tint: '#c8d890' }, bogmother: { f: 'spikyblob', k: 0.75, lit: 1.6, tint: '#d0e090' },
     rat: { f: 'rat', k: 0.75 }, wolf: { f: 'wolf', k: 1.05, lit: 1.6, tint: '#c8ccd8' },
-    goblin: { f: 'orc', k: 0.5 }, gobarcher: { f: 'orc', k: 0.5, tint: '#c8e0a0' }, gobchief: { f: 'orc', k: 0.5, tint: '#e0f0b0' },
-    revgob: { f: 'orc', k: 0.5 }, orc: { f: 'orcskull', k: 0.5 },
-    bat: { f: 'bat', h: 1.1, fly: 1.4, tint: '#b098d0' },
-    troll: { f: 'troll', k: 0.5, tint: '#c8d8c0', lit: 1.3 }, frosttroll: { f: 'troll', k: 0.5, tint: '#e0f4ff', lit: 1.5 },
-    yeti: { f: 'yeti', k: 0.65 },
+    goblin: { f: 'orc', k: 0.62 }, gobarcher: { f: 'orc', k: 0.62, tint: '#c8e0a0' }, gobchief: { f: 'orc', k: 0.62, tint: '#e0f0b0' },
+    revgob: { f: 'orc', k: 0.62 }, orc: { f: 'orcskull', k: 0.75 },
+    bat: { f: 'bat', h: 1.3, fly: 1.4, tint: '#c8b0e8', lit: 1.4, glow: 0.25 },
+    troll: { f: 'troll', k: 0.75, tint: '#c8d8c0', lit: 1.3 }, frosttroll: { f: 'troll', k: 0.75, tint: '#e0f4ff', lit: 1.5 },
+    yeti: { f: 'yeti', k: 0.8, lit: 1.2 },
     imp: { f: 'imp', h: 1.3, fly: 1.0, lit: 1.3 }, revimp: { f: 'imp', h: 1.3, fly: 1.0 },
-    lizard: { f: 'dino', k: 0.6, tint: '#ffb080', lit: 1.3 },
-    dragon: { f: 'dragon', h: 2.2, fly: 0.9, tint: '#ffa898', lit: 1.2 }, revdragon: { f: 'dragon', h: 2.2, fly: 0.9 },
-    shade: { f: 'ghost', h: 1.5, fly: 0.35, tint: '#c8a8ff', lit: 1.8 },
-    abyssal: { f: 'demon', k: 0.5, tint: '#e0a0e0', lit: 1.2 }, overlord: { f: 'demon', k: 0.5, tint: '#d090ff', lit: 1.2 },
+    lizard: { f: 'dino', k: 0.75, tint: '#ffb080', lit: 1.3 },
+    dragon: { f: 'dragon', h: 2.4, fly: 0.9, tint: '#ffa898', lit: 1.2 }, revdragon: { f: 'dragon', h: 2.4, fly: 0.9 },
+    shade: { f: 'ghost', h: 1.9, fly: 0.35, tint: '#e0d0ff', lit: 2.2, glow: 0.35 },
+    abyssal: { f: 'demon', k: 0.75, tint: '#e0a0e0', lit: 1.2 }, overlord: { f: 'demon', k: 0.75, tint: '#d090ff', lit: 1.2 },
   };
   const glbs = {};
   function glbGet(f) {
@@ -6141,9 +6196,11 @@ const G3 = (() => {
     m.traverse(n => {
       if (!n.isMesh) return;
       const o = n.material;
-      n.material = window.__noLam ? o.clone() : new T.MeshLambertMaterial({ map: o.map, color: o.color, vertexColors: o.vertexColors, skinning: !!n.isSkinnedMesh, transparent: true, side: o.side });
+      // flat shaded like the low-poly world, with a little self light so dark monsters show in dark zones
+      n.material = window.__noLam ? o.clone() : new T.MeshPhongMaterial({ map: o.map, color: o.color, vertexColors: o.vertexColors, skinning: !!n.isSkinnedMesh, transparent: true, side: o.side, flatShading: true, shininess: 0, specular: 0x000000 });
       if (cfg.tint) n.material.color.multiply(C(cfg.tint));
       if (cfg.lit) n.material.color.multiplyScalar(cfg.lit);
+      if (n.material.emissive) { n.material.emissive.copy(n.material.color).multiplyScalar(cfg.glow || 0.12); n.material.userData.em = n.material.emissive.clone(); }
       n.castShadow = true; n.frustumCulled = false;
     });
     const mx = new T.AnimationMixer(m), acts = {};
@@ -6156,7 +6213,8 @@ const G3 = (() => {
     if (b.isEmpty()) b.setFromObject(m);
     b.max.y += (b.max.y - b.min.y) * 0.12;   // the top bone is inside the head
     const size = b.getSize(new T.Vector3());
-    const h = (cfg.h || entHeight(e) / U3 * (cfg.k || 1)) * (cfg.h ? d.size || 1 : 1), s = h / Math.max(0.01, size.y);
+    const h = (cfg.h || entHeight(e) / U3 * (cfg.k || 1)) * (cfg.h ? d.size || 1 : 1) * (d.boss ? 1.5 : 1), s = h / Math.max(0.01, size.y);
+    e.h3 = (h + (cfg.fly || 0)) * U3;   // name tag and hit splats sit on the real model
     const inner = new T.Group(); inner.add(m); m.scale.setScalar(s); m.position.y = -b.min.y * s;
     inner.rotation.y = -Math.PI / 2;   // glTF characters face +z; ours face -x
     g.add(inner);
@@ -6261,7 +6319,7 @@ const G3 = (() => {
           if (d.boss) { const c = crown(0.28); hd.add(c); }
         },
       });
-      if (look && look.aura) { const au = glow(look.aura, 2.6, 0.35); au.position.y = 1.0; g.add(au); }
+      if (look && look.aura) { const au = glow(look.aura, 2.6, 0.35); au.position.y = 1.0; g.add(au); P.ring = auraRing(g, look.aura); }
       if (id === 'abyssal' || id === 'overlord') demonParts(p, d.body);
       if (id === 'warden') for (const z of [0.3, -0.3]) { const m = mk(new T.OctahedronGeometry(0.14, 0), lam('#c8f6ff', { opacity: 0.85 }), 0, 1.42, z); m.scale.y = 2; p.add(m); }
       p.rotation.y = Math.PI + 0.6;
@@ -6335,8 +6393,9 @@ const G3 = (() => {
       t.add(at(mk(new T.IcosahedronGeometry(0.42, 0), lam(shade(c, 0.08))), -0.15, 3.0, 0.25));
       if (e.tier === 2) for (let k = 0; k < 7; k++) t.add(box(0.1, 0.1, 0.1, '#f0a040', -0.7 + hash(k) * 1.4, 2.0 + hash(k + 3) * 1.2, 0.6 + hash(k + 5) * 0.3));
       if (e.tier === 4) { P.spark = group(); for (let k = 0; k < 6; k++) P.spark.add(mk(new T.OctahedronGeometry(0.06, 0), unlit('#f6e3ff'))); t.add(P.spark); }
+      t.position.z = -0.9;   // the trunk stands just behind the hero's swing, never in front of it
       g.add(t); P.t = t;
-      g.add(shadow(0.9));
+      g.add(at(shadow(0.9), 0, 0, -0.9));
       fxInit(g, P, '#d8a868');
       P.prod = itemMesh('log' + e.tier); P.prod.visible = false; P.fx.add(P.prod);
       P.leaves = []; for (let k = 0; k < 10; k++) { const l = box(0.12, 0.02, 0.08, k & 1 ? c : shade(c, -0.1)); l.visible = false; P.leaves.push(l); P.fx.add(l); }
@@ -6799,12 +6858,14 @@ const G3 = (() => {
     if (e.kind === 'enemy') {
       const d = e.d;
       x += e.lunge * (d.type === 'melee' ? -18 : -5);
-      if (e.hit > 0.5) flash(g, 0.6, 0.6, 0.6); else flash(g, 0, e.d.ghost ? 0.18 : 0, 0);
+      if (e.hit > 0.5) flash(g, 0.5, 0.14, 0.06); else flash(g, 0, e.d.ghost ? 0.18 : 0, 0);
       if (P.anim) P.anim(e);
       else if (d.shape === 'blob') { const q = 1 + 0.08 * Math.sin(time * 5); P.body.scale.set(1.05 * q, 0.85 / q, 0.9 * q); P.body.position.y = 0.5 / q; }
       else if (d.shape === 'quad') { P.head.position.y = (d.id === 'lizard' ? 0.45 : 0.75) + Math.sin(time * 4) * 0.025; P.tail.rotation.z = 0.4 + Math.sin(time * 6) * 0.15; }
       else if (d.shape === 'flyer') { const fl = Math.sin(time * 16); P.fly.position.y = 1.9 + Math.sin(time * 4) * 0.2; P.wingR.rotation.y = fl * 0.5; P.wingL.rotation.y = -fl * 0.5; P.wingR.rotation.z = fl * 0.35; P.wingL.rotation.z = -fl * 0.35; }
       else if (d.shape === 'humanoid') {
+        if (P.ring) animRing(P.ring);
+        P.p.position.y = Math.sin(time * 2.2) * 0.025; P.p.rotation.z = e.lunge * 0.12;   // breathing, and a lean into the attack
         const PP = P.p.userData.P; PP.armF.rotation.z = -(d.type === 'melee' ? -0.5 - 1.6 * e.lunge : -1.5 - 0.25 * e.lunge); PP.armB.rotation.z = PP.armB.children.length > 2 ? 0.5 : 0.15;
         const tl = PP.armF.children[2]; if (tl && tl.userData.segs) tl.userData.segs.forEach((sg, i) => { sg.rotation.z = Math.sin(time * 6 - i * 0.7) * 0.15 + e.lunge * (i ? 0.35 : -0.6); });
         if (tl && tl.userData.draw) tl.userData.draw(d.type === 'ranged' ? 1 - e.lunge : 0);
@@ -6990,8 +7051,10 @@ const G3 = (() => {
     scene.add(camera);   // so the first person view model, a child of the camera, is drawn
     hemi = new T.HemisphereLight('#ffffff', '#4a4232', 0.8); scene.add(hemi);
     sun = new T.DirectionalLight('#fff4e0', 0.65); sun.position.set(-4, 10, 7); scene.add(sun, sun.target);
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
-    sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
+    // phones get a cheaper shadow map: same look at their screen size, much less GPU work
+    const phone = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 800;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = phone ? T.BasicShadowMap : T.PCFShadowMap;
+    sun.castShadow = true; sun.shadow.mapSize.set(phone ? 1024 : 2048, phone ? 1024 : 2048); sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
     Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 22, bottom: -22, near: 1, far: 70 }); sun.shadow.camera.updateProjectionMatrix();
     torch = new T.PointLight('#ffb060', 0, 14, 1.6); scene.add(torch);
     fireLight = new T.PointLight('#ff9a40', 0, 7, 2); scene.add(fireLight);
@@ -7010,7 +7073,7 @@ const G3 = (() => {
   let chunkMat;
   api.resize = () => {
     if (!renderer) return;
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.setPixelRatio(Math.min(matchMedia('(pointer: coarse)').matches ? 1.5 : 2, window.devicePixelRatio || 1));
     renderer.setSize(W, H, false);
     zoneKey = -1;   // horizon moves with the view size, so rebuild the sky
   };
@@ -7968,7 +8031,7 @@ function htmlProgress() {
 function renderTab(force) {
   if (force) lastHtml = '';
   const html = { activity: htmlActivity, skills: htmlSkills, inventory: htmlBag, craft: htmlCraft, slayer: htmlSlayer, quests: htmlQuests, progress: htmlProgress }[tab]();
-  if (html !== lastHtml) { $('#tab-content').innerHTML = html; lastHtml = html; if (tab === 'activity') drawMap(); }
+  if (html !== lastHtml) { $('#tab-content').innerHTML = html; lastHtml = html; if (tab === 'activity') drawMap(); drawHeroPreview(document.getElementById('lux-cv'), heroLook(), sl => S.equip[sl] ? ITEMS[S.equip[sl]] : null); }
 }
 
 // special attack buttons on the game view: tap one to use it on your next attack, ⟳ picks the one used by itself
