@@ -305,13 +305,13 @@ local function onPlayerAdded(player: Player)
 		offline = math.max(0, os.time() - data.lastSeen)
 	end
 	profiles[player] = data
-	setupLeaderstats(player, data)
 	for _, fn in onLoaded do
 		local ok, err = pcall(fn, player, data, offline)
 		if not ok then
 			warn("[Endless Road] onLoaded: " .. tostring(err))
 		end
 	end
+	setupLeaderstats(player, data) -- after onLoaded, so offline levels are counted
 	DataService.sync(player)
 	if memoryOnly then
 		Remotes.Notify:FireClient(player, "Test mode: saving is off (DataStores unavailable).", "warn")
