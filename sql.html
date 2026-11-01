@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endless Road – server SQL</title>
+<style>
+  body { margin: 0; font: 16px system-ui, sans-serif; background: #15131c; color: #eee; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { color: #aaa; margin: 6px 0 12px; }
+  button { font: 700 20px system-ui, sans-serif; width: 100%; padding: 18px; border: 0; border-radius: 12px; background: #f2c94c; color: #222; }
+  button:disabled { opacity: 0.5; }
+  #msg { min-height: 24px; margin: 10px 0; font-weight: 700; }
+  textarea { width: 100%; box-sizing: border-box; height: 50vh; background: #0d0c12; color: #cfc; border: 1px solid #333; border-radius: 8px; font: 11px ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<h1>🗄️ Server SQL</h1>
+<p>Tap the button, then paste into the Supabase SQL Editor and press Run.</p>
+<button id="copy" disabled>Loading…</button>
+<div id="msg"></div>
+<textarea id="sql" readonly></textarea>
+<script>
+const btn = document.getElementById('copy'), ta = document.getElementById('sql'), msg = document.getElementById('msg');
+fetch('schema.txt', { cache: 'no-store' }).then(r => r.text()).then(t => {
+  ta.value = t; btn.disabled = false; btn.textContent = `📋 Copy all (${Math.round(t.length / 1024)} KB)`;
+}).catch(() => { btn.textContent = 'Could not load – reload the page'; });
+function fallback() {
+  // older iPhones: select the text box and use the old copy command
+  ta.readOnly = false; ta.focus(); ta.setSelectionRange(0, ta.value.length);
+  const ok = document.execCommand('copy'); ta.readOnly = true; ta.blur();
+  return ok;
+}
+btn.onclick = () => {
+  const done = ok => { msg.textContent = ok ? '✅ Copied! Now paste it in the SQL Editor.' : '⚠️ Copy failed – long-press the text box and choose Select All.'; msg.style.color = ok ? '#7fe07f' : '#ffb070'; };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(() => done(true), () => done(fallback()));
+  else done(fallback());
+};
+</script>
+</body>
+</html>

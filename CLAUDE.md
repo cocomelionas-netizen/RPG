@@ -7,4 +7,5 @@
 - Bump the cache version in `sw.js` once per release.
 - Server SQL lives in `supabase/schema.sql` (idempotent). The user runs it in the Supabase SQL Editor, often from a phone:
   it is readable as plain text at https://cocomelionas-netizen.github.io/RPG/schema.txt (copied there by the Pages workflow).
+  On iPhone send them https://cocomelionas-netizen.github.io/RPG/sql.html instead: it has a one-tap "Copy all" button.
 - Never ask for or put the Supabase secret key in the game; the publishable key is fine.
