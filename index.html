@@ -3135,23 +3135,51 @@ function potionLine() {
 }
 
 /* ===== Agility: courses all over the world, each with its own obstacles ===== */
-// L: how far the hero moves over it (px), d: seconds, lift(u): height above the ground (px), pose: how the hero holds itself
+// L: how far the hero moves over it (px), d: seconds, lift(u): height above the ground (px), pose: how the hero holds itself.
+// path(u) gives [x, feet height] in 3D units (40 px) instead, worked out from the obstacle's own shape so the hero
+// really stands on the net, hangs from the bars and swings on the rope. pose and lean may change along the way.
+const lerp = (a, b, t) => a + (b - a) * t;
+// jumps between landing spots: lands are [u, height] pairs; the hero arcs `peak` above the straight line between them
+function hopY(u, lands, peak) {
+  const pts = [[0, 0], ...lands, [1, 0]];
+  for (let k = 0; k < pts.length - 1; k++) { const [u0, y0] = pts[k], [u1, y1] = pts[k + 1]; if (u <= u1) { const t = (u - u0) / Math.max(1e-6, u1 - u0); return lerp(y0, y1, t) + peak * 4 * t * (1 - t); } }
+  return 0;
+}
+const seg = (u, a, b) => clamp((u - a) / (b - a), 0, 1);
+const NETO = { H: 2.2, A: 1.4 }, ROPE = { len: 1.5, top: 3.35, arm: 1.78, swing: 0.8 }, ZIP = { y0: 3.4, y1: 1.9 }, ARM = 1.78;
+const ropeA = u => (seg(u, 0.15, 0.85) - 0.5) * 2 * ROPE.swing;
 const OBS = {
-  hurdles: { name: 'Hurdles',          L: 200, d: 2.0, lift: u => 26 * Math.abs(Math.sin(u * Math.PI * 3)), pose: 'jump' },
-  log:     { name: 'Balance log',      L: 160, d: 3.0, lift: u => 14 * Math.sin(Math.min(1, u * 6) * Math.PI / 2) * Math.sin(Math.min(1, (1 - u) * 6) * Math.PI / 2), pose: 'balance' },
-  wall:    { name: 'Climbing wall',    L: 120, d: 2.6, lift: u => u < 0.55 ? 66 * u / 0.55 : 66 * Math.max(0, 1 - (u - 0.55) / 0.3), pose: 'climb', fx: u => u < 0.45 ? u * 0.4 : 0.18 + (u - 0.45) / 0.55 * 0.82 },
-  gap:     { name: 'Gap jump',         L: 140, d: 1.4, lift: u => 50 * Math.sin(u * Math.PI), pose: 'jump' },
-  rope:    { name: 'Rope swing',       L: 200, d: 2.2, lift: u => 30 + 26 * Math.sin(u * Math.PI) - 30 * Math.pow(Math.abs(u - 0.5) * 2, 6), pose: 'swing' },
-  net:     { name: 'Cargo net',        L: 140, d: 3.2, lift: u => 88 * (1 - Math.abs(u - 0.5) * 2), pose: 'climb' },
-  bars:    { name: 'Monkey bars',      L: 180, d: 3.0, lift: u => 46 * Math.min(1, u * 8, (1 - u) * 8), pose: 'hang' },
-  stones:  { name: 'Stepping stones',  L: 200, d: 2.6, lift: u => 20 * Math.abs(Math.sin(u * Math.PI * 4)), pose: 'jump' },
-  zip:     { name: 'Zipline',          L: 260, d: 1.8, lift: u => u < 0.12 ? 100 * u / 0.12 : 100 * (1 - (u - 0.12) / 0.88), pose: 'hang', fx: u => u < 0.12 ? 0 : (u - 0.12) / 0.88 },
-  ledge:   { name: 'Narrow ledge',     L: 160, d: 3.2, lift: u => 24 * Math.min(1, u * 6, (1 - u) * 6), pose: 'balance' },
+  hurdles: { name: 'Hurdles',          L: 200, d: 2.0, lift: u => hopY(u, [], 0) + 34 * Math.abs(Math.sin(u * Math.PI * 3)), pose: 'jump' },
+  log:     { name: 'Balance log',      L: 160, d: 3.0, lift: u => 20 * Math.min(1, u * 10, (1 - u) * 10), pose: 'balance' },
+  wall:    { name: 'Climbing wall',    L: 120, d: 2.8,
+    path: u => [u < 0.08 ? 0.36 * u / 0.08 : u < 0.45 ? 0.36 : u < 0.6 ? lerp(0.36, 1.25, seg(u, 0.45, 0.6)) : u < 0.75 ? lerp(1.25, 1.75, seg(u, 0.6, 0.75)) : lerp(1.75, 3, seg(u, 0.75, 1)),
+      u < 0.08 ? 0 : u < 0.45 ? 1.72 * seg(u, 0.08, 0.45) : u < 0.6 ? 1.72 : u < 0.75 ? 1.72 * (1 - seg(u, 0.6, 0.75) ** 2) : 0],
+    pose: u => u < 0.08 ? 'walk' : u < 0.45 ? 'climbup' : u < 0.6 ? 'crouch' : u < 0.75 ? 'jump' : 'walk' },
+  gap:     { name: 'Gap jump',         L: 140, d: 1.4, lift: u => 10 + 46 * Math.sin(u * Math.PI), pose: 'jump' },
+  rope:    { name: 'Rope swing',       L: 200, d: 2.4,
+    path: u => {
+      const px = 2.5, sx = a => px + ROPE.len * Math.sin(a), sy = a => ROPE.top - ROPE.len * Math.cos(a) - ROPE.arm;
+      if (u < 0.15) { const t = seg(u, 0, 0.15), a = -ROPE.swing; return [lerp(0, sx(a), t), lerp(0, sy(a), t) + 0.5 * 4 * t * (1 - t)]; }
+      if (u < 0.85) { const a = ropeA(u); return [sx(a), sy(a)]; }
+      const t = seg(u, 0.85, 1), a = ROPE.swing; return [lerp(sx(a), 5, t), lerp(sy(a), 0, t) + 0.4 * 4 * t * (1 - t)];
+    }, pose: u => u < 0.15 || u > 0.85 ? 'jump' : 'swing', lean: u => u < 0.15 || u > 0.85 ? 0 : -ropeA(u) * 0.9 },
+  net:     { name: 'Cargo net',        L: 140, d: 3.4,
+    path: u => { const x = u * 3.5, h = NETO.H * Math.max(0, 1 - Math.abs(x - 1.75) / NETO.A); return [x, h > 0 ? h + 0.06 : 0]; },
+    pose: u => Math.abs(u * 3.5 - 1.75) >= NETO.A ? 'walk' : u < 0.5 ? 'climbup' : 'climbdown', lean: u => Math.abs(u * 3.5 - 1.75) >= NETO.A ? 0 : u < 0.5 ? -0.4 : 0.3 },
+  bars:    { name: 'Monkey bars',      L: 180, d: 3.0, lift: u => (2.4 - ARM - 0.02) * 40 * Math.min(1, u * 8, (1 - u) * 8), pose: u => u < 0.12 || u > 0.88 ? 'jump' : 'hang' },
+  stones:  { name: 'Stepping stones',  L: 200, d: 2.6, lift: u => 40 * hopY(u, [[0.125, 0.2], [0.375, 0.2], [0.625, 0.2], [0.875, 0.2]], 0.5), pose: 'jump' },
+  zip:     { name: 'Zipline',          L: 260, d: 2.0,
+    path: u => { const Lu = 6.5, cy = x => lerp(ZIP.y0, ZIP.y1, x / Lu) - ARM;
+      if (u < 0.12) { const t = seg(u, 0, 0.12); return [0.3 * t, cy(0.3) * Math.sin(t * Math.PI / 2)]; }
+      if (u < 0.93) { const x = lerp(0.3, Lu - 0.4, seg(u, 0.12, 0.93)); return [x, cy(x)]; }
+      const t = seg(u, 0.93, 1); return [lerp(Lu - 0.4, Lu, t), cy(Lu - 0.4) * (1 - t * t)]; },
+    pose: u => u < 0.12 ? 'climbup' : u < 0.93 ? 'hang' : 'jump' },
+  ledge:   { name: 'Narrow ledge',     L: 160, d: 3.2, lift: u => 24 * Math.min(1, u * 8, (1 - u) * 8), pose: 'ledge' },
   tight:   { name: 'Tightrope',        L: 200, d: 3.4, lift: u => 80 * Math.min(1, u * 6, (1 - u) * 6), pose: 'balance' },
-  slide:   { name: 'Ice slide',        L: 220, d: 1.6, lift: u => 40 * (1 - u), pose: 'crouch' },
+  slide:   { name: 'Ice slide',        L: 220, d: 1.6, lift: u => 40 * (1 - u) + 2, pose: 'slide' },
   pipe:    { name: 'Squeeze pipe',     L: 160, d: 2.8, lift: () => 0, pose: 'crouch' },
-  lava:    { name: 'Lava stones',      L: 200, d: 2.6, lift: u => 22 * Math.abs(Math.sin(u * Math.PI * 4)), pose: 'jump' },
-  crystal: { name: 'Crystal bridge',   L: 160, d: 3.0, lift: u => 18 * Math.min(1, u * 6, (1 - u) * 6), pose: 'balance' },
+  lava:    { name: 'Lava stones',      L: 200, d: 2.6, lift: u => 40 * hopY(u, [[0.125, 0.2], [0.375, 0.2], [0.625, 0.2], [0.875, 0.2]], 0.55), pose: 'jump' },
+  crystal: { name: 'Crystal bridge',   L: 160, d: 3.0, lift: u => 14 * Math.min(1, u * 10, (1 - u) * 10), pose: 'balance' },
   portal:  { name: 'Rift hop',         L: 220, d: 1.6, lift: u => 10 * Math.sin(u * Math.PI), pose: 'blink' },
 };
 const COURSES = [
@@ -3194,15 +3222,19 @@ function spawnObstacle(x) {
   const ob = obs[R.agi.i];
   R.ent = { kind: 'obstacle', skill: 'agility', ob, c: c.id, i: R.agi.i, n: obs.length, x, stop: 18, t: 0, hit: 0, fail: Math.random() < failChance(c) };
 }
+function agiPlace(e, o, u, fell, dt) {
+  const pth = o.path && o.path(u);
+  if (!fell) R.worldX = e.x0 + (pth ? pth[0] * U3 : o.L * u);
+  R.heroLift = fell ? Math.max(0, (R.heroLift || 0) - dt * 400) : pth ? pth[1] * U3 : o.lift(u);
+  R.agiPose = fell ? 'fall' : typeof o.pose === 'function' ? o.pose(u) : o.pose; R.agiU = u; R.agiLean = !fell && o.lean ? o.lean(u) : 0;
+}
 function agiTick(dt) {
   const e = R.ent, o = OBS[e.ob], c = COURSE[e.c];
   if (e.x0 === undefined) e.x0 = R.worldX;
   e.t += dt * agiSpeed();
   let u = Math.min(1, e.t / o.d);
   const fell = e.fail && u > 0.5;
-  R.worldX = e.x0 + o.L * (o.fx ? o.fx(u) : u);
-  R.heroLift = fell ? Math.max(0, (R.heroLift || 0) - dt * 400) : o.lift(u);
-  R.agiPose = fell ? 'fall' : o.pose; R.agiU = u;
+  agiPlace(e, o, u, fell, dt);
   if (fell && !e.fellT) {
     e.fellT = 1;
     const dmg = Math.max(1, Math.round(2 + c.lvl * 0.12));
@@ -6051,26 +6083,38 @@ const G3 = (() => {
   }
   function person(o) {
     const g = new T.Group(), P = {};
-    // legs: plain trousers, or wider platelegs with knee plates
+    // legs bend at the knee: the thigh hangs from the hip, the shin and boot from the knee
+    const trim = o.tier >= 5 ? '#e8c86a' : o.tier >= 3 ? '#d8b04a' : null;   // high metals get gold edging
     const leg = c => {
-      const p = new T.Group(), w = o.plateLegs ? 0.2 : 0.17;
-      p.add(box(w, 0.62, w, c, 0, -0.31, 0));
-      if (o.plateLegs) p.add(box(0.06, 0.12, w * 0.8, shadeC(c, 0.12), 0.11, -0.3, 0));
-      p.add(box(0.23, 0.09, 0.2, o.boots || shadeC(c, -0.25), 0.03, -0.6, 0));
+      const p = new T.Group(), w = o.plateLegs ? 0.2 : 0.17, knee = new T.Group();
+      p.add(box(w, 0.34, w, c, 0, -0.16, 0));
+      if (o.plateLegs) p.add(box(0.05, 0.26, w * 0.9, shadeC(c, 0.12), w / 2, -0.17, 0));
+      knee.position.y = -0.31; p.add(knee); p.userData.knee = knee;
+      knee.add(box(w * 0.94, 0.3, w * 0.94, shadeC(c, -0.04), 0, -0.14, 0));
+      if (o.plateLegs) { knee.add(box(0.07, 0.1, w * 0.85, shadeC(c, 0.2), w / 2 + 0.01, 0, 0)); if (trim) knee.add(box(0.075, 0.025, w * 0.86, trim, w / 2 + 0.012, 0.05, 0)); }
+      const bc = o.boots || shadeC(c, -0.3);
+      knee.add(box(0.2, 0.13, 0.19, bc, 0.01, -0.27, 0), box(0.12, 0.08, 0.18, shadeC(bc, 0.05), 0.12, -0.3, 0), box(0.27, 0.03, 0.2, shadeC(bc, -0.35), 0.04, -0.34, 0));
       return p;
     };
-    P.legB = at(leg(shadeC(o.leg, -0.12)), 0, 0.62, -0.11); P.legF = at(leg(o.leg), 0, 0.62, 0.11);
+    P.legB = at(leg(shadeC(o.leg, -0.12)), 0, 0.66, -0.11); P.legF = at(leg(o.leg), 0, 0.66, 0.11);
     // OSRS bodies are broad in the chest and narrow at the waist
     const chest = box(0.34, 0.36, 0.56, o.body, 0, 1.07, 0);
-    const waist = box(0.29, 0.3, 0.46, shadeC(o.body, -0.06), 0, 0.77, 0);
-    const belt = box(0.31, 0.07, 0.48, shadeC(o.body, -0.35), 0, 0.65, 0);
-    g.add(P.legB, P.legF, chest, waist, belt, box(0.14, 0.08, 0.14, o.skin, 0, 1.27, 0));
+    const pecs = box(0.04, 0.16, 0.44, shadeC(o.body, 0.08), 0.17, 1.12, 0);
+    const waist = box(0.29, 0.3, 0.46, shadeC(o.body, -0.06), 0, 0.79, 0);
+    const belt = box(0.31, 0.07, 0.48, shadeC(o.body, -0.4), 0, 0.66, 0), buckle = box(0.04, 0.06, 0.08, '#d8b04a', 0.16, 0.66, 0);
+    const neck = box(0.14, 0.1, 0.14, o.skin, 0, 1.27, 0);
+    g.add(P.legB, P.legF, chest, pecs, waist, belt, buckle, neck);
     if (o.plate) {
-      // shoulder plates and a ridge down the chest
-      g.add(box(0.26, 0.12, 0.2, shadeC(o.body, 0.1), 0, 1.24, 0.3), box(0.26, 0.12, 0.2, shadeC(o.body, -0.05), 0, 1.24, -0.3));
-      g.add(box(0.27, 0.03, 0.21, shadeC(o.body, -0.35), 0, 1.18, 0.3), box(0.27, 0.03, 0.21, shadeC(o.body, -0.4), 0, 1.18, -0.3));   // darker pauldron edges
-      g.add(box(0.03, 0.4, 0.08, shadeC(o.body, 0.18), 0.17, 0.98, 0));
-    } else if (o.chain) for (let k = 0; k < 4; k++) g.add(box(0.02, 0.025, 0.5, shadeC(o.body, -0.2), 0.175, 0.8 + k * 0.1, 0));
+      // a breastplate with a ridge, a gorget at the neck and tassets over the hips
+      g.add(box(0.06, 0.34, 0.42, shadeC(o.body, 0.14), 0.16, 1.02, 0), box(0.03, 0.4, 0.06, shadeC(o.body, 0.3), 0.19, 1.0, 0));
+      g.add(box(0.22, 0.08, 0.24, shadeC(o.body, -0.1), 0, 1.27, 0));
+      for (const z of [-0.12, 0.12]) g.add(box(0.06, 0.2, 0.2, shadeC(o.body, 0.05), 0.15, 0.55, z));
+      g.add(box(0.06, 0.2, 0.44, shadeC(o.body, -0.12), -0.15, 0.55, 0));
+      if (trim) g.add(box(0.035, 0.03, 0.43, trim, 0.19, 1.19, 0), box(0.035, 0.03, 0.43, trim, 0.19, 0.86, 0), box(0.07, 0.025, 0.44, trim, 0.15, 0.45, 0));
+    } else if (o.chain) {
+      for (let k = 0; k < 4; k++) g.add(box(0.02, 0.025, 0.5, shadeC(o.body, -0.2), 0.175, 0.8 + k * 0.1, 0));
+      g.add(box(0.3, 0.16, 0.5, shadeC(o.body, -0.12), 0, 0.56, 0));   // mail skirt
+    }
     if (o.cape) {
       // hung from the shoulders so it can sway as the hero walks
       const c = new T.Group(); c.position.set(-0.18, 1.24, 0); c.add(box(0.05, 0.95, 0.62, o.cape, -0.02, -0.47, 0), box(0.06, 0.08, 0.62, shadeC(o.cape, -0.25), -0.02, -0.92, 0));
@@ -6082,9 +6126,19 @@ const G3 = (() => {
     head.add(box(0.04, 0.06, 0.06, o.eye || '#1a1a1a', 0.18, 0.03, 0.09), box(0.04, 0.06, 0.06, o.eye || '#1a1a1a', 0.18, 0.03, -0.09));
     head.add(box(0.07, 0.08, 0.07, shadeC(o.skin, -0.06), 0.2, -0.04, 0), box(0.02, 0.025, 0.12, shadeC(o.skin, -0.3), 0.185, -0.12, 0));
     if (o.helm) {
-      head.add(box(0.42, 0.22, 0.42, o.helm, -0.01, 0.12, 0));
-      if (o.fullhelm) { head.add(box(0.38, 0.4, 0.42, o.helm, -0.04, -0.02, 0)); head.add(box(0.02, 0.05, 0.3, '#111111', 0.16, 0.03, 0)); }
-      else head.add(box(0.04, 0.2, 0.06, o.helm, 0.19, -0.04, 0));   // nose guard
+      head.add(box(0.42, 0.22, 0.42, o.helm, -0.01, 0.12, 0), box(0.3, 0.06, 0.3, shadeC(o.helm, 0.12), -0.01, 0.25, 0));
+      if (o.fullhelm) {
+        // a closed helm: visor with an eye slit and breathing holes, a crest, and a plume on the high metals
+        head.add(box(0.38, 0.4, 0.42, o.helm, -0.04, -0.02, 0), box(0.05, 0.2, 0.38, shadeC(o.helm, 0.1), 0.17, -0.06, 0));
+        head.add(box(0.02, 0.04, 0.3, '#111111', 0.2, 0.03, 0));
+        for (let k = 0; k < 3; k++) head.add(box(0.02, 0.025, 0.025, '#111111', 0.2, -0.08 - (k % 2) * 0.05, -0.08 + k * 0.08));
+        head.add(box(0.36, 0.05, 0.05, shadeC(o.helm, 0.2), -0.04, 0.26, 0));
+        if (o.tier >= 2) { const pc = o.tier >= 5 ? '#e0453a' : o.tier >= 4 ? '#f2c94c' : '#d83a3a', pl = box(0.34, 0.12, 0.05, pc, -0.12, 0.33, 0); pl.rotation.z = -0.25; head.add(pl, box(0.08, 0.2, 0.05, shadeC(pc, -0.2), -0.3, 0.2, 0)); }
+        if (trim) head.add(box(0.06, 0.02, 0.4, trim, 0.17, 0.05, 0));
+      } else {
+        head.add(box(0.04, 0.2, 0.06, o.helm, 0.19, -0.04, 0));   // nose guard
+        head.add(box(0.12, 0.22, 0.04, shadeC(o.helm, -0.05), 0.1, -0.07, 0.2), box(0.12, 0.22, 0.04, shadeC(o.helm, -0.05), 0.1, -0.07, -0.2));   // cheek guards
+      }
     } else if (o.hair) {
       const hc = o.hair, st = o.style || 'short', cap = () => head.add(box(0.4, 0.12, 0.4, hc, -0.02, 0.2, 0));
       const sides = () => head.add(box(0.12, 0.3, 0.4, hc, -0.17, 0.04, 0), box(0.2, 0.12, 0.04, hc, -0.04, 0.08, 0.19), box(0.2, 0.12, 0.04, hc, -0.04, 0.08, -0.19));
@@ -6102,7 +6156,19 @@ const G3 = (() => {
     if (o.hat) o.hat(head);
     g.add(head); P.head = head;
     // arms keep [sleeve, hand, tool] as their children
-    const arm = (c, z) => { const p = new T.Group(); p.position.set(0, 1.2, z); p.add(box(0.15, 0.5, 0.15, c, 0, -0.25, 0)); p.add(box(0.13, 0.12, 0.13, o.gloves || o.skin, 0, -0.55, 0)); return p; };
+    const arm = (c, z) => {
+      const p = new T.Group(); p.position.set(0, 1.2, z);
+      const sl = box(0.15, 0.5, 0.15, c, 0, -0.25, 0); p.add(sl); p.add(box(0.13, 0.12, 0.13, o.gloves || o.skin, 0, -0.55, 0));
+      // extras ride on the sleeve so the arm's children stay [sleeve, hand, tool]
+      sl.add(box(0.19, 0.14, 0.19, shadeC(c, 0.05), 0, 0.2, 0));   // shoulder
+      if (o.gloves) sl.add(box(0.17, 0.08, 0.17, shadeC(o.gloves, -0.15), 0, -0.22, 0));   // cuff
+      if (o.plate) {
+        sl.add(box(0.26, 0.1, 0.26, shadeC(o.body, 0.12), 0, 0.27, z > 0 ? 0.02 : -0.02), box(0.24, 0.07, 0.24, shadeC(o.body, -0.05), 0, 0.17, 0));
+        sl.add(box(0.17, 0.08, 0.17, shadeC(o.body, 0.15), 0, -0.04, 0));   // elbow cop
+        if (trim) sl.add(box(0.265, 0.025, 0.265, trim, 0, 0.23, z > 0 ? 0.02 : -0.02));
+      }
+      return p;
+    };
     P.armB = arm(shadeC(o.body, -0.15), -0.34); P.armF = arm(shadeC(o.body, 0.06), 0.34);
     if (o.shield) {
       const sh = new T.Group(); sh.position.set(0.13, -0.42, -0.1); sh.rotation.y = 0.1;
@@ -6115,6 +6181,7 @@ const G3 = (() => {
     g.userData.P = P;
     return g;
   }
+  function knees(P, f, b) { if (P.legF.userData.knee) P.legF.userData.knee.rotation.z = -f; if (P.legB.userData.knee) P.legB.userData.knee.rotation.z = -b; }
   function shadeC(c, amt) { return shade('#' + C(c || '#888888').getHexString(), amt); }
 
   // the arm points along -y and the hand sits at y = -0.56; weapons are gripped in the fist and point
@@ -6267,7 +6334,7 @@ const G3 = (() => {
       body: body ? body.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.2) : look.pants, skin: look.skin, hair: look.hair,
       helm: helm && !look.hideHelm && shade(helm.color, -0.05), fullhelm: helm && !look.hideHelm && helm.kind === 'fullhelm',
       shield: shield && fight ? shield.color : null, kite: shield && shield.kind === 'kiteshield',
-      plate: body && (body.kind === 'platebody' || /plate/i.test(body.name)), chain: body && body.kind === 'chainbody', plateLegs: legs && legs.kind === 'platelegs',
+      plate: body && (body.kind === 'platebody' || /plate/i.test(body.name)), chain: body && body.kind === 'chainbody', plateLegs: legs && legs.kind === 'platelegs', tier: Math.max(body && body.metal != null ? body.metal : -1, helm && helm.metal != null ? helm.metal : -1),
       cape: cape ? cape.color : look.cape, gloves: hands && hands.color, boots: feet && feet.color,
       style: look.style, beard: look.beard, eye: look.eyes, hat: (!helm || look.hideHelm) && look.hat ? hd => heroHat(hd, look.hat) : null,
     };
@@ -6300,8 +6367,9 @@ const G3 = (() => {
     heroObj.position.set((R.worldX - R.heroHit * 5 - (dead ? 30 : 0)) / U3, stepping ? Math.abs(Math.sin(time * 13)) * 0.05 + (fishing && heroZ < -1.4 ? 0.1 : 0) : fishing && heroZ < -1.4 ? 0.1 : 0, heroZ);
     p.rotation.y = heroYaw;
     p.rotation.z = dead ? Math.PI / 2 : 0; p.position.y = dead ? 0.25 : 0;
-    const ls = stepping ? Math.sin(time * 13) * 0.6 : 0;
+    const ls = stepping ? Math.sin(time * 13) * 0.6 : 0, kc = stepping ? Math.cos(time * 13) : 0;
     P.legF.rotation.z = ls; P.legB.rotation.z = -ls;
+    knees(P, Math.max(0, kc) * 0.9 + (stepping ? 0.1 : 0), Math.max(0, -kc) * 0.9 + (stepping ? 0.1 : 0));
     P.armF.rotation.z = -heroArmAngle();
     const fight = S.activity === 'combat' && !dead;
     const drawB = fight && wtype() === 'ranged' && !walking;
@@ -6311,16 +6379,32 @@ const G3 = (() => {
     const pose = R.phase === 'act' && R.ent && R.ent.kind === 'obstacle' ? R.agiPose : null;
     heroObj.visible = !(pose === 'blink' && R.agiU > 0.3 && R.agiU < 0.7);
     if (pose) heroObj.position.y += (R.heroLift || 0) / U3;
-    p.scale.y = pose === 'crouch' ? 0.62 : 1; p.rotation.x = 0;
+    p.scale.y = 1; p.rotation.x = 0; if (!pose) p.rotation.z = dead ? Math.PI / 2 : 0;
     P.armF.rotation.x = 0; if (!drawB) P.armB.rotation.x = 0;
     if (pose) {
-      const m = Math.sin(time * 9) * 0.5;
-      if (pose === 'balance') { P.armF.rotation.x = -1.3; P.armB.rotation.x = 1.3; P.armF.rotation.z = 0; P.armB.rotation.z = 0; p.rotation.x = Math.sin(time * 5) * 0.08; P.legF.rotation.z = m; P.legB.rotation.z = -m; }
-      else if (pose === 'climb') { P.armF.rotation.z = -2.6 + m; P.armB.rotation.z = -2.6 - m; P.legF.rotation.z = 0.6 + m; P.legB.rotation.z = 0.6 - m; }
-      else if (pose === 'hang' || pose === 'swing') { P.armF.rotation.z = -3.0; P.armB.rotation.z = -3.0; P.legF.rotation.z = 0.2 + m * 0.3; P.legB.rotation.z = 0.2 - m * 0.3; if (pose === 'swing') p.rotation.z = (0.5 - (R.agiU || 0)) * 0.8; }
-      else if (pose === 'jump' || pose === 'blink') { P.legF.rotation.z = 0.7; P.legB.rotation.z = -0.5; P.armF.rotation.z = -1.2; P.armB.rotation.z = 1.0; }
-      else if (pose === 'crouch') { P.legF.rotation.z = m; P.legB.rotation.z = -m; P.armF.rotation.z = -0.8; }
-      else if (pose === 'fall') p.rotation.z = 1.2;
+      const m = Math.sin(time * 9) * 0.5, c9 = Math.cos(time * 9);
+      p.rotation.z = R.agiLean || 0;
+      if (pose === 'walk') { const w = Math.sin(time * 13) * 0.6, kc = Math.cos(time * 13); P.legF.rotation.z = w; P.legB.rotation.z = -w; knees(P, Math.max(0, kc) * 0.9 + 0.1, Math.max(0, -kc) * 0.9 + 0.1); P.armF.rotation.z = -0.3 - w * 0.3; P.armB.rotation.z = w * 0.6; }
+      else if (pose === 'balance' || pose === 'ledge') {
+        // arms out wide, small careful steps, a wobble
+        P.armF.rotation.x = pose === 'ledge' ? -0.4 : -1.35; P.armB.rotation.x = pose === 'ledge' ? 0.4 : 1.35; P.armF.rotation.z = pose === 'ledge' ? -0.2 : -0.1; P.armB.rotation.z = pose === 'ledge' ? 0.2 : 0.1;
+        p.rotation.x = Math.sin(time * 5) * (pose === 'ledge' ? 0.03 : 0.09); const w = Math.sin(time * 7) * 0.3; P.legF.rotation.z = w; P.legB.rotation.z = -w; knees(P, Math.max(0, Math.cos(time * 7)) * 0.4, Math.max(0, -Math.cos(time * 7)) * 0.4);
+      }
+      else if (pose === 'climbup') {
+        // hand over hand up the net or wall, one knee lifted to the next hold
+        P.armF.rotation.z = -2.5 + m * 0.5; P.armB.rotation.z = -2.5 - m * 0.5; P.legF.rotation.z = 0.7 + m * 0.5; P.legB.rotation.z = 0.7 - m * 0.5;
+        knees(P, 1.0 + c9 * 0.4, 1.0 - c9 * 0.4);
+      }
+      else if (pose === 'climbdown') { P.armF.rotation.z = -1.7 + m * 0.4; P.armB.rotation.z = -1.7 - m * 0.4; P.legF.rotation.z = 0.5 + m * 0.4; P.legB.rotation.z = -0.1 - m * 0.4; knees(P, 0.9 + c9 * 0.3, 0.4 - c9 * 0.3); }
+      else if (pose === 'hang' || pose === 'swing') {
+        // straight arms up to the bar or rope; the legs swing below
+        const hs = pose === 'hang' ? Math.sin(time * 6) * 0.25 : 0;
+        P.armF.rotation.z = -3.1 + hs * 0.4; P.armB.rotation.z = -3.1 - hs * 0.4; P.legF.rotation.z = 0.25 + hs; P.legB.rotation.z = 0.05 - hs; knees(P, 0.5, 0.3);
+      }
+      else if (pose === 'jump' || pose === 'blink') { P.legF.rotation.z = 0.9; P.legB.rotation.z = -0.4; knees(P, 1.2, 0.8); P.armF.rotation.z = -1.4; P.armB.rotation.z = 1.0; p.rotation.z = (R.agiLean || 0) - 0.15; }
+      else if (pose === 'crouch') { p.scale.y = 0.7; const w = Math.sin(time * 10) * 0.4; P.legF.rotation.z = 0.5 + w; P.legB.rotation.z = 0.5 - w; knees(P, 1.3, 1.3); P.armF.rotation.z = -1.1 - w * 0.3; P.armB.rotation.z = -0.9 + w * 0.3; p.rotation.z = -0.35; }
+      else if (pose === 'slide') { P.legF.rotation.z = 0.35; P.legB.rotation.z = -0.25; knees(P, 0.8, 0.8); P.armF.rotation.x = -1.1; P.armB.rotation.x = 1.1; p.rotation.z = 0.15; }
+      else if (pose === 'fall') { p.rotation.z = 1.2; knees(P, 0.3, 0.6); }
     }
     animTool(P.armF.children[2]);
     if (heroObj.userData.aura) heroObj.userData.aura.material.opacity = 0.28 + 0.1 * Math.sin(time * 2.5);
@@ -7270,8 +7354,9 @@ const G3 = (() => {
         break;
       }
       case 'wall':
-        g.add(box(0.6, 1.7, 1.8, '#8a8478', Lu * 0.3, 0.85, 0));
-        for (let k = 0; k < 4; k++) g.add(box(0.1, 0.1, 0.25, '#c8a060', Lu * 0.3 - 0.33, 0.3 + k * 0.38, (k & 1 ? 0.3 : -0.3)));
+        // a timber climbing wall with hand holds on the side the hero comes from
+        g.add(box(0.6, 1.7, 1.8, '#8a8478', Lu * 0.3, 0.85, 0), box(0.68, 0.08, 1.9, '#6a6458', Lu * 0.3, 1.72, 0));
+        for (let k = 0; k < 6; k++) g.add(box(0.1, 0.1, 0.22, ['#c8a060', '#d84a4a', '#4a8ad8'][k % 3], Lu * 0.3 - 0.33, 0.25 + k * 0.26, (k & 1 ? 0.25 : -0.25)));
         break;
       case 'gap':
         pit(g, Lu, Lu * 0.2, Lu * 0.8);
@@ -7279,19 +7364,21 @@ const G3 = (() => {
         break;
       case 'rope':
         pit(g, Lu, Lu * 0.15, Lu * 0.85);
-        post(g, Lu / 2 - 0.8, 3.4); post(g, Lu / 2 + 0.8, 3.4); g.add(box(1.8, 0.14, 0.14, '#6b4a2a', Lu / 2, 3.4, 0));
-        P.rope = new T.Group(); P.rope.position.set(Lu / 2, 3.35, 0.1);
-        P.rope.add(box(0.05, 2.0, 0.05, '#d8c8a0', 0, -1.0, 0)); g.add(P.rope);
+        post(g, Lu / 2 - 0.8, ROPE.top + 0.05); post(g, Lu / 2 + 0.8, ROPE.top + 0.05); g.add(box(1.8, 0.14, 0.14, '#6b4a2a', Lu / 2, ROPE.top + 0.05, 0));
+        P.rope = new T.Group(); P.rope.position.set(Lu / 2, ROPE.top, 0.05);
+        P.rope.add(box(0.05, ROPE.len + 0.25, 0.05, '#d8c8a0', 0, -(ROPE.len + 0.25) / 2, 0), box(0.09, 0.12, 0.09, '#b8a880', 0, -ROPE.len - 0.2, 0)); g.add(P.rope);
         break;
       case 'net': {
-        const h = 2.3;
+        // an A-frame: two net panels meet at the top beam; the hero climbs the near panel and down the far one
+        const H = NETO.H, A = NETO.A, c0 = Lu / 2, len = Math.hypot(A, H), ang = Math.atan2(A, H);
         for (const s of [-1, 1]) {
-          const side = new T.Group(); side.position.set(Lu / 2 + s * Lu * 0.22, h / 2, 0); side.rotation.z = s * 0.75;
-          for (let k = -3; k <= 3; k++) side.add(box(0.03, h * 1.35, 0.03, '#c8b890', 0, 0, k * 0.25));
-          for (let k = -3; k <= 3; k++) side.add(box(0.03, 0.03, 1.6, '#c8b890', 0, k * 0.4, 0));
+          const side = new T.Group(); side.position.set(c0 + s * A / 2, H / 2, 0); side.rotation.z = s * ang;
+          for (let k = -3; k <= 3; k++) side.add(box(0.03, len, 0.03, '#c8b890', 0, 0, k * 0.26));
+          for (let k = 0; k < 7; k++) side.add(box(0.035, 0.035, 1.6, '#c8b890', 0, -len / 2 + 0.2 + k * (len - 0.3) / 6, 0));
+          for (const z of [-0.85, 0.85]) side.add(box(0.09, len + 0.1, 0.09, '#6b4a2a', 0, 0, z));
           g.add(side);
         }
-        post(g, Lu / 2, h + 0.2);
+        g.add(box(0.12, 0.12, 1.9, '#6b4a2a', c0, H + 0.02, 0));
         break;
       }
       case 'bars':
@@ -7306,15 +7393,20 @@ const G3 = (() => {
         if (lv) g.add(at(glow('#ff7a2a', 3, 0.4), Lu / 2, 0.3, 0.5));
         break;
       }
-      case 'zip':
-        for (const z of [0.5, -0.5]) post(g, 0.2, 2.6, '#6b4a2a', z);
-        g.add(box(1.0, 0.12, 1.2, '#8a5a32', 0.3, 2.55, 0));
-        post(g, Lu, 0.9);
-        { const len = Math.hypot(Lu, 2.0), c = box(len, 0.04, 0.04, '#2a2a2a', Lu / 2, 1.85, 0.1); c.rotation.z = -Math.atan2(2.0, Lu); g.add(c); }
+      case 'zip': {
+        // a launch tower whose deck is one arm's reach under the cable, and a low end post
+        const deck = ZIP.y0 - ARM - 0.02;
+        for (const z of [0.5, -0.5]) for (const x of [-0.15, 0.6]) post(g, x, ZIP.y0 + 0.15, '#6b4a2a', z);
+        g.add(box(1.0, 0.1, 1.2, '#8a5a32', 0.22, deck, 0));
+        for (let k = 1; k < 5; k++) g.add(box(0.05, 0.05, 0.9, '#8a5a32', -0.18, deck * k / 5, 0));   // ladder rungs
+        post(g, Lu, ZIP.y1 + 0.1);
+        { const len = Math.hypot(Lu, ZIP.y0 - ZIP.y1), c = box(len, 0.04, 0.04, '#2a2a2a', Lu / 2, (ZIP.y0 + ZIP.y1) / 2, 0); c.rotation.z = -Math.atan2(ZIP.y0 - ZIP.y1, Lu); g.add(c); }
         break;
+      }
       case 'ledge':
+        // a rock face behind, a narrow shelf under the hero's feet
         pit(g, Lu, 0.2, Lu - 0.2);
-        g.add(box(Lu, 3.0, 0.4, '#7a7468', Lu / 2, 1.5, -0.7), box(Lu, 0.12, 0.35, '#9a9488', Lu / 2, 0.6, -0.35));
+        g.add(box(Lu, 3.0, 0.4, '#7a7468', Lu / 2, 1.5, -0.55), box(Lu, 0.12, 0.42, '#9a9488', Lu / 2, 0.54, -0.12), box(Lu, 0.4, 0.3, '#6a6458', Lu / 2, 0.3, -0.2));
         break;
       case 'tight':
         pit(g, Lu, 0.4, Lu - 0.4);
@@ -7393,7 +7485,7 @@ const G3 = (() => {
     } else if (e.kind === 'obstacle') {
       x = e.x - e.stop;
       const act = R.phase === 'act' && R.ent === e;
-      if (P.rope) P.rope.rotation.z = act ? (0.5 - (R.agiU || 0)) * 1.8 : Math.sin(time * 1.5) * 0.15;
+      if (P.rope) P.rope.rotation.z = act ? ropeA(R.agiU || 0) : -ROPE.swing * 0.9 + Math.sin(time * 1.5) * 0.08;
     } else if (e.kind === 'patch') {
       const f = e.pk ? growFrac(patch(e.pk)) : 0;
       // seedling → leafy plant → crop swelling → ripe (bobbing and glinting)
