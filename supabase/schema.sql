@@ -829,6 +829,31 @@ begin
   return null;
 exception when others then return null;
 end $$;
+-- what other players see of a hero: only looks the save owns (or the free ones), plus its worn gear
+alter table public.hiscores add column if not exists look jsonb;
+create or replace function public.look_for(d jsonb) returns jsonb
+language plpgsql immutable set search_path = public as $$
+declare
+  c jsonb := case when jsonb_typeof(d -> 'cos') = 'object' then d -> 'cos' else '{}' end;
+  own jsonb := case when jsonb_typeof(d -> 'cos' -> 'own') = 'object' then d -> 'cos' -> 'own' else '{}' end;
+  free constant text[] := array['hair_brown', 'skin_light', 'shirt_blue', 'pants_dusk', 'style_short', 'beard_full', 'beard_none', 'eyes_dark'];
+  r jsonb := '{}'; k text; v text; eq jsonb := '{}'; sl text; it text;
+begin
+  foreach k in array array['hair', 'style', 'beard', 'skin', 'eyes', 'shirt', 'pants', 'hat', 'cape', 'aura', 'trail', 'nc'] loop
+    v := c ->> k;
+    if v ~ '^[a-z]{1,12}$' and ((k || '_' || v) = any (free) or own ? (k || '_' || v)) then r := r || jsonb_build_object(k, v); end if;
+  end loop;
+  if c -> 'hideHelm' = 'true'::jsonb then r := r || '{"hideHelm": true}'; end if;
+  if jsonb_typeof(d -> 'equip') = 'object' then
+    for sl, it in select key, value from jsonb_each_text(d -> 'equip') loop
+      if sl ~ '^[a-z]{1,10}$' and it ~ '^[a-z0-9_]{1,40}$' then eq := eq || jsonb_build_object(sl, it); end if;
+    end loop;
+  end if;
+  return r || jsonb_build_object('equip', eq);
+exception when others then return '{}';
+end $$;
+-- heroes saved before this existed get their looks right away
+update public.hiscores h set look = look_for(s.data) from public.saves s where s.user_id = h.user_id and h.look is null;
 create or replace function public.title_for(d jsonb, tl int) returns text
 language plpgsql stable set search_path = public as $$
 declare t text := d ->> 'title'; got int; pets int; total int; pct numeric;
@@ -867,13 +892,13 @@ begin
                 + coalesce((lv ->> 'defence')::int, 1) + coalesce((lv ->> 'hitpoints')::int, 1)) / 3);
   select count(*) into bosses from jsonb_each_text(coalesce(d -> 'kc', '{}')) e
     where e.key = any (array['kingslime','gobchief','bonelord','frosttroll','dragon','bogmother','warden','overlord']) and e.value::numeric > 0;
-  insert into hiscores (user_id, name, total_level, total_xp, combat, skills, kills, bosses, pks, imported, updated_at, rating, week_key, week_base, title, ncolor)
+  insert into hiscores (user_id, name, total_level, total_xp, combat, skills, kills, bosses, pks, imported, updated_at, rating, week_key, week_base, title, ncolor, look)
   select uid, p.name, tl, tx, cmb, coalesce(d -> 'skills', '{}'), coalesce((d ->> 'kills')::numeric, 0), bosses,
-         coalesce((d -> 'wild' ->> 'pks')::int, 0), p.imported, now(), p.rating, week_key(), tx, title_for(d, tl), ncolor_for(d)
+         coalesce((d -> 'wild' ->> 'pks')::int, 0), p.imported, now(), p.rating, week_key(), tx, title_for(d, tl), ncolor_for(d), look_for(d)
   from profiles p where p.id = uid
   on conflict (user_id) do update set name = excluded.name, total_level = excluded.total_level, total_xp = excluded.total_xp,
     combat = excluded.combat, skills = excluded.skills, kills = excluded.kills, bosses = excluded.bosses, pks = excluded.pks,
-    imported = excluded.imported, rating = excluded.rating, updated_at = now(), title = excluded.title, ncolor = excluded.ncolor,
+    imported = excluded.imported, rating = excluded.rating, updated_at = now(), title = excluded.title, ncolor = excluded.ncolor, look = excluded.look,
     -- a new week starts counting from the XP the hero had at the last save of the old one
     week_base = case when hiscores.week_key is distinct from excluded.week_key then hiscores.total_xp else hiscores.week_base end,
     week_key = excluded.week_key;
@@ -1110,7 +1135,8 @@ begin
   insert into pvp_fights (attacker, defender, attacker_name, defender_name, winner, rating_change, gold, log)
     values (uid, p_target, me.name, op.name, case when win then uid else p_target end, chg, gold, ev);
   return jsonb_build_object('ok', true, 'win', win, 'gold', gold, 'rating_change', chg, 'rating', me.rating + chg,
-    'me', a, 'opp', b || jsonb_build_object('name', op.name, 'equip', os.data -> 'equip'), 'log', ev);
+    'me', a, 'opp', b || jsonb_build_object('name', op.name, 'equip', os.data -> 'equip', 'look', look_for(os.data),
+      'title', (select title from hiscores where user_id = p_target)), 'log', ev);
 end $$;
 
 -- ---------- Trading Post: offers hold the items or gold in escrow, the server matches them ----------
@@ -1692,7 +1718,7 @@ grant execute on function public.wb_state(), public.wb_hit(bigint), public.wb_cl
 create or replace function public.hiscores_week() returns jsonb
 language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(x order by x.gain desc), '[]') from (
-    select h.name, h.title, h.ncolor, h.combat, h.total_level, (h.total_xp - h.week_base) as gain, h.imported
+    select h.name, h.title, h.ncolor, h.combat, h.total_level, (h.total_xp - h.week_base) as gain, h.imported, h.look, h.rating
     from hiscores h join profiles p on p.id = h.user_id
     where h.week_key = week_key() and h.total_xp > h.week_base and not p.banned
     order by h.total_xp - h.week_base desc limit 50) x

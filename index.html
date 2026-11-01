@@ -165,6 +165,7 @@
     display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10;
   }
   #modal[hidden] { display: none; }
+  a.insp { cursor: pointer; text-decoration: underline dotted rgba(255,255,255,0.35); }
   #modal .card { max-width: 440px; width: 100%; padding: 18px; max-height: 80vh; max-height: 80dvh; overflow-y: auto; overscroll-behavior: contain; }
   #modal textarea { width: 100%; min-height: 110px; font: 12px/1.4 ui-monospace, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
   .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 16px; }
@@ -2127,8 +2128,10 @@ function cosPick(kind, id) {
   S.cos[kind] = S.cos[kind] === id && COS_NONE.has(kind) ? null : id;
   if (kind === 'nc' && typeof netSync === 'function') setTimeout(() => netSync(), 50);
 }
-function heroLook() {
-  const c = S.cos || {};
+function heroLook() { return lookFrom(S.cos); }
+// turns saved look ids (yours, or another player's from the server) into colours and shapes
+function lookFrom(c) {
+  c = c || {};
   return { hair: (HAIRS[c.hair] || HAIRS.brown)[1], skin: (SKINS[c.skin] || SKINS.light)[1], shirt: (DYES[c.shirt] || DYES.blue)[1], pants: (PANTS[c.pants] || PANTS.dusk)[1], aura: AURAS[c.aura] ? AURAS[c.aura][1] : null,
     style: (HSTYLES[c.style] || HSTYLES.short)[1], beard: (BEARDS[c.beard] || BEARDS.full)[1], eyes: (EYES[c.eyes] || EYES.dark)[1],
     hat: HATS[c.hat] ? c.hat : null, cape: CAPES[c.cape] ? CAPES[c.cape][1] : null, trail: TRAILS[c.trail] ? TRAILS[c.trail][1] : null, hideHelm: !!c.hideHelm };
@@ -3138,7 +3141,7 @@ function sfx(kind) {
 /* ================= RENDERING ================= */
 
 const canvas = document.getElementById('scene');
-const ctx = canvas.getContext('2d');
+let ctx = canvas.getContext('2d');   // swapped for a moment to draw hero previews
 function resizeCanvas() {
   // phones get a narrower, zoomed-in view so the hero and text stay readable
   const narrow = window.innerWidth < 700;
@@ -3299,11 +3302,16 @@ function heroTool() {
   const a = S.activity;
   if (a === 'combat') {
     const w = S.equip.weapon ? ITEMS[S.equip.weapon] : null;
-    const blade = w ? w.color || TIER_COLORS[w.tier] || '#c0c4cc' : '#8a6a4a';
     if (wtype() === 'ranged') return () => drawBow(w && w.tier !== undefined ? TIER_COLORS[w.tier] : '#8a6a4a', R.swing < 0.5);
     if (wtype() === 'magic') { const sp = curSpell(); return () => drawStaff(sp ? sp.color : '#888'); }
+    return bladeTool(w);
+  }
+  return heroToolSkill(a);
+}
+// a melee weapon in a 2D hand (yours or another player's)
+function bladeTool(w) {
     if (!w) return null;
-    const kind = w.kind || 'sword';
+    const kind = w.kind || 'sword', blade = w.color || TIER_COLORS[w.tier] || '#c0c4cc';
     // blade length and shape follow the weapon type
     const len = { dagger: 16, sword: 28, scimitar: 28, '2h': 44 }[kind] || 30, wide = kind === '2h' ? 3.6 : 2.5;
     return () => {
@@ -3315,7 +3323,8 @@ function heroTool() {
       else { ctx.lineTo(wide * 0.8, y0 + len); ctx.lineTo(0, y0 + len + 5); ctx.lineTo(-wide * 0.8, y0 + len); }
       ctx.closePath(); ctx.fill();
     };
-  }
+}
+function heroToolSkill(a) {
   if (a === 'smithing') return () => { rr(-1.5, 12, 3, 24, 1, '#7a4e2a'); rr(-7, 33, 14, 9, 2, '#5b5f68'); };
   if (a === 'thieving') return null;
   if (a === 'firemaking') return () => { rr(-4, 16, 8, 6, 1, '#7a6a5a'); };
@@ -3399,11 +3408,43 @@ function heroArmAngle() {
   return -0.6 - 1.9 * R.swing;
 }
 
+// a hero's head: helmet, or hair and hat (also used for other players)
+function drawLookHead(look, helm) {
+  const armor = look.hideHelm ? null : helm;
+  if (armor) {
+    const hc = shade(helm.color, -0.05);
+    ctx.fillStyle = hc; ctx.beginPath(); ctx.arc(0, -61, 11, Math.PI, 0); ctx.fill(); ctx.fillRect(-11, -62, 22, 3);
+    if (helm.kind === 'fullhelm') { ctx.fillRect(-11, -62, 6, 12); ctx.fillStyle = '#111'; ctx.fillRect(3, -61, 7, 2); }
+  }
+  else if (look.style !== 'bald') {
+    ctx.fillStyle = look.hair;
+    if (look.style === 'mohawk') ctx.fillRect(-6, -76, 10, 7);
+    else { ctx.beginPath(); ctx.arc(-1, -62, 10.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
+    if (look.style === 'long') ctx.fillRect(-11, -62, 5, 16);
+    if (look.style === 'ponytail') ctx.fillRect(-14, -62, 4, 11);
+    if (look.style === 'spiky') for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(-9 + k * 5, -70); ctx.lineTo(-7 + k * 5, -78); ctx.lineTo(-4 + k * 5, -70); ctx.fill(); }
+  }
+  if (!armor && look.hat) {
+    const k = look.hat;
+    if (k === 'wizard') { ctx.fillStyle = '#5a3aa8'; ctx.fillRect(-13, -71, 26, 3); ctx.beginPath(); ctx.moveTo(-8, -71); ctx.lineTo(2, -94); ctx.lineTo(8, -71); ctx.fill(); }
+    else if (k === 'tophat') { ctx.fillStyle = '#18161c'; ctx.fillRect(-12, -71, 24, 3); ctx.fillRect(-7, -87, 14, 16); ctx.fillStyle = '#a82a2a'; ctx.fillRect(-7, -75, 14, 3); }
+    else if (k === 'bandana') { ctx.fillStyle = '#b02a2a'; ctx.fillRect(-11, -70, 22, 5); ctx.fillRect(-15, -68, 5, 7); }
+    else if (k === 'cat') { ctx.fillStyle = '#2a2830'; for (const x of [-8, 4]) { ctx.beginPath(); ctx.moveTo(x, -70); ctx.lineTo(x + 3, -80); ctx.lineTo(x + 6, -70); ctx.fill(); } }
+    else if (k === 'viking') { ctx.fillStyle = '#8a8f98'; ctx.beginPath(); ctx.arc(0, -64, 11, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#f0ead8'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 9, -68); ctx.lineTo(s * 16, -80); ctx.lineTo(s * 12, -66); ctx.fill(); } }
+    else if (k === 'flower') for (let i = 0; i < 5; i++) circle(-9 + i * 4.5, -71, 2.5, ['#ff7ab0', '#ffffff', '#ffe04a'][i % 3]);
+    else if (k === 'crown') { ctx.fillStyle = '#f2c94c'; ctx.beginPath(); ctx.moveTo(-9, -70); ctx.lineTo(-9, -78); ctx.lineTo(-4, -73); ctx.lineTo(0, -80); ctx.lineTo(4, -73); ctx.lineTo(9, -78); ctx.lineTo(9, -70); ctx.fill(); }
+    else if (k === 'halo') { ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -80, 9, 3, 0, 0, Math.PI * 2); ctx.stroke(); }
+  }
+}
+// the drawHumanoid options for a hero wearing these looks and this gear (sl -> item or null)
+function lookFig(look, gear, hit) {
+  const bodyIt = gear('body'), helm = gear('helm'), legs = gear('legs');
+  return { body: hit ? '#d84a4a' : bodyIt ? bodyIt.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.08) : look.pants, skin: hit ? '#ff9a8a' : look.skin,
+    eye: look.eyes, headExtra: () => drawLookHead(look, helm) };
+}
 function drawHero() {
   const gear = sl => S.equip[sl] ? ITEMS[S.equip[sl]] : null;
-  const bodyIt = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield');
-  const look = heroLook(), body = bodyIt ? bodyIt.color || '#9aa0a8' : look.shirt;
-  const armor = look.hideHelm ? null : helm;
+  const shield = gear('shield'), look = heroLook();
   const walking = R.phase === 'walk';
   const bob = walking ? Math.abs(Math.sin(time * 13)) * -2 : 0;
   const dead = R.phase === 'dead';
@@ -3415,34 +3456,8 @@ function drawHero() {
     x: (dead ? HX - 30 : HX) - R.heroHit * 5, y: GY + bob - (dead ? 6 : 0) - (R.phase === 'act' && R.ent && R.ent.kind === 'obstacle' ? R.heroLift || 0 : 0), s: 1, face: 1,
     rot: dead ? -Math.PI / 2 : 0,
     walk: walking ? Math.sin(time * 13) * 0.6 : 0,
-    arm: heroArmAngle(), body: R.heroHit > 0.5 ? '#d84a4a' : body, leg: legs ? shade(legs.color, -0.08) : look.pants, skin: R.heroHit > 0.5 ? '#ff9a8a' : look.skin,
-    shield: shield && S.activity === 'combat' ? shield.color : null, eye: look.eyes,
-    headExtra: () => {
-      if (armor) {
-        const hc = shade(helm.color, -0.05);
-        ctx.fillStyle = hc; ctx.beginPath(); ctx.arc(0, -61, 11, Math.PI, 0); ctx.fill(); ctx.fillRect(-11, -62, 22, 3);
-        if (helm.kind === 'fullhelm') { ctx.fillRect(-11, -62, 6, 12); ctx.fillStyle = '#111'; ctx.fillRect(3, -61, 7, 2); }
-      }
-      else if (look.style !== 'bald') {
-        ctx.fillStyle = look.hair;
-        if (look.style === 'mohawk') ctx.fillRect(-6, -76, 10, 7);
-        else { ctx.beginPath(); ctx.arc(-1, -62, 10.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
-        if (look.style === 'long') ctx.fillRect(-11, -62, 5, 16);
-        if (look.style === 'ponytail') ctx.fillRect(-14, -62, 4, 11);
-        if (look.style === 'spiky') for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(-9 + k * 5, -70); ctx.lineTo(-7 + k * 5, -78); ctx.lineTo(-4 + k * 5, -70); ctx.fill(); }
-      }
-      if (!armor && look.hat) {
-        const k = look.hat;
-        if (k === 'wizard') { ctx.fillStyle = '#5a3aa8'; ctx.fillRect(-13, -71, 26, 3); ctx.beginPath(); ctx.moveTo(-8, -71); ctx.lineTo(2, -94); ctx.lineTo(8, -71); ctx.fill(); }
-        else if (k === 'tophat') { ctx.fillStyle = '#18161c'; ctx.fillRect(-12, -71, 24, 3); ctx.fillRect(-7, -87, 14, 16); ctx.fillStyle = '#a82a2a'; ctx.fillRect(-7, -75, 14, 3); }
-        else if (k === 'bandana') { ctx.fillStyle = '#b02a2a'; ctx.fillRect(-11, -70, 22, 5); ctx.fillRect(-15, -68, 5, 7); }
-        else if (k === 'cat') { ctx.fillStyle = '#2a2830'; for (const x of [-8, 4]) { ctx.beginPath(); ctx.moveTo(x, -70); ctx.lineTo(x + 3, -80); ctx.lineTo(x + 6, -70); ctx.fill(); } }
-        else if (k === 'viking') { ctx.fillStyle = '#8a8f98'; ctx.beginPath(); ctx.arc(0, -64, 11, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#f0ead8'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 9, -68); ctx.lineTo(s * 16, -80); ctx.lineTo(s * 12, -66); ctx.fill(); } }
-        else if (k === 'flower') for (let i = 0; i < 5; i++) circle(-9 + i * 4.5, -71, 2.5, ['#ff7ab0', '#ffffff', '#ffe04a'][i % 3]);
-        else if (k === 'crown') { ctx.fillStyle = '#f2c94c'; ctx.beginPath(); ctx.moveTo(-9, -70); ctx.lineTo(-9, -78); ctx.lineTo(-4, -73); ctx.lineTo(0, -80); ctx.lineTo(4, -73); ctx.lineTo(9, -78); ctx.lineTo(9, -70); ctx.fill(); }
-        else if (k === 'halo') { ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -80, 9, 3, 0, 0, Math.PI * 2); ctx.stroke(); }
-      }
-    },
+    arm: heroArmAngle(), shield: shield && S.activity === 'combat' ? shield.color : null,
+    ...lookFig(look, gear, R.heroHit > 0.5),
     tool: heroTool(),
   });
   ctx.restore();
@@ -3524,6 +3539,16 @@ function drawEnemy(e) {
     poly([x + 9, cy - 9, x + 6, cy - 22, x + 2, cy - 11], d.color);
     circle(x - 4, cy - 3, 2.2, '#ff3b3b'); circle(x + 4, cy - 3, 2.2, '#ff3b3b');
     if (d.orb) { const g = ctx.createRadialGradient(x, cy, 2, x, cy, 30); g.addColorStop(0, d.orb + '88'); g.addColorStop(1, d.orb + '00'); ctx.fillStyle = g; ctx.fillRect(x - 30, cy - 30, 60, 60); }
+  } else if (d.shape === 'humanoid' && d.look) {
+    // a real player: their own looks and gear
+    const eq = d.look.equip || {}, gear = sl => eq[sl] && ITEMS[eq[sl]] || null, look = lookFrom(d.look), w = gear('weapon'), sh = gear('shield');
+    const gl = look.aura;
+    if (gl) { ctx.shadowColor = gl; ctx.shadowBlur = 8 + 6 * Math.sin(time * 4); }
+    drawHumanoid({
+      x, y: GY, s, face: -1, walk: 0, arm: d.type === 'melee' ? -0.5 - 1.6 * e.lunge : -1.5 - 0.25 * e.lunge,
+      shield: sh && d.type === 'melee' ? sh.color : null, ...lookFig(look, gear, false),
+      tool: d.type === 'ranged' ? () => drawBow(w && w.tier !== undefined ? TIER_COLORS[w.tier] : '#8a6a4a', e.atkT > 0.4) : d.type === 'magic' ? () => drawStaff(d.orb || '#c58bff') : bladeTool(w),
+    });
   } else if (d.shape === 'humanoid') {
     const sk = e.id === 'skeleton' || e.id === 'bonelord';
     const gob = e.id.startsWith('gob');
@@ -3905,8 +3930,11 @@ function font(weight, px) { ctx.font = `${weight} ${Math.round(px * FS)}px syste
 const NC_HEX = { gold: '#f2c94c', ruby: '#ff5a6a', emerald: '#4ae08a', sapphire: '#5aa8ff', amethyst: '#c58bff' };
 function drawNameTag() {
   if (R.phase === 'dead') return;
-  const name = me ? me.name : 'You', t = S.title && TITLES.find(x => x.id === S.title), nc = S.cos && S.cos.nc;
-  const y = GY - 100 - (t ? 11 * FS : 0);
+  const t = S.title && TITLES.find(x => x.id === S.title);
+  drawNick(HX, GY - 100 - (t ? 11 * FS : 0), me ? me.name : 'You', S.cos && S.cos.nc, t && t.name);
+}
+// a player's name in their bought colour, with their title under it
+function drawNick(HX, y, name, nc, title) {
   ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
   font(700, 13); ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,0,0.75)';
   let fill = NC_HEX[nc] || '#ffffff';
@@ -3916,7 +3944,7 @@ function drawNameTag() {
     fill = g;
   }
   ctx.strokeText(name, HX, y); ctx.fillStyle = fill; ctx.fillText(name, HX, y);
-  if (t) { font(600, 10); ctx.lineWidth = 3; ctx.strokeText(t.name, HX, y + 12 * FS); ctx.fillStyle = '#ffe9a8'; ctx.fillText(t.name, HX, y + 12 * FS); }
+  if (title) { font(600, 10); ctx.lineWidth = 3; ctx.strokeText(title, HX, y + 12 * FS); ctx.fillStyle = '#ffe9a8'; ctx.fillText(title, HX, y + 12 * FS); }
   ctx.restore();
 }
 function drawHud() {
@@ -3990,7 +4018,9 @@ function drawHud() {
     if (e.kind === 'enemy') {
       const top = Math.max(GY - entHeight(e) - 24, 34 * FS + 26);
       const tri = triangle(e);
-      const name = (e.d.boss || e.d.world ? '👑 ' : e.d.pker ? '☠️ ' : '') + TYPE_ICON[etype(e)] + ' ' + e.d.name + (e.d.pker ? ` (lvl ${e.d.lvl})` : '') + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
+      // real players get their own name tag (name colour and title) above the fight label
+      if (e.d.real) drawNick(ex, top - 30 * FS - (e.d.title ? 11 * FS : 0), e.d.name, e.d.nc, e.d.title);
+      const name = (e.d.boss || e.d.world ? '👑 ' : e.d.pker && !e.d.real ? '☠️ ' : '') + TYPE_ICON[etype(e)] + ' ' + (e.d.real ? `level ${e.d.lvl}` : e.d.name + (e.d.pker ? ` (lvl ${e.d.lvl})` : '')) + (onTask(e) ? ' 💀' : ''), bw = e.d.boss ? 130 : 70;
       // name colour shows the combat triangle: green = your style is strong here, red = weak
       font(e.d.boss ? 700 : 600, e.d.boss ? 14 : 12); ctx.textAlign = 'center';
       ctx.fillStyle = tri > 0 ? '#9dffa0' : tri < 0 ? '#ffaaa0' : e.d.boss ? '#ffe27a' : '#fff';
@@ -4562,7 +4592,9 @@ function startReplay(r) {
   if (S.zone !== WILD || S.activity !== 'combat') travel(WILD, 'combat');
   const o = r.opp, eq = o.equip || {}, it = sl => eq[sl] && ITEMS[eq[sl]];
   const d = { name: o.name, pker: true, real: true, lvl: o.combat, type: o.type, hp: o.hp, maxHit: o.maxhit, atk: Math.round(o.atk), def: o.def,
-    speed: o.speed, gold: [0, 0], shape: 'humanoid', size: 1, color: '#f1c27d', body: it('body') ? it('body').color : '#5a4a3a', orb: '#c58bff', drops: [] };
+    speed: o.speed, gold: [0, 0], shape: 'humanoid', size: 1, color: '#f1c27d', body: it('body') ? it('body').color : '#5a4a3a', orb: '#c58bff', drops: [],
+    // their looks (only what they own – the server checks) and gear; older servers send no look
+    look: { ...(o.look || {}), equip: eq }, nc: o.look && o.look.nc, title: o.title || null };
   R.ent = { kind: 'enemy', id: 'player', d, hp: o.hp, maxHp: o.hp, atk: d.atk, def: d.def, atkT: 99, x: R.worldX + Math.max(420, W - HX - 40),
     stop: o.type === 'melee' && wtype() === 'melee' ? 70 : 140, hit: 0, lunge: 0, pend: 0, style: o.type, swap: 99, food: 0,
     replay: r.log, rt: 0, ri: 0, result: r, hpBack: S.hp };
@@ -4818,8 +4850,29 @@ function htmlHiscores() {
     const x = (r.skills && r.skills[hsSkill]) || 0; return [`${levelFromXp(x)}`, `${fmt(x)} XP`];
   };
   return h + '<table class="hs"><thead><tr><th>#</th><th>Name</th><th>Combat</th><th>' + (hsSkill === 'overall' ? 'Total level' : hsSkill === 'week' ? 'XP gained' : hsSkill === 'rating' ? 'Rating' : hsSkill === 'pks' ? 'PKs' : hsSkill === 'bosses' ? 'Bosses' : 'Level') + '</th><th></th></tr></thead><tbody>'
-    + hsRows.map((r, i) => { const [a, b] = val(r); return `<tr class="${me && r.name === me.name ? 'me' : ''}"><td>${hsSkill === 'week' && i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</td><td>${nameT(r.name, r.title, r.ncolor)}${r.imported ? ' <span class="muted" title="progress from before the account">ⓘ</span>' : ''}</td><td>${r.combat}</td><td><b>${a}</b></td><td class="muted">${b}</td></tr>`; }).join('')
+    + hsRows.map((r, i) => { const [a, b] = val(r); return `<tr class="${me && r.name === me.name ? 'me' : ''}"><td>${hsSkill === 'week' && i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</td><td><a class="insp" data-a="insp" data-id="${i}">${nameT(r.name, r.title, r.ncolor)}</a>${r.imported ? ' <span class="muted" title="progress from before the account">ⓘ</span>' : ''}</td><td>${r.combat}</td><td><b>${a}</b></td><td class="muted">${b}</td></tr>`; }).join('')
     + '</tbody></table>';
+}
+
+// tap a name on the hiscores: see that hero with their looks and gear
+function inspectHero(r) {
+  if (!r) return;
+  const L = r.look || {}, eq = L.equip || {}, gear = sl => eq[sl] && ITEMS[eq[sl]] || null, w = gear('weapon'), sh = gear('shield'), look = lookFrom(L);
+  const worn = ['weapon', ...ARMOUR_SLOTS].map(gear).filter(Boolean);
+  openModal(`<h2>${nameT(r.name, r.title, r.ncolor)}</h2>
+    <canvas id="insp-cv" width="360" height="300" style="width:180px;height:150px;display:block;margin:0 auto;background:radial-gradient(#3a3550,#1b1925);border-radius:10px"></canvas>
+    <p class="muted" style="text-align:center">Combat ${r.combat} · total level ${fmt(r.total_level)}${r.rating ? ` · PvP rating ${fmt(r.rating)}` : ''}</p>
+    ${r.look ? `<p><small>${worn.length ? worn.map(it => `${it.icon || ''} ${it.name}`).join(' · ') : 'No gear worn.'}</small></p>` : '<p class="muted"><small>This hero has not saved since looks were shared – they will show after their next save.</small></p>'}
+    <button data-a="close">Close</button>`);
+  const cv = document.getElementById('insp-cv'), main = ctx;
+  ctx = cv.getContext('2d');
+  try {
+    ctx.scale(2, 2); ellipse(90, 132, 22, 5, 'rgba(0,0,0,0.3)');
+    if (look.aura) { ctx.shadowColor = look.aura; ctx.shadowBlur = 14; }
+    const wt = w ? w.wtype || 'melee' : 'melee';
+    drawHumanoid({ x: 90, y: 130, s: 1.25, face: 1, walk: 0, arm: wt === 'melee' ? -0.45 : -1.4, shield: sh ? sh.color : null, ...lookFig(look, gear, false),
+      tool: wt === 'ranged' ? () => drawBow(w.tier !== undefined ? TIER_COLORS[w.tier] : '#8a6a4a', true) : wt === 'magic' ? () => drawStaff('#c58bff') : bladeTool(w) });
+  } finally { ctx = main; }
 }
 
 function applyGfx() {
@@ -5514,6 +5567,18 @@ const G3 = (() => {
   }
 
   let heroObj = null, heroKey = '', petKey = '', heroZ = 0, heroYaw = -0.6, fpYaw = 0, fpBack = 0, fpPitch = -0.06, vm = null, vmKey = '';
+  // person() options for a hero with these looks and this gear (sl -> item or null): you, or another player
+  function lookOpts(look, gear, fight) {
+    const body = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield'), cape = gear('cape'), hands = gear('hands'), feet = gear('feet');
+    return {
+      body: body ? body.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.08) : look.pants, skin: look.skin, hair: look.hair,
+      helm: helm && !look.hideHelm && shade(helm.color, -0.05), fullhelm: helm && !look.hideHelm && helm.kind === 'fullhelm',
+      shield: shield && fight ? shield.color : null, kite: shield && shield.kind === 'kiteshield',
+      plate: body && (body.kind === 'platebody' || /plate/i.test(body.name)), chain: body && body.kind === 'chainbody', plateLegs: legs && legs.kind === 'platelegs',
+      cape: cape ? cape.color : look.cape, gloves: hands && hands.color, boots: feet && feet.color,
+      style: look.style, beard: look.beard, eye: look.eyes, hat: (!helm || look.hideHelm) && look.hat ? hd => heroHat(hd, look.hat) : null,
+    };
+  }
   function syncHero() {
     const gear = sl => S.equip[sl] ? ITEMS[S.equip[sl]] : null;
     const body = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield');
@@ -5524,14 +5589,7 @@ const G3 = (() => {
       heroKey = key;
       if (heroObj) { scene.remove(heroObj); dispose(heroObj); }
       const look = heroLook();
-      const p = person({
-        body: body ? body.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.08) : look.pants, skin: look.skin, hair: look.hair,
-        helm: helm && !look.hideHelm && shade(helm.color, -0.05), fullhelm: helm && !look.hideHelm && helm.kind === 'fullhelm',
-        shield: shield && S.activity === 'combat' ? shield.color : null, kite: shield && shield.kind === 'kiteshield', tool: heroTool3(),
-        plate: body && (body.kind === 'platebody' || /plate/i.test(body.name)), chain: body && body.kind === 'chainbody', plateLegs: legs && legs.kind === 'platelegs',
-        cape: cape ? cape.color : look.cape, gloves: hands && hands.color, boots: feet && feet.color,
-        style: look.style, beard: look.beard, eye: look.eyes, hat: (!helm || look.hideHelm) && look.hat ? hd => heroHat(hd, look.hat) : null,
-      });
+      const p = person({ ...lookOpts(look, gear, S.activity === 'combat'), tool: heroTool3() });
       p.rotation.y = -0.6;
       heroObj = group(p, shadow(0.45)); heroObj.userData.p = p; heroObj.userData.mats = mats(p); cast(p);
       const al = armorAura(), ac = look.aura || (al ? enchGlow(al) : null);
@@ -6037,7 +6095,11 @@ const G3 = (() => {
       else if (id === 'abyssal' || id === 'overlord') tool = weapon('whip', '#5a1a4a');
       else if (sk) tool = weapon('sword', '#d8d0b8');
       else tool = club('#6b4a2a', 0.9);
-      const p = person({
+      // a real player (PvP): their own looks, gear and weapon
+      const eq = d.look && (d.look.equip || {}), gear = sl => eq[sl] && ITEMS[eq[sl]] || null, w = d.look && gear('weapon'), look = d.look && lookFrom(d.look);
+      if (d.look) tool = d.type === 'ranged' ? weapon('bow', '#c0c4cc', w ? w.color || WOOD_C[w.tier] || '#8a6a4a' : '#8a6a4a') : d.type === 'magic' ? weapon('staff', d.orb || '#c58bff', w && /^mstaff|thammaron/.test(w.id) ? '#4a4a5a' : null)
+        : w ? weapon(w.id === 'whip' ? 'whip' : w.id === 'viggora' ? 'mace' : w.kind || 'sword', w.color || TIER_COLORS[w.tier] || '#c0c4cc') : null;
+      const p = d.look ? person({ ...lookOpts(look, gear, d.type === 'melee'), tool }) : person({
         body: d.body, leg: sk ? '#d8d3c0' : shade(d.body, -0.2), skin: d.color, ribs: sk, tool,
         shield: id === 'drakeknight' ? '#7a1e14' : id === 'revknight' ? '#3a4a3a' : null, kite: true, plate: id === 'drakeknight' || id === 'revknight' || id === 'warden',
         cape: id === 'bonelord' || id === 'overlord' ? shade(d.body, -0.3) : null,
@@ -6053,6 +6115,7 @@ const G3 = (() => {
           if (d.boss) { const c = crown(0.28); hd.add(c); }
         },
       });
+      if (look && look.aura) { const au = glow(look.aura, 2.6, 0.35); au.position.y = 1.0; g.add(au); }
       if (id === 'abyssal' || id === 'overlord') demonParts(p, d.body);
       if (id === 'warden') for (const z of [0.3, -0.3]) { const m = mk(new T.OctahedronGeometry(0.14, 0), lam('#c8f6ff', { opacity: 0.85 }), 0, 1.42, z); m.scale.y = 2; p.add(m); }
       p.rotation.y = Math.PI + 0.6;
@@ -7917,6 +7980,7 @@ document.addEventListener('click', ev => {
     case 'syncnow': netSync().then(accountModal); break;
     case 'progsub': progSub = id; break;
     case 'hsk': hsSkill = id; break;
+    case 'insp': inspectHero(Array.isArray(hsRows) && hsRows[+id]); break;
     case 'pvpfind': pvpFind(); break;
     case 'pvpfight': pvpFight(id); break;
     case 'wildleave': leaveWild('Teleported out'); break;
