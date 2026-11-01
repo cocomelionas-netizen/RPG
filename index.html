@@ -407,6 +407,8 @@
 <div id="rotate" aria-live="polite"><span class="big">📱</span><b>Turn your phone upright</b><span class="muted">Endless Road is played in portrait.</span></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script src="lib/SkeletonUtils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 'use strict';
@@ -5816,8 +5818,92 @@ const G3 = (() => {
     }
     const tl = chain(7, 0.16, 0.08, 0.04, wc, cone(0.08, 0.18, '#1a0a14', 0.06, 0, 0, -Math.PI / 2, 0, 4)); tl.position.set(-0.18, 0.7, 0); tl.rotation.z = Math.PI + 0.5; p.add(tl); P.tailD = tl;
   }
+  /* --- animated creature models (CC0, Quaternius; see models/LICENSE.txt) ---
+     Loaded the first time a creature is met; the hand-made model stands in until the file arrives.
+     f: file, k: height as a share of the creature's overlay height, fly: hover height, tint: colour multiplied in,
+     big: extra scale, ghost: see-through */
+  const GLB = {
+    bog: { f: 'spikyblob', k: 0.75, lit: 1.6, tint: '#c8d890' }, bogmother: { f: 'spikyblob', k: 0.75, lit: 1.6, tint: '#d0e090' },
+    rat: { f: 'rat', k: 0.75 }, wolf: { f: 'wolf', k: 1.05, lit: 1.6, tint: '#c8ccd8' },
+    goblin: { f: 'orc', k: 0.5 }, gobarcher: { f: 'orc', k: 0.5, tint: '#c8e0a0' }, gobchief: { f: 'orc', k: 0.5, tint: '#e0f0b0' },
+    revgob: { f: 'orc', k: 0.5 }, orc: { f: 'orcskull', k: 0.5 },
+    bat: { f: 'bat', h: 1.1, fly: 1.4, tint: '#b098d0' },
+    troll: { f: 'troll', k: 0.5, tint: '#c8d8c0', lit: 1.3 }, frosttroll: { f: 'troll', k: 0.5, tint: '#e0f4ff', lit: 1.5 },
+    yeti: { f: 'yeti', k: 0.65 },
+    imp: { f: 'imp', h: 1.3, fly: 1.0, lit: 1.3 }, revimp: { f: 'imp', h: 1.3, fly: 1.0 },
+    lizard: { f: 'dino', k: 0.6, tint: '#ffb080', lit: 1.3 },
+    dragon: { f: 'dragon', h: 2.2, fly: 0.9, tint: '#ffa898', lit: 1.2 }, revdragon: { f: 'dragon', h: 2.2, fly: 0.9 },
+    shade: { f: 'ghost', h: 1.5, fly: 0.35, tint: '#c8a8ff', lit: 1.8 },
+    abyssal: { f: 'demon', k: 0.5, tint: '#e0a0e0', lit: 1.2 }, overlord: { f: 'demon', k: 0.5, tint: '#d090ff', lit: 1.2 },
+  };
+  const glbs = {};
+  function glbGet(f) {
+    const c = glbs[f];
+    if (c) return c.g || null;
+    glbs[f] = {};
+    if (!T.GLTFLoader) return null;
+    new T.GLTFLoader().load('models/' + f + '.glb', g => {
+      glbs[f].g = g;
+      // swap the stand-in for the real model on the next frame
+      if (entRef && GLB[entRef.id] && GLB[entRef.id].f === f) entRef = null;
+    }, undefined, () => { glbs[f].err = true; });
+    return null;
+  }
+  function buildGlb(e, cfg, src) {
+    const d = e.d, g = new T.Group(), P = {};
+    const m = T.SkeletonUtils ? T.SkeletonUtils.clone(src.scene) : src.scene.clone(true);
+    // the same matte light as the rest of the world
+    m.traverse(n => {
+      if (!n.isMesh) return;
+      const o = n.material;
+      n.material = window.__noLam ? o.clone() : new T.MeshLambertMaterial({ map: o.map, color: o.color, vertexColors: o.vertexColors, skinning: !!n.isSkinnedMesh, transparent: true, side: o.side });
+      if (cfg.tint) n.material.color.multiply(C(cfg.tint));
+      if (cfg.lit) n.material.color.multiplyScalar(cfg.lit);
+      n.castShadow = true; n.frustumCulled = false;
+    });
+    const mx = new T.AnimationMixer(m), acts = {};
+    for (const a of src.animations) acts[a.name] = mx.clipAction(a);
+    if (acts.idle) { acts.idle.play(); mx.update(0); }
+    // measure the posed skeleton: the skinned meshes are drawn by their bones, whatever the mesh nodes say
+    m.updateMatrixWorld(true);
+    const b = new T.Box3(), v = new T.Vector3();
+    m.traverse(n => { if (n.isBone) b.expandByPoint(n.getWorldPosition(v)); });
+    if (b.isEmpty()) b.setFromObject(m);
+    b.max.y += (b.max.y - b.min.y) * 0.12;   // the top bone is inside the head
+    const size = b.getSize(new T.Vector3());
+    const h = (cfg.h || entHeight(e) / U3 * (cfg.k || 1)) * (cfg.h ? d.size || 1 : 1), s = h / Math.max(0.01, size.y);
+    const inner = new T.Group(); inner.add(m); m.scale.setScalar(s); m.position.y = -b.min.y * s;
+    inner.rotation.y = -Math.PI / 2;   // glTF characters face +z; ours face -x
+    g.add(inner);
+    if (d.boss) g.add(crown(h * 1.02 + (cfg.fly || 0), Math.max(1, h / 1.6)));
+    g.add(shadow(Math.max(0.4, Math.min(2.4, h * 0.42))));
+    g.rotation.y = 0.45;
+    P.mixer = mx; P.cur = acts.idle ? 'idle' : '';
+    const play = (k, once) => {
+      const a = acts[k]; if (!a || P.cur === k) return;
+      a.reset(); a.setLoop(once ? T.LoopOnce : T.LoopRepeat); a.clampWhenFinished = true; a.fadeIn(0.12).play();
+      if (P.cur && acts[P.cur]) acts[P.cur].fadeOut(0.12);
+      P.cur = k; P.lock = once && k !== 'death' ? time + a.getClip().duration * 0.85 : 0;
+    };
+    play('idle');
+    P.anim = e => {
+      const dt = Math.min(0.1, Math.max(0, time - (P.t || time))); P.t = time;
+      if (e.dying) play('death', true);
+      else if (time >= (P.lock || 0)) {
+        if (e.lunge > 0.3 && acts.attack) play('attack', true);
+        else if (e.hit > 0.5 && acts.hit) play('hit', true);
+        else play('idle');
+      }
+      mx.update(dt);
+      inner.position.y = cfg.fly ? cfg.fly + Math.sin(time * 2.5) * 0.12 : 0;
+    };
+    g.userData.P = P;
+    return g;
+  }
   function buildEnemy(e) {
-    const d = e.d, id = e.id, g = new T.Group(), P = {};
+    const d = e.d, id = e.id;
+    if (GLB[id]) { const src = glbGet(GLB[id].f); if (src) { const gg = buildGlb(e, GLB[id], src); if (d.ghost) gg.traverse(n => { if (n.material && n.material.emissive) { n.material.opacity = 0.7; n.material.emissive.setRGB(0.05, 0.18, 0.06); } }); gg.userData.mats = mats(gg); return gg; } }
+    const g = new T.Group(), P = {};
     // models are built facing -x (toward the hero); people reuse the hero builder and get turned round
     if (MOBS[id]) MOBS[id](g, P, d);
     else if (d.shape === 'blob') {

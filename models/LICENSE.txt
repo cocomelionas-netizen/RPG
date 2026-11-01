@@ -1,0 +1,10 @@
+3D creature models in this folder are by Quaternius (https://quaternius.com), released under
+CC0 1.0 Universal (public domain): https://creativecommons.org/publicdomain/zero/1.0/
+
+  spikyblob, orc, orcskull, bat, troll, yeti, imp, dino, dragon, ghost, demon
+      - Ultimate Monsters pack: https://quaternius.com/packs/ultimatemonsters.html
+  rat - Easy Enemy pack: https://quaternius.com/packs/easyenemy.html
+  wolf - Ultimate Animated Animal pack: https://quaternius.com/packs/ultimateanimatedanimals.html
+
+They were converted to .glb, trimmed to four animations (idle, attack, hit, death) and compressed.
+lib/GLTFLoader.js and lib/SkeletonUtils.js are from three.js r128 (MIT).
