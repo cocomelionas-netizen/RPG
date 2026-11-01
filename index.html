@@ -41,7 +41,13 @@
     background: var(--panel); border-bottom: 1px solid var(--line);
   }
   header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; display: flex; align-items: center; gap: 10px; }
-  #mute, #gfx { padding: 2px 8px; min-height: 0; font-size: 16px; line-height: 1.2; }
+  #mute, #gfx, #bell { padding: 2px 8px; min-height: 0; font-size: 16px; line-height: 1.2; }
+  #bell { position: relative; margin-right: 6px; }
+  #bell i { position: absolute; top: -6px; right: -6px; background: #e0453a; color: #fff; font: 700 10px/16px sans-serif; min-width: 16px; height: 16px; border-radius: 8px; padding: 0 3px; font-style: normal; }
+  .notes .note { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .notes .note span { flex: 1; }
+  .notes .note.old { opacity: .55; }
+  .notes .note small { display: block; color: var(--muted); }
   #gfx { font-size: 12px; font-weight: 700; margin-left: 6px; }
   #acct { padding: 2px 10px; min-height: 0; font-size: 13px; line-height: 1.4; margin-right: 6px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   header .stat { color: var(--muted); display: inline-block; }
@@ -376,7 +382,7 @@
 </head>
 <body>
 <header>
-  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button><button id="install" data-a="install" hidden>⬇️ Install</button></h1>
+  <h1>🗺️ Endless Road <button id="acct" data-a="acct" aria-label="Account">👤 Log in</button><button id="bell" data-a="notes" aria-label="Notifications">🔔<i hidden></i></button><button id="mute" data-a="mute" aria-label="Toggle sound">🔊</button><button id="gfx" data-a="gfx" aria-label="Switch between 3D and 2D graphics" hidden>3D</button><button id="install" data-a="install" hidden>⬇️ Install</button></h1>
   <span class="stat" id="gold">Gold: <b>0</b></span>
   <span class="stat" id="cmb">Combat level: <b>1</b></span>
   <span class="stat" id="dist">Distance: <b>0 m</b></span>
@@ -605,6 +611,22 @@ defItem('gobboots',      { name: 'Goblin War Boots', icon: '🥾', color: '#6f8a
 defItem('bonering',      { name: 'Ring of the Bone Lord', icon: '💍', color: '#efe9d6', unique: true, value: 1200, slot: 'ring', acc: 0.04, type: 'Equipment', note: '+4% accuracy' });
 defItem('frostcape',     { name: 'Frost Cape', icon: '🧣', color: '#9fd8f0', unique: true, value: 2000, slot: 'cape', armor: 6, dr: 0.03, req: 40, type: 'Equipment', note: '+3% damage reduction' });
 defItem('firecape',      { name: 'Dragonfire Cape', icon: '🧣', color: '#e0453a', unique: true, value: 6000, slot: 'cape', armor: 9, dmg: 0.05, req: 60, type: 'Equipment', note: '+5% max hit' });
+// skill capes: bought at level 99 in a skill, the Max cape needs every skill at 99
+const CAPE_COST = 99000, MAXCAPE_COST = 990000;
+const CAPE_COL = { attack: '#a8322a', strength: '#2a8a3a', defence: '#3a5ab8', hitpoints: '#c83a4a', ranged: '#3a7a2a', magic: '#3a4ad8', prayer: '#e8e0c0', slayer: '#2a2a30',
+  woodcutting: '#5a8a3a', mining: '#5a6a7a', fishing: '#3a8ab8', smithing: '#6a6a6a', cooking: '#8a3ab8', fletching: '#2a7a7a', runecrafting: '#c8a83a', thieving: '#5a2a7a',
+  firemaking: '#e8702a', agility: '#3a3a8a', farming: '#6aa83a', herblore: '#2a6a3a', construction: '#a8885a', summoning: '#d8d8e8' };
+const CAPE_PERK = { attack: { acc: 0.04 }, strength: { dmg: 0.04 }, defence: { dr: 0.04 }, hitpoints: { dr: 0.03 }, ranged: { acc: 0.02, dmg: 0.02 }, magic: { acc: 0.02, dmg: 0.02 },
+  prayer: { dr: 0.02, acc: 0.01 }, slayer: { slay: 0.05 } };
+function capeNote(k) { const pk = CAPE_PERK[k]; return pk ? Object.entries(pk).map(([b, v]) => `+${Math.round(v * 100)}% ${{ acc: 'accuracy', dmg: 'max hit', dr: 'damage reduction', slay: 'on task' }[b]}`).join(', ')
+  : MASTERY_SKILLS_C.includes(k) ? `8% faster ${SKILLS[k].name}` : `+10% ${SKILLS[k].name} XP`; }
+const MASTERY_SKILLS_C = ['woodcutting', 'mining', 'fishing', 'thieving', 'smithing', 'cooking', 'fletching', 'runecrafting', 'firemaking'];
+for (const k in SKILLS) defItem('cape_' + k, Object.assign({ name: SKILLS[k].name + ' Cape', icon: '🧣', color: CAPE_COL[k], unique: true, value: 9900, slot: 'cape', armor: 4, req: 1,
+  type: 'Equipment', capeOf: k, note: '99 skill cape: ' + capeNote(k) }, CAPE_PERK[k] || {}));
+defItem('cape_max', { name: 'Max Cape', icon: '🧣', color: '#e8d27a', unique: true, value: 99000, slot: 'cape', armor: 8, acc: 0.04, dmg: 0.04, dr: 0.04, req: 1, type: 'Equipment', capeOf: 'max',
+  note: 'Every skill at 99: +4% accuracy, max hit and damage reduction, 8% faster skilling, +10% XP in every skill' });
+function capeOn(k) { const c = S.equip.cape; return c === 'cape_max' || c === 'cape_' + k; }
+function ownsItem(id) { return (S.inv[id] || 0) > 0 || Object.values(S.equip).includes(id); }
 defItem('dboots',        { name: 'Wyrmsteel Boots', icon: '🥾', color: '#c0302a', unique: true, value: 4000, slot: 'feet', armor: 7, req: 60, type: 'Equipment' });
 defItem('bogring',       { name: 'Ring of the Bog', icon: '💍', color: '#6a8a3a', unique: true, value: 1200, slot: 'ring', slay: 0.1, type: 'Equipment', note: '+10% damage and Slayer XP on task' });
 defItem('crystalgloves', { name: 'Crystal Gauntlets', icon: '🧤', color: '#9fe8f5', unique: true, value: 3000, slot: 'hands', armor: 6, acc: 0.03, req: 50, type: 'Equipment', note: '+3% accuracy' });
@@ -944,6 +966,8 @@ const SKILL_ACH = { attack: 'Duelist', strength: 'Brute', defence: 'Bulwark', hi
 const ACH = [
   { id: 'pk1', name: 'Wilderness Warrior', desc: 'Defeat a player killer', bonus: ['gold', 2], test: () => S.wild.pks >= 1 },
   { id: 'rev100k', name: 'Wraith Hunter', desc: 'Bank 100,000 gold of loot from the Wraith Caves', bonus: ['gold', 3], test: () => S.wild.banked >= 100000 },
+  { id: 'elite1', name: 'Elite Hunter', desc: 'Defeat an Elite monster', bonus: ['gold', 2], test: () => (S.stats.elites || 0) >= 1 },
+  { id: 'elite50', name: 'Bane of Elites', desc: 'Defeat 50 Elite monsters', bonus: ['xp', 2], test: () => (S.stats.elites || 0) >= 50 },
   { id: 'kill1', name: 'First Blood', desc: 'Defeat an enemy', bonus: ['gold', 1], test: () => S.kills >= 1 },
   { id: 'kill100', name: 'Monster Hunter', desc: 'Defeat 100 enemies', bonus: ['gold', 2], test: () => S.kills >= 100 },
   { id: 'kill1k', name: 'Monster Slayer', desc: 'Defeat 1,000 enemies', bonus: ['gold', 3], test: () => S.kills >= 1000 },
@@ -1089,6 +1113,58 @@ const randi = (a, b) => Math.floor(rand(a, b + 1));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const fmt = n => Math.floor(n).toLocaleString('en-US');
 
+/* ===== Notification centre: important things that happened, inside the game (no push notifications) ===== */
+// go: { tab } opens a tab, { z, act } travels there, { map } opens that map spot
+function notify(key, text, go) {
+  if (SIM) return;
+  const N = S.notes || (S.notes = []);
+  const old = N.find(n => n.key === key && !n.done);
+  if (old) { if (old.text !== text) { old.text = text; old.t = Date.now(); old.read = false; renderBell(); } old.go = go; return; }
+  N.unshift({ key, text, go, t: Date.now(), read: false, done: false });
+  if (N.length > 30) N.length = 30;
+  sfx('coin'); renderBell();
+}
+function notifyDone(key) { for (const n of S.notes || []) if (n.key === key && !n.done) { n.done = true; n.read = true; } renderBell(); }
+function renderBell() {
+  const el = document.querySelector('#bell i'); if (!el) return;
+  const c = (S.notes || []).filter(n => !n.read).length;
+  el.hidden = !c; el.textContent = c > 9 ? '9+' : c;
+}
+function ago(t) { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + ' d ago'; }
+function notesModal() {
+  const N = S.notes || [];
+  openModal(`<h3>🔔 Notifications</h3><div class="notes">${N.length ? N.map((n, i) => `<div class="note ${n.done || n.read ? 'old' : ''}"><span>${n.text}<small>${ago(n.t)}${n.done ? ' · done' : ''}</small></span>${n.go && !n.done ? `<button data-a="notego" data-id="${i}">▶ Go</button>` : ''}</div>`).join('')
+    : '<p class="muted">Nothing new. Ready crops, finished quests, rewards, world bosses and PvP seasons show up here.</p>'}</div>
+    <div class="btns">${N.length ? '<button data-a="notesclear">🧹 Clear all</button>' : ''}<button data-a="close">Close</button></div>`);
+  N.forEach(n => n.read = true); renderBell();
+}
+function noteGo(i) {
+  const n = (S.notes || [])[i]; if (!n || !n.go) return;
+  const g = n.go; closeModal();
+  if (g.act !== undefined) { travel(g.z, g.act); R.ent = null; R.phase = 'walk'; lastGoal = ''; }
+  openTab(g.tab || 'activity', true);
+  if (g.map !== undefined) mapSel = g.map;
+  uiDirty = true;
+}
+// checks the game every few seconds and tells the player when something becomes ready
+const NOTE_ST = {};
+function noteCheck() {
+  if (SIM || !S || !S.skills) return;
+  const edge = (key, on, text, go) => {
+    if (on && !NOTE_ST[key]) notify(key, text, go);
+    else if (on) { const n = (S.notes || []).find(x => x.key === key && !x.done); if (n) n.text = text; }   // quietly keep the text current
+    else if (NOTE_ST[key]) notifyDone(key);
+    NOTE_ST[key] = on;
+  };
+  const ripe = isOpen('home') && S.home && S.home.p ? Object.keys(S.home.p).filter(k => { const p = S.home.p[k]; return p && p.s && growFrac(p) >= 1; }).length : 0;
+  edge('crops', ripe > 0, `🌱 ${ripe} crop patch${ripe > 1 ? 'es are' : ' is'} ready to harvest`, { z: HOME, act: 'farming', tab: 'activity' });
+  const qs = QUESTS.filter(q => questReady(q));
+  edge('quest', qs.length > 0, `📜 Quest done – hand in: ${qs.map(q => q.name).join(', ')}`, { tab: 'quests' });
+  edge('daily', isOpen('daily') && dailyClaimable(), '📅 A daily reward is ready to claim', { tab: 'daily' });
+  edge('path', pathActive() && pathReady() >= 0, '🛣️ A Road to Adventure reward is waiting', { tab: 'path' });
+  const caps = Object.keys(SKILLS).filter(k => LV[k] >= 99 && !ownsItem('cape_' + k));
+  edge('cape', caps.length > 0, `🧣 Skill cape${caps.length > 1 ? 's' : ''} available: ${caps.map(k => SKILLS[k].name).join(', ')}`, { tab: 'skills' });
+}
 function log(msg, cls = '') {
   if (SIM) return;
   logLines.unshift({ msg, cls });
@@ -1106,7 +1182,7 @@ function take(id, n = 1) {
 function has(id) { return S.inv[id] || 0; }
 
 function addXp(skill, amt, raw) {
-  if (!raw) amt *= (MASTERY_SKILLS.includes(skill) ? mXpMult(skill) : 1) * xpMult() * roadEventXp(skill) * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1) * roomXp(skill) * (1 + potB('wis'));
+  if (!raw) amt *= (MASTERY_SKILLS.includes(skill) ? mXpMult(skill) : 1) * xpMult() * roadEventXp(skill) * (R.buff > 0 ? 1.5 : 1) * (R.rested > 0 ? 1.5 : 1) * (S.bonfire ? 1 + S.bonfire.pct / 100 : 1) * (petFor(skill) ? 1.05 : 1) * roomXp(skill) * (1 + potB('wis')) * (capeOn(skill) && (S.equip.cape === 'cape_max' || !CAPE_PERK[skill] && !MASTERY_SKILLS.includes(skill)) ? 1.1 : 1);
   const before = LV[skill];
   S.skills[skill] += amt;
   LV[skill] = levelFromXp(S.skills[skill]);
@@ -1372,6 +1448,18 @@ function newJourney() {
 let W = 960, HX = 230, FS = 1;   // view width, hero x and font scale change on phones
 const H = 320, GY = 262, WALK = 230;
 
+/* ===== Elite monsters: halfway to the next zone, a rare stronger version of a zone monster walks up ===== */
+const ELITE_CHANCE = 0.04;
+function eliteLevel(z) { return z < MAIN_ZONES - 1 ? Math.floor((ZONES[z].req + ZONES[z + 1].req) / 2) : ZONES[z].req + 15; }
+function eliteReady(z) { const zz = ZONES[z]; return z < MAIN_ZONES && !zz.wild && !zz.wboss && combatLevel() >= eliteLevel(z); }
+const ELITE_CACHE = {};
+function eliteOf(id) {
+  if (ELITE_CACHE[id]) return ELITE_CACHE[id];
+  const d = ENEMIES[id], z = ZONES.findIndex(q => q.enemies && q.enemies.includes(id));
+  return ELITE_CACHE[id] = Object.assign({}, d, { name: '⭐ Elite ' + d.name, elite: true, hp: Math.round(d.hp * 3), maxHit: Math.ceil(d.maxHit * 1.3), atk: d.atk + 6, def: d.def + 6,
+    size: d.size * 1.3, gold: [d.gold[0] * 5, d.gold[1] * 6],
+    drops: d.drops.map(([i, ch, mn, mx]) => [i, Math.min(1, ch * 2), mn, mx * 2]).concat([['gem', 0.5, 1, 2], ['clue_' + ['easy', 'easy', 'medium', 'medium', 'hard'][Math.max(0, Math.min(4, z))], 0.35, 1, 1]]) });
+}
 function spawnEntity() {
   // fixed distance so pacing (and offline progress) is the same on every screen size
   const x = R.worldX + Math.max(790, W - HX + 60) + Math.random() * 140;
@@ -1391,7 +1479,9 @@ function spawnEntity() {
     const lair = S.ctarget && S.ctarget === z.boss && bossOpen(bossOf(z.boss));
     const id = auto ? S.task.id : lair || (S.ctarget && z.enemies.includes(S.ctarget)) ? S.ctarget : z.enemies[Math.floor(Math.random() * z.enemies.length)];
     const pk = z.wild && (S.ctarget === 'pvp' || Math.random() < PK_CHANCE);
-    const d = pk ? makePker() : ENEMIES[id];
+    const el = !pk && !lair && !auto && eliteReady(S.zone) && Math.random() < ELITE_CHANCE;
+    const d = pk ? makePker() : el ? eliteOf(id) : ENEMIES[id];
+    if (el && !SIM) { log(`⭐ An Elite ${ENEMIES[id].name} blocks the road!`, 'lg-xp'); showBanner(`⭐ Elite ${ENEMIES[id].name}!`); }
     // archers and mages keep their distance
     // melee monsters stop a step away so they don't stand inside the hero; bosses are bigger
     const stop = (d.shape === 'dragon' ? 150 : d.shape === 'flyer' ? 80 : 80 + 30 * d.size) + (d.boss ? 30 : 0) + (wtype() !== 'melee' ? 60 : 0);
@@ -1786,6 +1876,7 @@ function killEnemy(e) {
   if (e.d.pker && S.ctarget === 'pvp') S.wild.gold += e.d.lvl * 8;   // bounty for hunting
   if (e.d.pker) { S.wild.pks++; log(`☠️ You defeated ${e.d.name}! Their gear is in your loot sack.`, 'lg-xp'); showBanner(`☠️ You PK'd ${e.d.name}!`); }
   const z = S.zone;
+  if (e.d.elite) { S.stats.elites = (S.stats.elites || 0) + 1; if (!SIM) showBanner(`⭐ Elite ${ENEMIES[e.id].name} defeated!`); }
   if (BOSS_PETS[e.id]) rollPet(...BOSS_PETS[e.id]);
   if (e.d.boss) {
     if (z < MAIN_ZONES && !S.bosses[z]) {
@@ -1971,7 +2062,7 @@ function mNext(skill, key) { const l = mLv(skill, key); return l < 99 ? XP_TABLE
 function poolCap(skill) { return 150000 + 5000 * masteryItems(skill).length; }
 function poolPct(skill) { return S.mastery[skill] ? S.mastery[skill].pool / poolCap(skill) : 0; }
 function mXpMult(skill) { const p = poolPct(skill); return (p >= 0.1 ? 1.05 : 1) * (p >= 0.95 ? 1.05 : 1); }
-function mSpeed(skill, key) { return (1 - mLv(skill, key) * 0.001) * (poolPct(skill) >= 0.25 ? 0.95 : 1); }
+function mSpeed(skill, key) { return (1 - mLv(skill, key) * 0.001) * (poolPct(skill) >= 0.25 ? 0.95 : 1) * (capeOn(skill) ? 0.92 : 1); }
 function mDouble(skill, key) { return mLv(skill, key) * 0.002 + (poolPct(skill) >= 0.5 ? 0.05 : 0) + potB('dbl'); }
 function masteryName(skill, key) { const m = masteryItems(skill).find(x => x.key === key); return m ? m.name || ITEMS[m.item].name : key; }
 function addMastery(skill, key, time) {
@@ -2225,7 +2316,8 @@ const HAIRS = { brown: ['Brown', '#6b3e1f', 0], black: ['Black', '#231a16', 2500
 const SKINS = { light: ['Light', '#f1c27d', 0], fair: ['Fair', '#ffdbb4', 15000], tan: ['Tan', '#d09a62', 15000], brown: ['Brown', '#9a6a40', 15000], dark: ['Dark', '#5e3c24', 15000] };
 const DYES = { blue: ['Blue', '#3f6fb5', 0], red: ['Red', '#b53f3f', 20000], green: ['Green', '#3f9a4f', 20000], purple: ['Purple', '#7a4ab5', 20000], black: ['Black', '#2a2830', 20000], white: ['White', '#e0e0e6', 30000], gold: ['Gold', '#d8a830', 50000], teal: ['Teal', '#2fa8a0', 30000] };
 const PANTS = { dusk: ['Dusk', '#3b3550', 0], brown: ['Leather', '#6a4a2a', 20000], black: ['Black', '#22202a', 20000], grey: ['Grey', '#7a7a84', 20000], navy: ['Navy', '#24366a', 20000], red: ['Crimson', '#7a2430', 30000], white: ['White', '#d8d8de', 30000] };
-const AURAS = { frost: ['Frost Aura', '#6ab0ff', 500000], ember: ['Ember Aura', '#ff7a3a', 500000], venom: ['Venom Aura', '#5aff7a', 750000], royal: ['Royal Aura', '#f2c94c', 1500000], void: ['Void Aura', '#b46bff', 3000000] };
+const AURAS = { frost: ['Frost Aura', '#6ab0ff', 500000], ember: ['Ember Aura', '#ff7a3a', 500000], venom: ['Venom Aura', '#5aff7a', 750000], royal: ['Royal Aura', '#f2c94c', 1500000], void: ['Void Aura', '#b46bff', 3000000],
+  gladiator: ['Gladiator Aura', '#ff4a4a', -3], platinum: ['Platinum Aura', '#cfe8ff', -4], dragonfire: ['Dragon Champion Aura', '#ff6a1a', -5] };   // negative price: PvP season reward (that tier)
 // name colours show in chat, clan chat and hiscores for everyone (the server checks the save owns them)
 const NCOLOR = { gold: ['Gold', 100000], ruby: ['Ruby', 150000], emerald: ['Emerald', 150000], sapphire: ['Sapphire', 150000], amethyst: ['Amethyst', 250000], rainbow: ['Rainbow', 1000000] };
 // shapes and extras: [name, value, price, icon]
@@ -2237,13 +2329,13 @@ const CAPES = { red: ['Red cape', '#a82a2a', 60000], blue: ['Blue cape', '#2a4aa
 const TRAILS = { sparkle: ['Sparkles', ['#fff6a0', '#ffffff'], 300000, '✨'], flame: ['Flames', ['#ff9a3a', '#ffd04a', '#ff5a2a'], 500000, '🔥'], leaf: ['Leaves', ['#6ad04a', '#a8e05a', '#3a9a3a'], 300000, '🍃'], heart: ['Hearts', ['#ff6a9a', '#ff9ac0'], 400000, '💗'], frost: ['Frost', ['#bfe6ff', '#ffffff', '#7ac0ff'], 500000, '❄️'], void: ['Void', ['#b46bff', '#5a1a9a', '#e0b0ff'], 1500000, '🌌'], rainbow: ['Rainbow', ['#ff5a5a', '#ffb84a', '#f2e24a', '#5ae07a', '#5aa8ff', '#c58bff'], 3000000, '🌈'] };
 const COS_KINDS = { hair: HAIRS, style: HSTYLES, beard: BEARDS, skin: SKINS, eyes: EYES, shirt: DYES, pants: PANTS, hat: HATS, cape: CAPES, aura: AURAS, trail: TRAILS, nc: NCOLOR };
 const COS_NONE = new Set(['aura', 'nc', 'hat', 'cape', 'trail']);   // these can be taken off
-function cosOwn(kind, id) { const t = COS_KINDS[kind][id]; return !!t && ((kind === 'nc' ? t[1] : t[2]) === 0 || !!S.cos.own[kind + '_' + id]); }
+function cosOwn(kind, id) { const t = COS_KINDS[kind][id]; return !!t && ((kind === 'nc' ? t[1] : t[2]) === 0 || !!S.cos.own[kind + '_' + id] || cosPrice(kind, id) < 0 && (S.pvpTier || 0) >= -cosPrice(kind, id)); }
 function cosPrice(kind, id) { const t = COS_KINDS[kind][id]; return kind === 'nc' ? t[1] : t[2]; }
 function cosPick(kind, id) {
   if (!COS_KINDS[kind] || (id && !COS_KINDS[kind][id])) return;
   if (id && !cosOwn(kind, id)) {
     const c = cosPrice(kind, id);
-    if (S.gold < c) return;
+    if (c < 0 || S.gold < c) return;
     S.gold -= c; S.cos.own[kind + '_' + id] = true; S.stats.luxGold = (S.stats.luxGold || 0) + c; sfx('chest');
     log(`🎨 Bought: ${kind === 'nc' ? NCOLOR[id][0] + ' name' : COS_KINDS[kind][id][0]}.`, 'lg-gold');
   }
@@ -2266,7 +2358,7 @@ function htmlLux() {
       <div class="btns"><button data-a="boost" data-id="${id}" ${S.gold < bc || full ? 'disabled' : ''}>${full ? 'Max 6 hours' : `+1 hour – ${fmt(bc)} 🪙`}</button></div></div>`; }).join('') + '</div>';
   const row = (kind, title, sw) => `<h3>${title}</h3><div class="cosrow">` + Object.entries(COS_KINDS[kind]).map(([id, t]) => {
     const own = cosOwn(kind, id), sel = (S.cos[kind] || (COS_NONE.has(kind) ? null : Object.keys(COS_KINDS[kind])[0])) === id, price = cosPrice(kind, id);
-    return `<button class="cos ${sel ? 'sel' : ''}" data-a="cos" data-id="${kind}:${id}" ${!own && S.gold < price ? 'disabled' : ''}>${sw(id, t)}<small>${t[0]}</small><small class="${own ? 'have' : ''}">${sel ? '✔ on' : own ? 'owned' : fmt(price) + ' 🪙'}</small></button>`;
+    return `<button class="cos ${sel ? 'sel' : ''}" data-a="cos" data-id="${kind}:${id}" ${!own && (price < 0 || S.gold < price) ? 'disabled' : ''}>${sw(id, t)}<small>${t[0]}</small><small class="${own ? 'have' : ''}">${sel ? '✔ on' : own ? 'owned' : price < 0 ? `⚔️ ${PVP_TIERS[-price][1]} season` : fmt(price) + ' 🪙'}</small></button>`;
   }).join('') + '</div>';
   const dot = (id, t) => `<span class="sw" style="background:${t[1]}"></span>`;
   const ico = (id, t) => `<span class="sw emo">${t[3]}</span>`;
@@ -3651,6 +3743,7 @@ function drawEnemy(e) {
   ctx.globalAlpha = dying * (d.ghost ? 0.7 : 1);
   if (e.hit > 0.5) ctx.filter = 'brightness(2.2)';
   if (d.shape !== 'flyer') ellipse(x, GY + 2, 26 * s * (d.shape === 'dragon' ? 3 : 1), 5, 'rgba(0,0,0,0.25)');
+  if (d.elite) ellipse(x, GY + 2, 34 * s, 7, `rgba(255,207,58,${0.3 + 0.15 * Math.sin(time * 4)})`);
   if (d.shape === 'blob') {
     const q = 1 + 0.08 * Math.sin(time * 5);
     const w = 26 * q, h = 22 / q;
@@ -4518,6 +4611,8 @@ function wbSet(st) {
   const old = WB.st;
   WB.st = Object.assign({}, old || {}, st);
   if (st.unclaimed && WB.told !== st.id) { WB.told = st.id; log('👹 You have world boss rewards to claim (Map → World Boss Arena).', 'lg-gold'); }
+  if (st.unclaimed) notify('wbclaim', '👹 World boss rewards are waiting in the World Boss Arena', { tab: 'activity', map: WBOSS }); else notifyDone('wbclaim');
+  if (old && old.id !== WB.st.id) notify('wbnew', '👹 A new world boss has risen – join the fight!', { z: WBOSS, act: 'combat', tab: 'activity' });
   // a new boss rose: the arena shows it
   if (old && old.id !== WB.st.id && S.zone === WBOSS && R.ent && R.ent.d.world) resetEncounter();
 }
@@ -4722,7 +4817,50 @@ function renderClan() {
 }
 
 /* --- PvP against other players' heroes: the server rolls the fight, the game plays it back --- */
-const PVP = { targets: null, history: null, busy: false, msg: '' };
+const PVP = { targets: null, history: null, busy: false, msg: '', season: null };
+// [min rating, name, icon, gold reward]
+const PVP_TIERS = [[0, 'Unranked', '▫️', 0], [1050, 'Bronze', '🥉', 20000], [1150, 'Silver', '🥈', 50000], [1250, 'Gold', '🥇', 120000], [1400, 'Platinum', '💠', 250000], [1600, 'Dragon', '🐉', 500000]];
+const PVP_REWARD = ['', 'title Bronze Duelist', 'title Silver Duelist', 'title Gold Gladiator + Gladiator Aura', 'title Platinum Gladiator + Platinum Aura', 'title Dragon Champion + Dragon Champion Aura'];
+async function pvpSeason() {
+  if (!me || !sb) return;
+  try {
+    const { data, error } = await sb.rpc('pvp_season');
+    if (!error && data && data.ok) {
+      PVP.season = data;
+      if (data.max_tier > (S.pvpTier || 0)) S.pvpTier = data.max_tier;
+      if (data.unclaimed && data.unclaimed.length) notify('season', `⚔️ PvP season reward ready (${data.unclaimed.map(u => PVP_TIERS[u.tier][1]).join(', ')})`, { tab: 'combat' });
+      uiDirty = true;
+    }
+  } catch (e) {}
+}
+async function pvpClaim() {
+  if (!me || PVP.busy) return;
+  PVP.busy = true; uiDirty = true;
+  try {
+    const { data, error } = await sb.rpc('pvp_season_claim');
+    if (error) PVP.msg = error.message;
+    else if (!data.ok) PVP.msg = data.reason;
+    else {
+      S.gold += data.gold; S.pvpTier = Math.max(S.pvpTier || 0, data.max_tier);
+      log(`🏆 PvP season rewards: +${fmt(data.gold)} gold, ${PVP_REWARD[data.tier]}.`, 'lg-gold');
+      showBanner(`🏆 ${PVP_TIERS[data.tier][2]} ${PVP_TIERS[data.tier][1]} season reward!`); sfx('level');
+      notifyDone('season'); save();
+    }
+  } catch (e) { PVP.msg = 'Could not reach the server'; }
+  PVP.busy = false; PVP.season = null; pvpSeason();
+}
+function htmlSeason() {
+  const z = PVP.season;
+  if (!z) return '<p class="muted">Loading the season…</p>';
+  const t = PVP_TIERS[z.tier], nx = PVP_TIERS[z.tier + 1], days = Math.max(0, Math.ceil((new Date(z.ends) - Date.now()) / 86400000));
+  let h = `<div class="info"><b>⚔️ Season ${z.season}</b> · ends in ${days} day${days === 1 ? '' : 's'}<br>
+    Rating <b>${fmt(z.rating)}</b> · best this season <b>${fmt(z.best)}</b> · tier ${t[2]} <b>${t[1]}</b>${nx ? ` <small class="muted">(${nx[2]} ${nx[1]} at ${nx[0]})</small>` : ''}<br>
+    <small class="muted">Your best rating of the month sets your tier. A new month pulls every rating halfway back to 1000.
+    Rewards: ${PVP_TIERS.slice(1).map((q, i) => `${q[2]} ${q[1]} ${fmt(q[3])} 🪙 + ${PVP_REWARD[i + 1].replace('title ', '')}`).join(' · ')}</small>`;
+  if (z.top && z.top.length) h += `<br><small>🏅 Top this season: ${z.top.map((r, i) => `${i + 1}. ${esc(r.name)} (${r.best})`).join(' · ')}</small>`;
+  if (z.unclaimed && z.unclaimed.length) h += `<div class="btns"><button data-a="pvpclaim" ${PVP.busy ? 'disabled' : ''}>🎁 Claim ${z.unclaimed.map(u => `${PVP_TIERS[u.tier][2]} ${PVP_TIERS[u.tier][1]} (${u.season})`).join(', ')}</button></div>`;
+  return h + '</div>';
+}
 async function pvpFind() {
   if (!me || PVP.busy) return;
   PVP.busy = true; PVP.msg = ''; uiDirty = true;
@@ -4732,7 +4870,7 @@ async function pvpFind() {
       sb.from('pvp_fights').select('attacker,defender,attacker_name,defender_name,winner,rating_change,gold,created_at')
         .or(`attacker.eq.${me.id},defender.eq.${me.id}`).order('created_at', { ascending: false }).limit(8),
     ]);
-    PVP.targets = t.error ? [] : t.data; PVP.history = h.error ? [] : h.data;
+    PVP.targets = t.error ? [] : t.data; PVP.history = h.error ? [] : h.data; pvpSeason();
     if (t.error) PVP.msg = t.error.message;
   } catch (e) { PVP.msg = 'Could not reach the server'; }
   PVP.busy = false; uiDirty = true;
@@ -4807,6 +4945,7 @@ function htmlRealPvp() {
   if (!PVP.targets && !PVP.busy) pvpFind();
   h += `<p class="muted">The server fights your saved hero against theirs with the real stats, gear and food – nobody can fake the result.
     Winning gives rating and gold; losing costs only rating. Your rating: <b>${fmt(me.rating)}</b> · ${me.wins} W / ${me.losses} L</p>`;
+  h += htmlSeason();
   if (PVP.msg) h += `<p class="need">${PVP.msg}</p>`;
   h += `<div class="btns"><button data-a="pvpfind" ${PVP.busy ? 'disabled' : ''}>🔍 Find opponents</button></div>`;
   if (!PVP.targets) return h + '<p class="muted">Loading…</p>';
@@ -6849,7 +6988,7 @@ const G3 = (() => {
   function syncEnt() {
     const e = R.ent;
     if (e && e.kind === 'patch' && e.pk && patch(e.pk).s !== e.seedShown) entRef = null;
-    if (e !== entRef) { dropEnt(); entRef = e; if (e) { entObj = buildEnt(e); cast(entObj); scene.add(entObj); } }
+    if (e !== entRef) { dropEnt(); entRef = e; if (e) { entObj = buildEnt(e); cast(entObj); scene.add(entObj); if (e.d && e.d.elite) { const r = auraRing(entObj, '#ffcf3a'); r.scale.setScalar(1.6 / (entObj.scale.x || 1)); entObj.userData.eRing = r; } } }
     fireLight.intensity = 0;
     if (!e) return;
     const g = entObj, P = g.userData.P, dying = e.dying ? clamp(R.doneT / 0.6, 0, 1) : 1;
@@ -6859,6 +6998,7 @@ const G3 = (() => {
       const d = e.d;
       x += e.lunge * (d.type === 'melee' ? -18 : -5);
       if (e.hit > 0.5) flash(g, 0.5, 0.14, 0.06); else flash(g, 0, e.d.ghost ? 0.18 : 0, 0);
+      if (g.userData.eRing) animRing(g.userData.eRing);
       if (P.anim) P.anim(e);
       else if (d.shape === 'blob') { const q = 1 + 0.08 * Math.sin(time * 5); P.body.scale.set(1.05 * q, 0.85 / q, 0.9 * q); P.body.position.y = 0.5 / q; }
       else if (d.shape === 'quad') { P.head.position.y = (d.id === 'lizard' ? 0.45 : 0.75) + Math.sin(time * 4) * 0.025; P.tail.rotation.z = 0.4 + Math.sin(time * 6) * 0.15; }
@@ -7558,6 +7698,18 @@ function htmlFarm(i) {
   h += `<p class="muted">Seeds drop from monsters everywhere (better ones in harder areas), from Farmers and the Master Farmer in Riverbend, and the Shop sells a few. You can plant ${known} of ${SEEDS.length} kinds.</p>`;
   return h;
 }
+function capeBtn(k) {
+  const id = 'cape_' + k, cost = k === 'max' ? MAXCAPE_COST : CAPE_COST;
+  return ownsItem(id) ? `<small class="muted">🧣 ${ITEMS[id].name} owned</small>` : `<button data-a="buycape" data-id="${k}" ${S.gold < cost ? 'disabled' : ''}>🧣 ${ITEMS[id].name} – ${fmt(cost)} 🪙</button><small class="muted">${ITEMS[id].note.replace('99 skill cape: ', '')}</small>`;
+}
+function buyCape(k) {
+  const id = 'cape_' + k, cost = k === 'max' ? MAXCAPE_COST : CAPE_COST;
+  if (!ITEMS[id] || ownsItem(id) || S.gold < cost) return;
+  if (k === 'max' ? !Object.keys(SKILLS).every(s => LV[s] >= 99) : LV[k] < 99) return;
+  S.gold -= cost; give(id); sfx('chest');
+  log(`🧣 You bought the ${ITEMS[id].name}! Wear it from the Bag.`, 'lg-good');
+  showBanner(`🧣 ${ITEMS[id].name}!`); uiDirty = true;
+}
 function htmlSkills() {
   return htmlSoon() + '<div class="grid">' + Object.entries(SKILLS).map(([k, sk]) => {
     const l = LV[k], xp = S.skills[k];
@@ -7567,8 +7719,8 @@ function htmlSkills() {
       <div class="bar"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
       <small>${fmt(xp)} / ${fmt(nxt)} XP</small>${MASTERY_SKILLS.includes(k) && isOpen('mastery') ? `
       <div class="mpool"><small>🎓 Mastery pool ${(poolPct(k) * 100).toFixed(1)}%</small><div class="bar pool"><i style="width:${(poolPct(k) * 100).toFixed(1)}%"></i></div>
-      <button data-a="mastery" data-id="${k}">🎓 Mastery</button></div>` : ''}</div>`;
-  }).join('') + '</div>';
+      <button data-a="mastery" data-id="${k}">🎓 Mastery</button></div>` : ''}${l >= 99 ? capeBtn(k) : ''}</div>`;
+  }).join('') + '</div>' + (Object.keys(SKILLS).every(k => LV[k] >= 99) ? `<div class="skill">👑 <b>Every skill at 99!</b> ${capeBtn('max')}</div>` : '');
 }
 
 let bagSub = 'items', craftSub = 'smithing', smithMetal = null;
@@ -7901,6 +8053,11 @@ const clogHave = () => Object.keys(S.got || {}).filter(id => ITEMS[id]).length +
 const clogPct = () => clogHave() / clogTotal() * 100;
 // the server checks the same rules before it shows a title to anyone else
 const TITLES = [
+  { id: 'pvp1', name: 'Bronze Duelist', need: 'Bronze tier in a PvP season', test: () => (S.pvpTier || 0) >= 1 },
+  { id: 'pvp2', name: 'Silver Duelist', need: 'Silver tier in a PvP season', test: () => (S.pvpTier || 0) >= 2 },
+  { id: 'pvp3', name: 'Gold Gladiator', need: 'Gold tier in a PvP season', test: () => (S.pvpTier || 0) >= 3 },
+  { id: 'pvp4', name: 'Platinum Gladiator', need: 'Platinum tier in a PvP season', test: () => (S.pvpTier || 0) >= 4 },
+  { id: 'pvp5', name: 'Dragon Champion', need: 'Dragon tier in a PvP season', test: () => (S.pvpTier || 0) >= 5 },
   { id: 'hoarder', name: 'the Hoarder', need: 'Collection log 10%', test: () => clogPct() >= 10 },
   { id: 'collector', name: 'the Collector', need: 'Collection log 25%', test: () => clogPct() >= 25 },
   { id: 'curator', name: 'the Curator', need: 'Collection log 50%', test: () => clogPct() >= 50 },
@@ -8111,7 +8268,7 @@ function nextGoal() {
     return { t: `Finish your quests to unlock "${q.name}"`, tab: 'quests' };
   }
   const nz = best + 1;
-  if (nz < MAIN_ZONES) return { t: `Reach combat level ${ZONES[nz].req} to enter ${ZONES[nz].name} (now ${combatLevel()})`, tab: 'skills' };
+  if (nz < MAIN_ZONES) return { t: `Reach combat level ${ZONES[nz].req} to enter ${ZONES[nz].name} (now ${combatLevel()})` + (combatLevel() >= eliteLevel(nz - 1) ? ' – ⭐ Elites now roam here' : ` – ⭐ Elites appear at ${eliteLevel(nz - 1)}`), tab: 'skills' };
   if (!S.task) return { t: 'Get a 💀 Slayer task for Slayer XP and coins', tab: 'slayer' };
   return { t: `You beat the Dragon! Start a 🌟 New Journey for ${renownGain()} Renown`, tab: 'progress' };
 }
@@ -8234,11 +8391,16 @@ document.addEventListener('click', ev => {
       showBanner(sp ? `⟳ Auto special: ${sp.icon} ${sp.name} (${sp.cost}%)` : '⟳ Auto special off'); renderSpec(); save(); break; }
     case 'insp': inspectHero(Array.isArray(hsRows) && hsRows[+id]); break;
     case 'pvpfind': pvpFind(); break;
+    case 'pvpclaim': pvpClaim(); break;
+    case 'notes': notesModal(); break;
+    case 'notego': noteGo(+id); break;
+    case 'notesclear': S.notes = []; closeModal(); renderBell(); break;
     case 'pvpfight': pvpFight(id); break;
     case 'wildleave': leaveWild('Teleported out'); break;
     case 'wildskull': if (S.wild.in) { S.wild.skull = !S.wild.skull; log(S.wild.skull ? '☠️ You are skulled: better wraith loot, but you keep nothing if you die.' : 'Skull removed.', 'lg-bad'); } break;
     case 'wildflee': S.wild.flee = !S.wild.flee; break;
     case 'mastery': masteryModal(id); break;
+    case 'buycape': buyCape(id); break;
     case 'mspend': spendPool(b.dataset.skill, id); masteryModal(b.dataset.skill); break;
     case 'eslot': slotMenu(id); break;
     case 'questsub': questSub = id; break;
@@ -8371,7 +8533,7 @@ canvas.addEventListener('pointermove', ev => {
 
 /* ================= LOOP ================= */
 
-let lastFrame = performance.now(), lastWall = Date.now(), uiTimer = 0, saveTimer = 0;
+let lastFrame = performance.now(), lastWall = Date.now(), uiTimer = 0, saveTimer = 0, noteT = 0;
 // fast-forward time the page was not running; the wall clock keeps counting while a phone sleeps
 function catchUp(sec) {
   if (S.wild.in) leaveWild('You logged out');
@@ -8402,6 +8564,7 @@ function frame(now) {
   else tick(dt);
   draw();
   uiTimer += dt; saveTimer += dt;
+  if ((noteT += dt) > 3) { noteT = 0; noteCheck(); }
   if (uiTimer > 0.25) { uiTimer = 0; renderHero(); renderGoal(); renderSpec(); if (uiDirty) { uiDirty = false; renderTab(); } }
   if (saveTimer > 10) { saveTimer = 0; save(); }
   if (me && (NET.timer += dt) > 60) { NET.timer = 0; netSync(); }
@@ -8427,6 +8590,7 @@ function init() {
     document.body.appendChild(d);
   }
   $('#mute').textContent = S.muted ? '🔇' : '🔊';
+  renderBell();
   applyGfx();
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (ios && !navigator.standalone && !S.tipA2HS && location.protocol === 'https:' && !/claude/.test(location.hostname)) {

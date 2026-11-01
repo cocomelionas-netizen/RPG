@@ -15,6 +15,29 @@ create table if not exists public.xp_table (lvl int primary key, xp bigint not n
 alter table public.item_values enable row level security;
 alter table public.xp_table enable row level security;
 insert into public.item_values (id, value) values
+  ('cape_attack', 9900),
+  ('cape_strength', 9900),
+  ('cape_defence', 9900),
+  ('cape_hitpoints', 9900),
+  ('cape_ranged', 9900),
+  ('cape_magic', 9900),
+  ('cape_prayer', 9900),
+  ('cape_slayer', 9900),
+  ('cape_woodcutting', 9900),
+  ('cape_mining', 9900),
+  ('cape_fishing', 9900),
+  ('cape_smithing', 9900),
+  ('cape_cooking', 9900),
+  ('cape_fletching', 9900),
+  ('cape_runecrafting', 9900),
+  ('cape_thieving', 9900),
+  ('cape_firemaking', 9900),
+  ('cape_agility', 9900),
+  ('cape_farming', 9900),
+  ('cape_herblore', 9900),
+  ('cape_construction', 9900),
+  ('cape_summoning', 9900),
+  ('cape_max', 99000),
   ('warhammer0', 26),
   ('warhammer1', 40),
   ('warhammer2', 99),
@@ -428,6 +451,29 @@ create table if not exists public.item_stats (
 );
 alter table public.item_stats enable row level security;
 insert into public.item_stats (id, name, slot, wtype, power, armor, speed, acc, dmg, dr, heal) values
+  ('cape_attack', 'Attack Cape', 'cape', null, 0, 4, null, 0.04, 0, 0, 0),
+  ('cape_strength', 'Strength Cape', 'cape', null, 0, 4, null, 0, 0.04, 0, 0),
+  ('cape_defence', 'Defence Cape', 'cape', null, 0, 4, null, 0, 0, 0.04, 0),
+  ('cape_hitpoints', 'Hitpoints Cape', 'cape', null, 0, 4, null, 0, 0, 0.03, 0),
+  ('cape_ranged', 'Ranged Cape', 'cape', null, 0, 4, null, 0.02, 0.02, 0, 0),
+  ('cape_magic', 'Magic Cape', 'cape', null, 0, 4, null, 0.02, 0.02, 0, 0),
+  ('cape_prayer', 'Prayer Cape', 'cape', null, 0, 4, null, 0.01, 0, 0.02, 0),
+  ('cape_slayer', 'Slayer Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_woodcutting', 'Woodcutting Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_mining', 'Mining Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_fishing', 'Fishing Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_smithing', 'Smithing Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_cooking', 'Cooking Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_fletching', 'Fletching Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_runecrafting', 'Runeweaving Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_thieving', 'Thieving Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_firemaking', 'Firemaking Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_agility', 'Agility Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_farming', 'Farming Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_herblore', 'Herbalism Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_construction', 'Construction Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_summoning', 'Summoning Cape', 'cape', null, 0, 4, null, 0, 0, 0, 0),
+  ('cape_max', 'Max Cape', 'cape', null, 0, 8, null, 0.04, 0.04, 0.04, 0),
   ('warhammer0', 'Bronze Warhammer', 'weapon', 'melee', 4, 0, '2.4', 0, 0, 0, 0),
   ('warhammer1', 'Iron Warhammer', 'weapon', 'melee', 9, 0, '2.4', 0, 0, 0, 0),
   ('warhammer2', 'Steel Warhammer', 'weapon', 'melee', 15, 0, '2.4', 0, 0, 0, 0),
@@ -890,6 +936,91 @@ begin
 exception when others then return null;
 end $$;
 
+-- ---------- PvP seasons: one per calendar month (UTC). The best rating of the month sets the tier;
+-- a new month halves everyone's distance from 1000 and the old tier can be claimed for gold, a title and cosmetics ----------
+alter table public.profiles add column if not exists season_key text;
+alter table public.profiles add column if not exists season_best int not null default 1000;
+create table if not exists public.pvp_season_results (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  season text not null,
+  best int not null,
+  tier int not null,
+  claimed boolean not null default false,
+  created_at timestamptz not null default now(),
+  primary key (user_id, season)
+);
+alter table public.pvp_season_results enable row level security;
+drop policy if exists "own season results" on public.pvp_season_results;
+create policy "own season results" on public.pvp_season_results for select to authenticated using ((select auth.uid()) = user_id);
+revoke insert, update, delete on public.pvp_season_results from anon, authenticated;
+create or replace function public.season_key() returns text
+language sql stable set search_path = public as $$ select to_char(now() at time zone 'utc', 'YYYY-MM') $$;
+create or replace function public.pvp_tier(r int) returns int
+language sql immutable set search_path = public as $$
+  select case when r >= 1600 then 5 when r >= 1400 then 4 when r >= 1250 then 3 when r >= 1150 then 2 when r >= 1050 then 1 else 0 end
+$$;
+-- closes the hero's old season (if any) and starts the current one
+create or replace function public.pvp_season_roll(uid uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare p profiles; sk text := season_key();
+begin
+  select * into p from profiles where id = uid for update;
+  if p.id is null or p.season_key is not distinct from sk then return; end if;
+  if p.season_key is not null and pvp_tier(p.season_best) > 0 then
+    insert into pvp_season_results (user_id, season, best, tier) values (uid, p.season_key, p.season_best, pvp_tier(p.season_best))
+      on conflict (user_id, season) do nothing;
+  end if;
+  update profiles set rating = case when p.season_key is null then rating else 1000 + (rating - 1000) / 2 end, season_key = sk,
+    season_best = 1000 where id = uid;   -- the tier is earned again by fighting
+  update hiscores set rating = (select rating from profiles where id = uid) where user_id = uid;
+end $$;
+-- the season panel: this month's tier, days left, and old seasons waiting to be claimed
+create or replace function public.pvp_season() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); p profiles;
+begin
+  if uid is null then return jsonb_build_object('ok', false, 'reason', 'Sign in first'); end if;
+  perform pvp_season_roll(uid);
+  select * into p from profiles where id = uid;
+  return jsonb_build_object('ok', true, 'season', p.season_key, 'rating', p.rating, 'best', p.season_best, 'tier', pvp_tier(p.season_best),
+    'ends', (date_trunc('month', now() at time zone 'utc') + interval '1 month') at time zone 'utc',
+    'top', (select coalesce(jsonb_agg(t), '[]') from (select pr.name, pr.season_best as best from profiles pr
+             where pr.season_key = p.season_key and pr.season_best > 1000 and not pr.banned order by pr.season_best desc limit 5) t),
+    'unclaimed', (select coalesce(jsonb_agg(jsonb_build_object('season', season, 'best', best, 'tier', tier) order by season), '[]')
+                  from pvp_season_results where user_id = uid and not claimed),
+    'max_tier', (select coalesce(max(tier), 0) from pvp_season_results where user_id = uid and claimed));
+end $$;
+-- claims every finished season: the gold goes through the same credit as PvP wins
+create or replace function public.pvp_season_claim() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); g bigint := 0; t int := 0; n int := 0; r record;
+begin
+  if uid is null then return jsonb_build_object('ok', false, 'reason', 'Sign in first'); end if;
+  if exists (select 1 from profiles where id = uid and banned) then return jsonb_build_object('ok', false, 'reason', 'Not allowed'); end if;
+  for r in select * from pvp_season_results where user_id = uid and not claimed for update loop
+    g := g + (array[20000, 50000, 120000, 250000, 500000])[r.tier]; t := greatest(t, r.tier); n := n + 1;
+  end loop;
+  if n = 0 then return jsonb_build_object('ok', false, 'reason', 'Nothing to claim'); end if;
+  update pvp_season_results set claimed = true where user_id = uid and not claimed;
+  update profiles set credit = credit + g where id = uid;
+  return jsonb_build_object('ok', true, 'gold', g, 'tier', t, 'seasons', n,
+    'max_tier', (select coalesce(max(tier), 0) from pvp_season_results where user_id = uid and claimed));
+end $$;
+-- season titles are only shown when the hero really reached that tier in some season
+create or replace function public.season_title_for(uid uuid, d jsonb) returns text
+language plpgsql stable security definer set search_path = public as $$
+declare t text := d ->> 'title'; n int; best int;
+begin
+  n := case t when 'pvp1' then 1 when 'pvp2' then 2 when 'pvp3' then 3 when 'pvp4' then 4 when 'pvp5' then 5 end;
+  if n is null then return null; end if;
+  select coalesce(max(tier), 0) into best from pvp_season_results where user_id = uid;
+  if best < n then return null; end if;
+  return (array['Bronze Duelist', 'Silver Duelist', 'Gold Gladiator', 'Platinum Gladiator', 'Dragon Champion'])[n];
+exception when others then return null;
+end $$;
+revoke execute on function public.pvp_season_roll(uuid), public.season_title_for(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.pvp_season(), public.pvp_season_claim() to authenticated;
+
 create or replace function public.update_hiscore(uid uuid, d jsonb) returns void
 language plpgsql security definer set search_path = public as $$
 declare
@@ -906,7 +1037,7 @@ begin
     where e.key = any (array['kingslime','gobchief','bonelord','frosttroll','dragon','bogmother','warden','overlord']) and e.value::numeric > 0;
   insert into hiscores (user_id, name, total_level, total_xp, combat, skills, kills, bosses, pks, imported, updated_at, rating, week_key, week_base, title, ncolor, look)
   select uid, p.name, tl, tx, cmb, coalesce(d -> 'skills', '{}'), coalesce((d ->> 'kills')::numeric, 0), bosses,
-         coalesce((d -> 'wild' ->> 'pks')::int, 0), p.imported, now(), p.rating, week_key(), tx, title_for(d, tl), ncolor_for(d), look_for(d)
+         coalesce((d -> 'wild' ->> 'pks')::int, 0), p.imported, now(), p.rating, week_key(), tx, coalesce(title_for(d, tl), season_title_for(uid, d)), ncolor_for(d), look_for(d)
   from profiles p where p.id = uid
   on conflict (user_id) do update set name = excluded.name, total_level = excluded.total_level, total_xp = excluded.total_xp,
     combat = excluded.combat, skills = excluded.skills, kills = excluded.kills, bosses = excluded.bosses, pks = excluded.pks,
@@ -1086,6 +1217,7 @@ declare
 begin
   if uid is null then return jsonb_build_object('ok', false, 'reason', 'Sign in first'); end if;
   if p_target = uid then return jsonb_build_object('ok', false, 'reason', 'You cannot fight yourself'); end if;
+  perform pvp_season_roll(uid); perform pvp_season_roll(p_target);
   select * into me from profiles where id = uid;
   select * into op from profiles where id = p_target;
   if me.id is null or me.banned then return jsonb_build_object('ok', false, 'reason', 'Your account cannot fight'); end if;
@@ -1142,6 +1274,7 @@ begin
   gold := case when win then 15 * (b ->> 'combat')::int else 0 end;
   update profiles set rating = rating + chg, wins = wins + win::int, losses = losses + (not win)::int, credit = credit + gold where id = uid;
   update profiles set rating = rating - chg, wins = wins + (not win)::int, losses = losses + win::int where id = p_target;
+  update profiles set season_best = greatest(season_best, rating) where id in (uid, p_target);
   update hiscores set rating = (select rating from profiles where id = uid) where user_id = uid;
   update hiscores set rating = (select rating from profiles where id = p_target) where user_id = p_target;
   insert into pvp_fights (attacker, defender, attacker_name, defender_name, winner, rating_change, gold, log)
