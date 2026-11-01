@@ -201,6 +201,7 @@
   .cosrow .cos.sel { border-color: var(--accent); background: #2e2a1c; }
   .cosrow small { font-size: 10.5px; }
   .sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #0006; display: inline-block; }
+  .sw.emo { border: 0; font-size: 21px; line-height: 26px; text-align: center; }
   .sw.aura { background: radial-gradient(circle, var(--g) 0%, transparent 70%); border-color: transparent; animation: enchglow 1.6s infinite; }
   .ncs { font-weight: 800; font-size: 16px; }
   .nc-gold { color: #f2c94c; font-weight: 700; } .nc-ruby { color: #ff5a6a; font-weight: 700; } .nc-emerald { color: #4ae08a; font-weight: 700; }
@@ -2104,7 +2105,15 @@ const PANTS = { dusk: ['Dusk', '#3b3550', 0], brown: ['Leather', '#6a4a2a', 2000
 const AURAS = { frost: ['Frost Aura', '#6ab0ff', 500000], ember: ['Ember Aura', '#ff7a3a', 500000], venom: ['Venom Aura', '#5aff7a', 750000], royal: ['Royal Aura', '#f2c94c', 1500000], void: ['Void Aura', '#b46bff', 3000000] };
 // name colours show in chat, clan chat and hiscores for everyone (the server checks the save owns them)
 const NCOLOR = { gold: ['Gold', 100000], ruby: ['Ruby', 150000], emerald: ['Emerald', 150000], sapphire: ['Sapphire', 150000], amethyst: ['Amethyst', 250000], rainbow: ['Rainbow', 1000000] };
-const COS_KINDS = { hair: HAIRS, skin: SKINS, shirt: DYES, pants: PANTS, aura: AURAS, nc: NCOLOR };
+// shapes and extras: [name, value, price, icon]
+const HSTYLES = { short: ['Short', 'short', 0, '💇'], long: ['Long', 'long', 30000, '👩'], ponytail: ['Ponytail', 'ponytail', 30000, '🎀'], mohawk: ['Mohawk', 'mohawk', 50000, '🤘'], spiky: ['Spiky', 'spiky', 50000, '⚡'], bald: ['Bald', 'bald', 10000, '🥚'] };
+const BEARDS = { full: ['Full beard', 'full', 0, '🧔'], none: ['Clean shaven', 'none', 0, '🙂'], goatee: ['Goatee', 'goatee', 20000, '🐐'], moustache: ['Moustache', 'moustache', 20000, '👨'], long: ['Wizard beard', 'long', 60000, '🧙'] };
+const EYES = { dark: ['Dark', '#1a1a1a', 0], blue: ['Blue', '#2a6ad8', 15000], green: ['Green', '#2a9a3a', 15000], amber: ['Amber', '#d89a2a', 25000], red: ['Blood red', '#e02a2a', 80000], glow: ['Spirit glow', '#7af0ff', 200000] };
+const HATS = { wizard: ['Wizard hat', 'wizard', 120000, '🧙'], tophat: ['Top hat', 'tophat', 150000, '🎩'], bandana: ['Bandana', 'bandana', 40000, '🏴‍☠️'], cat: ['Cat ears', 'cat', 80000, '🐱'], viking: ['Horned cap', 'viking', 200000, '🐂'], flower: ['Flower crown', 'flower', 100000, '🌸'], crown: ['Golden crown', 'crown', 2500000, '👑'], halo: ['Halo', 'halo', 4000000, '😇'] };
+const CAPES = { red: ['Red cape', '#a82a2a', 60000], blue: ['Blue cape', '#2a4aa8', 60000], green: ['Green cape', '#2a7a3a', 60000], black: ['Black cape', '#1a1820', 80000], white: ['White cape', '#e6e6ee', 80000], purple: ['Royal cape', '#6a2a9a', 150000], gold: ['Golden cape', '#d8a830', 500000] };
+const TRAILS = { sparkle: ['Sparkles', ['#fff6a0', '#ffffff'], 300000, '✨'], flame: ['Flames', ['#ff9a3a', '#ffd04a', '#ff5a2a'], 500000, '🔥'], leaf: ['Leaves', ['#6ad04a', '#a8e05a', '#3a9a3a'], 300000, '🍃'], heart: ['Hearts', ['#ff6a9a', '#ff9ac0'], 400000, '💗'], frost: ['Frost', ['#bfe6ff', '#ffffff', '#7ac0ff'], 500000, '❄️'], void: ['Void', ['#b46bff', '#5a1a9a', '#e0b0ff'], 1500000, '🌌'], rainbow: ['Rainbow', ['#ff5a5a', '#ffb84a', '#f2e24a', '#5ae07a', '#5aa8ff', '#c58bff'], 3000000, '🌈'] };
+const COS_KINDS = { hair: HAIRS, style: HSTYLES, beard: BEARDS, skin: SKINS, eyes: EYES, shirt: DYES, pants: PANTS, hat: HATS, cape: CAPES, aura: AURAS, trail: TRAILS, nc: NCOLOR };
+const COS_NONE = new Set(['aura', 'nc', 'hat', 'cape', 'trail']);   // these can be taken off
 function cosOwn(kind, id) { const t = COS_KINDS[kind][id]; return !!t && ((kind === 'nc' ? t[1] : t[2]) === 0 || !!S.cos.own[kind + '_' + id]); }
 function cosPrice(kind, id) { const t = COS_KINDS[kind][id]; return kind === 'nc' ? t[1] : t[2]; }
 function cosPick(kind, id) {
@@ -2115,12 +2124,14 @@ function cosPick(kind, id) {
     S.gold -= c; S.cos.own[kind + '_' + id] = true; S.stats.luxGold = (S.stats.luxGold || 0) + c; sfx('chest');
     log(`🎨 Bought: ${kind === 'nc' ? NCOLOR[id][0] + ' name' : COS_KINDS[kind][id][0]}.`, 'lg-gold');
   }
-  S.cos[kind] = S.cos[kind] === id && (kind === 'aura' || kind === 'nc') ? null : id;
+  S.cos[kind] = S.cos[kind] === id && COS_NONE.has(kind) ? null : id;
   if (kind === 'nc' && typeof netSync === 'function') setTimeout(() => netSync(), 50);
 }
 function heroLook() {
   const c = S.cos || {};
-  return { hair: (HAIRS[c.hair] || HAIRS.brown)[1], skin: (SKINS[c.skin] || SKINS.light)[1], shirt: (DYES[c.shirt] || DYES.blue)[1], pants: (PANTS[c.pants] || PANTS.dusk)[1], aura: AURAS[c.aura] ? AURAS[c.aura][1] : null };
+  return { hair: (HAIRS[c.hair] || HAIRS.brown)[1], skin: (SKINS[c.skin] || SKINS.light)[1], shirt: (DYES[c.shirt] || DYES.blue)[1], pants: (PANTS[c.pants] || PANTS.dusk)[1], aura: AURAS[c.aura] ? AURAS[c.aura][1] : null,
+    style: (HSTYLES[c.style] || HSTYLES.short)[1], beard: (BEARDS[c.beard] || BEARDS.full)[1], eyes: (EYES[c.eyes] || EYES.dark)[1],
+    hat: HATS[c.hat] ? c.hat : null, cape: CAPES[c.cape] ? CAPES[c.cape][1] : null, trail: TRAILS[c.trail] ? TRAILS[c.trail][1] : null, hideHelm: !!c.hideHelm };
 }
 function htmlLux() {
   const bc = boostCost();
@@ -2129,12 +2140,17 @@ function htmlLux() {
       return `<div class="item ${left > 0 ? 'on' : ''}"><div class="top"><span class="ic">${b.icon}</span><span class="nm"><b>${b.name}</b><br><small>${b.desc}${left > 0 ? ` · <span class="have">${fmtTime(left)} left</span>` : ''}</small></span></div>
       <div class="btns"><button data-a="boost" data-id="${id}" ${S.gold < bc || full ? 'disabled' : ''}>${full ? 'Max 6 hours' : `+1 hour – ${fmt(bc)} 🪙`}</button></div></div>`; }).join('') + '</div>';
   const row = (kind, title, sw) => `<h3>${title}</h3><div class="cosrow">` + Object.entries(COS_KINDS[kind]).map(([id, t]) => {
-    const own = cosOwn(kind, id), sel = (S.cos[kind] || (kind === 'aura' || kind === 'nc' ? null : Object.keys(COS_KINDS[kind])[0])) === id, price = cosPrice(kind, id);
+    const own = cosOwn(kind, id), sel = (S.cos[kind] || (COS_NONE.has(kind) ? null : Object.keys(COS_KINDS[kind])[0])) === id, price = cosPrice(kind, id);
     return `<button class="cos ${sel ? 'sel' : ''}" data-a="cos" data-id="${kind}:${id}" ${!own && S.gold < price ? 'disabled' : ''}>${sw(id, t)}<small>${t[0]}</small><small class="${own ? 'have' : ''}">${sel ? '✔ on' : own ? 'owned' : fmt(price) + ' 🪙'}</small></button>`;
   }).join('') + '</div>';
   const dot = (id, t) => `<span class="sw" style="background:${t[1]}"></span>`;
-  h += row('hair', '💇 Hair', dot) + row('skin', '🧑 Skin', dot) + row('shirt', '👕 Shirt (shows without body armour)', dot) + row('pants', '👖 Trousers (show without leg armour)', dot)
+  const ico = (id, t) => `<span class="sw emo">${t[3]}</span>`;
+  h += `<p><button data-a="hidehelm" class="${S.cos.hideHelm ? 'sel' : ''}">🪖 ${S.cos.hideHelm ? 'Helmet hidden – your hair and hat show' : 'Hide my helmet (keeps its stats)'}</button></p>`;
+  h += row('hair', '💇 Hair colour', dot) + row('style', '✂️ Hairstyle', ico) + row('beard', '🧔 Beard', ico) + row('skin', '🧑 Skin', dot) + row('eyes', '👁️ Eyes', dot)
+    + row('shirt', '👕 Shirt (shows without body armour)', dot) + row('pants', '👖 Trousers (show without leg armour)', dot)
+    + row('hat', '🎩 Hat (shows without a helmet; tap again to take off)', ico) + row('cape', '🧣 Cape (shows without a worn cape)', dot)
     + row('aura', '✨ Aura', (id, t) => `<span class="sw aura" style="--g:${t[1]}"></span>`)
+    + row('trail', '👣 Walking trail', ico)
     + row('nc', '🏷️ Name colour (chat and hiscores)', id => `<span class="ncs nc-${id}">Aa</span>`);
   return h;
 }
@@ -3387,7 +3403,7 @@ function drawHero() {
   const gear = sl => S.equip[sl] ? ITEMS[S.equip[sl]] : null;
   const bodyIt = gear('body'), helm = gear('helm'), legs = gear('legs'), shield = gear('shield');
   const look = heroLook(), body = bodyIt ? bodyIt.color || '#9aa0a8' : look.shirt;
-  const armor = helm;
+  const armor = look.hideHelm ? null : helm;
   const walking = R.phase === 'walk';
   const bob = walking ? Math.abs(Math.sin(time * 13)) * -2 : 0;
   const dead = R.phase === 'dead';
@@ -3400,14 +3416,32 @@ function drawHero() {
     rot: dead ? -Math.PI / 2 : 0,
     walk: walking ? Math.sin(time * 13) * 0.6 : 0,
     arm: heroArmAngle(), body: R.heroHit > 0.5 ? '#d84a4a' : body, leg: legs ? shade(legs.color, -0.08) : look.pants, skin: R.heroHit > 0.5 ? '#ff9a8a' : look.skin,
-    shield: shield && S.activity === 'combat' ? shield.color : null,
+    shield: shield && S.activity === 'combat' ? shield.color : null, eye: look.eyes,
     headExtra: () => {
       if (armor) {
         const hc = shade(helm.color, -0.05);
         ctx.fillStyle = hc; ctx.beginPath(); ctx.arc(0, -61, 11, Math.PI, 0); ctx.fill(); ctx.fillRect(-11, -62, 22, 3);
         if (helm.kind === 'fullhelm') { ctx.fillRect(-11, -62, 6, 12); ctx.fillStyle = '#111'; ctx.fillRect(3, -61, 7, 2); }
       }
-      else { ctx.fillStyle = look.hair; ctx.beginPath(); ctx.arc(-1, -62, 10.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
+      else if (look.style !== 'bald') {
+        ctx.fillStyle = look.hair;
+        if (look.style === 'mohawk') ctx.fillRect(-6, -76, 10, 7);
+        else { ctx.beginPath(); ctx.arc(-1, -62, 10.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
+        if (look.style === 'long') ctx.fillRect(-11, -62, 5, 16);
+        if (look.style === 'ponytail') ctx.fillRect(-14, -62, 4, 11);
+        if (look.style === 'spiky') for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(-9 + k * 5, -70); ctx.lineTo(-7 + k * 5, -78); ctx.lineTo(-4 + k * 5, -70); ctx.fill(); }
+      }
+      if (!armor && look.hat) {
+        const k = look.hat;
+        if (k === 'wizard') { ctx.fillStyle = '#5a3aa8'; ctx.fillRect(-13, -71, 26, 3); ctx.beginPath(); ctx.moveTo(-8, -71); ctx.lineTo(2, -94); ctx.lineTo(8, -71); ctx.fill(); }
+        else if (k === 'tophat') { ctx.fillStyle = '#18161c'; ctx.fillRect(-12, -71, 24, 3); ctx.fillRect(-7, -87, 14, 16); ctx.fillStyle = '#a82a2a'; ctx.fillRect(-7, -75, 14, 3); }
+        else if (k === 'bandana') { ctx.fillStyle = '#b02a2a'; ctx.fillRect(-11, -70, 22, 5); ctx.fillRect(-15, -68, 5, 7); }
+        else if (k === 'cat') { ctx.fillStyle = '#2a2830'; for (const x of [-8, 4]) { ctx.beginPath(); ctx.moveTo(x, -70); ctx.lineTo(x + 3, -80); ctx.lineTo(x + 6, -70); ctx.fill(); } }
+        else if (k === 'viking') { ctx.fillStyle = '#8a8f98'; ctx.beginPath(); ctx.arc(0, -64, 11, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#f0ead8'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 9, -68); ctx.lineTo(s * 16, -80); ctx.lineTo(s * 12, -66); ctx.fill(); } }
+        else if (k === 'flower') for (let i = 0; i < 5; i++) circle(-9 + i * 4.5, -71, 2.5, ['#ff7ab0', '#ffffff', '#ffe04a'][i % 3]);
+        else if (k === 'crown') { ctx.fillStyle = '#f2c94c'; ctx.beginPath(); ctx.moveTo(-9, -70); ctx.lineTo(-9, -78); ctx.lineTo(-4, -73); ctx.lineTo(0, -80); ctx.lineTo(4, -73); ctx.lineTo(9, -78); ctx.lineTo(9, -70); ctx.fill(); }
+        else if (k === 'halo') { ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -80, 9, 3, 0, 0, Math.PI * 2); ctx.stroke(); }
+      }
     },
     tool: heroTool(),
   });
@@ -3846,7 +3880,12 @@ function updateVisuals(dt) {
   for (const d of xpDrops) d.t += dt;
   xpDrops = xpDrops.filter(d => d.t < 1.6);
   floaters = floaters.filter(f => f.life > 0);
-  for (const p of particles) { p.life -= dt; p.wx += p.vx * dt; p.y += p.vy * dt; p.vy += 420 * dt; if (p.y > GY + 4) { p.y = GY + 4; p.vy *= -0.3; p.vx *= 0.6; } }
+  // cosmetic walking trail: little motes left behind the hero's feet
+  const tr = S.cos && TRAILS[S.cos.trail];
+  if (tr && R.phase === 'walk' && Math.random() < dt * 28) {
+    const cs = tr[1]; particles.push({ wx: R.worldX - 10 + rand(-8, 6), y: GY - rand(0, 26), vx: rand(-25, 5), vy: rand(-40, -8), life: rand(0.5, 0.9), color: cs[Math.floor(Math.random() * cs.length)], float: true });
+  }
+  for (const p of particles) { p.life -= dt; p.wx += p.vx * dt; p.y += p.vy * dt; p.vy += (p.float ? -15 : 420) * dt; if (p.y > GY + 4) { p.y = GY + 4; p.vy *= -0.3; p.vx *= 0.6; } }
   particles = particles.filter(p => p.life > 0);
 }
 
@@ -5276,6 +5315,17 @@ const G3 = (() => {
 
   /* --- characters --- */
   // a box-limbed OSRS style person facing +x; o: body, leg, skin, hair, helm, shield, ribs, hat
+  // cosmetic hats sit on the head group (head centre at 0, top of the head at +0.19)
+  function heroHat(hd, k) {
+    if (k === 'wizard') { hd.add(mk(new T.CylinderGeometry(0.34, 0.34, 0.035, 12), '#4a2a8a', 0, 0.22, 0)); const c = mk(new T.ConeGeometry(0.22, 0.62, 10), '#5a3aa8', -0.04, 0.53, 0); c.rotation.z = 0.18; hd.add(c, mk(new T.IcosahedronGeometry(0.045, 0), unlit('#ffe04a'), 0.12, 0.4, 0.14)); }
+    else if (k === 'tophat') hd.add(mk(new T.CylinderGeometry(0.3, 0.3, 0.035, 12), '#18161c', 0, 0.22, 0), mk(new T.CylinderGeometry(0.18, 0.18, 0.36, 12), '#18161c', 0, 0.41, 0), mk(new T.CylinderGeometry(0.185, 0.185, 0.06, 12), '#a82a2a', 0, 0.27, 0));
+    else if (k === 'bandana') { hd.add(box(0.41, 0.12, 0.41, '#b02a2a', -0.01, 0.15, 0)); for (const z of [0.05, -0.05]) { const t = box(0.04, 0.2, 0.06, '#b02a2a', -0.24, 0.02, z); t.rotation.z = -0.5; hd.add(t); } for (let k2 = 0; k2 < 4; k2++) hd.add(box(0.415, 0.02, 0.02, '#ffffff', -0.01, 0.15, -0.15 + k2 * 0.1)); }
+    else if (k === 'cat') { for (const z of [0.12, -0.12]) { hd.add(mk(new T.ConeGeometry(0.08, 0.2, 4), '#2a2830', -0.02, 0.32, z), mk(new T.ConeGeometry(0.045, 0.12, 4), '#f0a0b8', 0.02, 0.31, z)); } }
+    else if (k === 'viking') { hd.add(mk(new T.SphereGeometry(0.22, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), '#8a8f98', 0, 0.15, 0), box(0.44, 0.05, 0.44, '#6a5030', 0, 0.16, 0)); for (const z of [1, -1]) { const hn = mk(new T.ConeGeometry(0.06, 0.32, 6), '#f0ead8', 0, 0.33, z * 0.26); hn.rotation.x = z * 0.7; hd.add(hn); } }
+    else if (k === 'flower') { for (let k2 = 0; k2 < 9; k2++) { const a = k2 / 9 * Math.PI * 2; hd.add(mk(new T.IcosahedronGeometry(0.05, 0), ['#ff7ab0', '#ffffff', '#ffe04a'][k2 % 3], Math.cos(a) * 0.21, 0.2, Math.sin(a) * 0.21), mk(new T.IcosahedronGeometry(0.035, 0), '#4aa84a', Math.cos(a + 0.35) * 0.21, 0.19, Math.sin(a + 0.35) * 0.21)); } }
+    else if (k === 'crown') hd.add(crown(0.28));
+    else if (k === 'halo') { const t = mk(new T.TorusGeometry(0.2, 0.03, 6, 20), unlit('#ffe680'), 0, 0.45, 0); t.rotation.x = Math.PI / 2; hd.add(t, at(glow('#ffe680', 0.8, 0.5), 0, 0.45, 0)); }
+  }
   function person(o) {
     const g = new T.Group(), P = {};
     // legs: plain trousers, or wider platelegs with knee plates
@@ -5308,8 +5358,18 @@ const G3 = (() => {
       if (o.fullhelm) { head.add(box(0.38, 0.4, 0.42, o.helm, -0.04, -0.02, 0)); head.add(box(0.02, 0.05, 0.3, '#111111', 0.16, 0.03, 0)); }
       else head.add(box(0.04, 0.2, 0.06, o.helm, 0.19, -0.04, 0));   // nose guard
     } else if (o.hair) {
-      head.add(box(0.4, 0.12, 0.4, o.hair, -0.02, 0.2, 0), box(0.12, 0.3, 0.4, o.hair, -0.17, 0.04, 0), box(0.2, 0.12, 0.04, o.hair, -0.04, 0.08, 0.19), box(0.2, 0.12, 0.04, o.hair, -0.04, 0.08, -0.19));
-      if (o.beard) head.add(box(0.1, 0.16, 0.3, o.hair, 0.15, -0.17, 0));
+      const hc = o.hair, st = o.style || 'short', cap = () => head.add(box(0.4, 0.12, 0.4, hc, -0.02, 0.2, 0));
+      const sides = () => head.add(box(0.12, 0.3, 0.4, hc, -0.17, 0.04, 0), box(0.2, 0.12, 0.04, hc, -0.04, 0.08, 0.19), box(0.2, 0.12, 0.04, hc, -0.04, 0.08, -0.19));
+      if (st === 'short') { cap(); sides(); }
+      else if (st === 'long') { cap(); sides(); head.add(box(0.14, 0.62, 0.42, hc, -0.17, -0.2, 0), box(0.1, 0.42, 0.06, hc, -0.06, -0.08, 0.2), box(0.1, 0.42, 0.06, hc, -0.06, -0.08, -0.2)); }
+      else if (st === 'ponytail') { cap(); sides(); const t = box(0.12, 0.42, 0.12, hc, -0.3, -0.12, 0); t.rotation.z = -0.35; head.add(t, box(0.07, 0.07, 0.14, shadeC(hc, -0.3), -0.22, 0.08, 0)); }
+      else if (st === 'mohawk') { head.add(box(0.42, 0.2, 0.09, hc, -0.02, 0.27, 0), box(0.12, 0.14, 0.07, hc, -0.2, 0.12, 0)); }
+      else if (st === 'spiky') { cap(); sides(); for (let k = 0; k < 7; k++) { const sp = mk(new T.ConeGeometry(0.07, 0.22, 4), hc, -0.14 + (k % 4) * 0.08, 0.3, k < 4 ? 0.09 : -0.09); sp.rotation.z = 0.35 - (k % 4) * 0.15; head.add(sp); } }
+      const bd = o.beard === true ? 'full' : o.beard;
+      if (bd === 'full') head.add(box(0.1, 0.16, 0.3, hc, 0.15, -0.17, 0));
+      else if (bd === 'goatee') head.add(box(0.08, 0.12, 0.12, hc, 0.17, -0.2, 0));
+      else if (bd === 'moustache') head.add(box(0.05, 0.045, 0.22, hc, 0.2, -0.08, 0));
+      else if (bd === 'long') { head.add(box(0.1, 0.18, 0.3, hc, 0.15, -0.17, 0), box(0.09, 0.3, 0.2, hc, 0.16, -0.38, 0), box(0.08, 0.12, 0.1, hc, 0.16, -0.58, 0)); }
     }
     if (o.hat) o.hat(head);
     g.add(head); P.head = head;
@@ -5466,10 +5526,11 @@ const G3 = (() => {
       const look = heroLook();
       const p = person({
         body: body ? body.color || '#9aa0a8' : look.shirt, leg: legs ? shade(legs.color, -0.08) : look.pants, skin: look.skin, hair: look.hair,
-        helm: helm && shade(helm.color, -0.05), fullhelm: helm && helm.kind === 'fullhelm',
+        helm: helm && !look.hideHelm && shade(helm.color, -0.05), fullhelm: helm && !look.hideHelm && helm.kind === 'fullhelm',
         shield: shield && S.activity === 'combat' ? shield.color : null, kite: shield && shield.kind === 'kiteshield', tool: heroTool3(),
-        plate: body && (body.kind === 'platebody' || /plate/i.test(body.name)), chain: body && body.kind === 'chainbody', plateLegs: legs && legs.kind === 'platelegs', beard: true,
-        cape: cape && cape.color, gloves: hands && hands.color, boots: feet && feet.color,
+        plate: body && (body.kind === 'platebody' || /plate/i.test(body.name)), chain: body && body.kind === 'chainbody', plateLegs: legs && legs.kind === 'platelegs',
+        cape: cape ? cape.color : look.cape, gloves: hands && hands.color, boots: feet && feet.color,
+        style: look.style, beard: look.beard, eye: look.eyes, hat: (!helm || look.hideHelm) && look.hat ? hd => heroHat(hd, look.hat) : null,
       });
       p.rotation.y = -0.6;
       heroObj = group(p, shadow(0.45)); heroObj.userData.p = p; heroObj.userData.mats = mats(p); cast(p);
@@ -7961,6 +8022,7 @@ document.addEventListener('click', ev => {
     case 'close': closeModal(); break;
     case 'boost': buyBoost(id); break;
     case 'cos': { const [k, v] = id.split(':'); cosPick(k, v); break; }
+    case 'hidehelm': S.cos.hideHelm = !S.cos.hideHelm; break;
     case 'ench': { const r = enchant(id, !!b.dataset.n); if (r === 'boom') closeModal(); else { slotMenu(id); const bx = document.querySelector('#modal .big'); if (bx && r) { bx.classList.add(r === 'ok' ? 'ench-ok' : 'ench-bad'); } } renderHero(); break; }
     case 'install': installApp(); break;
     case 'reset':
