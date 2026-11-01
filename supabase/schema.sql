@@ -1964,8 +1964,10 @@ alter table public.allowed_origins enable row level security;
 revoke all on public.allowed_origins from anon, authenticated;
 insert into public.allowed_origins (origin) values
   ('https://cocomelionas-netizen.github.io'),
-  ('https://endless-road.pages.dev')
+  ('https://endless-road.cocomelionas.workers.dev')
 on conflict do nothing;
+-- the game is on Cloudflare Workers, not Pages: the pages.dev name is not ours, so it must not pass
+delete from public.allowed_origins where origin like '%.pages.dev';
 create or replace function public.check_origin() returns void
 language plpgsql stable security definer set search_path = public as $$
 declare o text;
@@ -1973,7 +1975,6 @@ begin
   o := nullif(current_setting('request.headers', true), '')::json ->> 'origin';
   if o is null or o = '' or o = 'null' then return; end if;
   if exists (select 1 from allowed_origins where origin = o) then return; end if;
-  if o ~ '^https://[a-z0-9-]+\.endless-road\.pages\.dev$' then return; end if;   -- Cloudflare preview builds
   raise exception 'This copy of the game may not use the Endless Road server' using errcode = '42501';
 end $$;
 revoke execute on function public.check_origin() from public;
