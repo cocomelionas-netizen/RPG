@@ -190,6 +190,15 @@
   .luxprev { text-align: center; margin: 6px 0 10px; }
   .luxprev canvas { width: 180px; height: 150px; display: block; margin: 0 auto 4px; background: radial-gradient(#3a3550, #1b1925); border-radius: 10px; }
   a.insp { cursor: pointer; text-decoration: underline dotted rgba(255,255,255,0.35); }
+  #modal .card.wide { max-width: 640px; }
+  .deco canvas { width: 100%; display: block; border-radius: 8px; touch-action: none; margin: 6px 0; background: #222; }
+  .deco h3 { margin: 0 0 6px; } .deco h4 { margin: 10px 0 6px; }
+  .deco .dcomf { margin-left: auto; font-size: 12px; align-self: center; }
+  .deco .dbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; min-height: 34px; }
+  .deco .dbar span { flex: 1; min-width: 150px; } .deco .dbar .ii { width: 22px; height: 22px; vertical-align: middle; }
+  .dpal { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; }
+  .dpal button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; font-size: 11px; line-height: 1.2; }
+  .dpal .ii { width: 40px; height: 40px; }
   #modal .card { max-width: 440px; width: 100%; padding: 18px; max-height: 80vh; max-height: 80dvh; overflow-y: auto; overscroll-behavior: contain; }
   #modal textarea { width: 100%; min-height: 110px; font: 12px/1.4 ui-monospace, monospace; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
   .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 16px; }
@@ -971,6 +980,8 @@ const ACH = [
   { id: 'rev100k', name: 'Wraith Hunter', desc: 'Bank 100,000 gold of loot from the Wraith Caves', bonus: ['gold', 3], test: () => S.wild.banked >= 100000 },
   { id: 'elite1', name: 'Elite Hunter', desc: 'Defeat an Elite monster', bonus: ['gold', 2], test: () => (S.stats.elites || 0) >= 1 },
   { id: 'elite50', name: 'Bane of Elites', desc: 'Defeat 50 Elite monsters', bonus: ['xp', 2], test: () => (S.stats.elites || 0) >= 50 },
+  { id: 'deco10', name: 'Home Sweet Home', desc: 'Place 10 pieces of furniture', bonus: ['xp', 1], test: () => (S.stats.placed || 0) >= 10 },
+  { id: 'comfy', name: 'Interior Designer', desc: 'Reach 150 comfort in your house and yard', bonus: ['xp', 2], test: () => S.home && S.home.deco && comfort() >= 150 },
   { id: 'kill1', name: 'First Blood', desc: 'Defeat an enemy', bonus: ['gold', 1], test: () => S.kills >= 1 },
   { id: 'kill100', name: 'Monster Hunter', desc: 'Defeat 100 enemies', bonus: ['gold', 2], test: () => S.kills >= 100 },
   { id: 'kill1k', name: 'Monster Slayer', desc: 'Defeat 1,000 enemies', bonus: ['gold', 3], test: () => S.kills >= 1000 },
@@ -1344,7 +1355,7 @@ function recalcBonuses() {
   for (const a of ACH) if (S.ach[a.id]) BON[a.bonus[0]] += a.bonus[1];
 }
 function momentum() { return !SIM && R.mom && R.mom.t > 0 ? R.mom.n * 0.05 : 0; }
-function xpMult() { return 1 + momentum() + BON.xp / 100 + 0.15 * S.rup.wisdom + (S.buffs.boost_xp > 0 ? BOOST_PCT : 0) + clanPerk('xp'); }
+function xpMult() { return 1 + momentum() + BON.xp / 100 + 0.15 * S.rup.wisdom + (S.buffs.boost_xp > 0 ? BOOST_PCT : 0) + clanPerk('xp') + comfortXp(); }
 function goldMult() { return 1 + momentum() + BON.gold / 100 + 0.1 * S.rup.fortune + petB('gold') / 100 + (S.buffs.boost_gold > 0 ? BOOST_PCT : 0) + clanPerk('gold') + [0, 0.03, 0.06, 0.1, 0.13, 0.16][room('treasury')]; }
 function petFor(skill) { return PETS.some(p => p.skill === skill && S.pets[p.id]); }
 function rollPet(id, chance) {
@@ -2619,6 +2630,348 @@ CRAFTING.add('herblore'); CRAFTING.add('construction');
 ZONES[TOWN].stations.push('herblore');
 ZONES[TOWN].desc = 'A quiet river town with a forge, a campfire, a fletcher\'s bench, an apothecary and a rune altar.';
 
+/* ================= HOUSE BUILDER: make furniture at the sawbench, then place it in your house and yard ================= */
+// [id, name, icon, w, h, level, area, comfort, mats, kind, colour]
+const FURN = [
+  ['chair', 'Birch Chair', '🪑', 1, 1, 1, 'in', 1, { plank0: 2, nails: 4 }, 'chair', '#d8b07a'],
+  ['stool', 'Stool', '🪑', 1, 1, 1, 'in', 1, { plank0: 1, nails: 2 }, 'stool', '#c8a070'],
+  ['table', 'Birch Table', '🟫', 2, 1, 4, 'in', 2, { plank0: 4, nails: 8 }, 'table', '#d8b07a'],
+  ['plant', 'Potted Plant', '🪴', 1, 1, 6, 'any', 2, { plank0: 1, log0: 2 }, 'plant', '#4aa84a'],
+  ['bed', 'Straw Bed', '🛏️', 1, 2, 8, 'in', 4, { plank0: 5, nails: 10 }, 'bed', '#c84a4a'],
+  ['rug', 'Red Rug', '🟥', 2, 2, 10, 'in', 3, { gem: 1, nails: 4 }, 'rug', '#b53f3f'],
+  ['bookcase', 'Oak Bookcase', '📚', 2, 1, 14, 'in', 3, { plank1: 4, nails: 10 }, 'bookcase', '#b08850'],
+  ['lamp', 'Iron Lamp', '🪔', 1, 1, 16, 'in', 2, { bar1: 2, ore_coal: 2 }, 'lamp', '#f2c94c'],
+  ['fireplace', 'Fireplace', '🔥', 2, 1, 20, 'in', 6, { bar1: 4, plank1: 2, ore_coal: 5 }, 'fireplace', '#8a8f98'],
+  ['armchair', 'Maple Armchair', '🛋️', 1, 1, 24, 'in', 4, { plank2: 3, nails: 10 }, 'armchair', '#7a3a8a'],
+  ['bigtable', 'Maple Dining Table', '🟫', 2, 2, 28, 'in', 5, { plank2: 6, nails: 16 }, 'table', '#c87a40'],
+  ['bed2', 'Maple Bed', '🛏️', 2, 2, 34, 'in', 8, { plank2: 8, nails: 20 }, 'bed', '#3a5ab8'],
+  ['wardrobe', 'Yew Wardrobe', '🚪', 2, 1, 40, 'in', 5, { plank3: 6, nails: 20 }, 'wardrobe', '#8a5a30'],
+  ['rug2', 'Royal Rug', '🟪', 3, 2, 44, 'in', 6, { gem: 3, nails: 10 }, 'rug', '#6a2a9a'],
+  ['trophy', 'Trophy Stand', '🏆', 1, 1, 48, 'in', 5, { bar3: 3, gem: 1 }, 'trophy', '#f2c94c'],
+  ['piano', 'Yew Piano', '🎹', 2, 1, 55, 'in', 10, { plank3: 8, bar3: 2 }, 'piano', '#2a2228'],
+  ['aquarium', 'Aquarium', '🐠', 2, 1, 62, 'in', 10, { bar4: 3, gem: 2, fish2: 4 }, 'aquarium', '#4fb6e8'],
+  ['throne', 'Elder Throne', '👑', 1, 1, 72, 'in', 14, { plank4: 6, gem: 4, bar5: 2 }, 'throne', '#d8a830'],
+  ['bed3', 'Golden Bed', '🛏️', 2, 2, 82, 'in', 18, { plank4: 12, gem: 6, bar5: 4 }, 'bed', '#d8a830'],
+  ['crystal', 'Crystal Lamp', '💎', 1, 1, 90, 'in', 16, { gem: 8, bar5: 3 }, 'lamp', '#7af0ff'],
+  ['fence', 'Fence', '🚧', 1, 1, 1, 'out', 0, { plank0: 1, nails: 2 }, 'fence', '#b08850'],
+  ['path', 'Stone Path', '🪨', 1, 1, 1, 'out', 0, { ore_copper: 1, ore_tin: 1 }, 'path', '#9a9aa4'],
+  ['bench', 'Garden Bench', '🪑', 2, 1, 3, 'out', 2, { plank0: 3, nails: 6 }, 'bench', '#c8a070'],
+  ['flowers', 'Flower Bed', '🌷', 1, 1, 5, 'out', 1, { plank0: 1, log0: 1 }, 'flowers', '#e05a8a'],
+  ['campfire', 'Fire Pit', '🔥', 1, 1, 8, 'out', 2, { log0: 4, ore_copper: 2 }, 'campfire', '#e8702a'],
+  ['hedge', 'Hedge', '🌳', 1, 1, 12, 'out', 1, { log1: 3 }, 'hedge', '#3a8a3a'],
+  ['sapling', 'Young Tree', '🌲', 1, 1, 14, 'out', 2, { log1: 2, plank1: 1 }, 'tree', '#2f6b45'],
+  ['picnic', 'Picnic Table', '🧺', 2, 2, 18, 'out', 4, { plank1: 6, nails: 14 }, 'picnic', '#b08850'],
+  ['well', 'Well', '🪣', 2, 2, 22, 'out', 4, { ore_iron: 10, plank1: 4, bar1: 2 }, 'well', '#8a8f98'],
+  ['doghouse', 'Dog House', '🐕', 1, 1, 26, 'out', 3, { plank2: 4, nails: 12 }, 'doghouse', '#c0582a'],
+  ['lamppost', 'Lamp Post', '🏮', 1, 1, 32, 'out', 3, { bar2: 3, ore_coal: 3 }, 'lamppost', '#2a2a30'],
+  ['hammock', 'Hammock', '🏝️', 2, 1, 36, 'out', 5, { plank2: 4, log2: 4 }, 'hammock', '#e8c45a'],
+  ['statue', 'Stone Statue', '🗿', 1, 1, 46, 'out', 6, { ore_iron: 20, bar3: 2 }, 'statue', '#a8a8b0'],
+  ['pond', 'Fish Pond', '🐟', 2, 2, 50, 'out', 7, { fish1: 6, ore_coal: 10 }, 'pond', '#3a8ab8'],
+  ['fountain', 'Fountain', '⛲', 2, 2, 60, 'out', 10, { bar4: 4, gem: 3, ore_mithril: 10 }, 'fountain', '#c8d0d8'],
+  ['gazebo', 'Gazebo', '⛩️', 3, 3, 68, 'out', 12, { plank3: 16, nails: 60 }, 'gazebo', '#f0e6d0'],
+  ['dstatue', 'Dragon Statue', '🐉', 2, 2, 85, 'out', 18, { bar5: 6, gem: 6 }, 'dstatue', '#c0392b'],
+].map(([id, name, icon, w, h, lv, area, comfort, mats, kind, color]) => ({ id: 'f_' + id, name, icon, w, h, lv, area, comfort, mats, kind, color }));
+const FURN_BY = Object.fromEntries(FURN.map(f => [f.id, f]));
+FURN.forEach(f => {
+  const v = Math.round(Object.entries(f.mats).reduce((a, [id, n]) => a + (ITEMS[id] ? ITEMS[id].value * n : 0), 0) * 1.25 + 5);
+  defItem(f.id, { name: f.name, icon: f.icon, color: f.color, value: v, type: 'Furniture', furn: true,
+    note: `${f.w}×${f.h} · ${f.area === 'in' ? 'house' : f.area === 'out' ? 'yard' : 'house or yard'} · comfort ${f.comfort}` });
+  CONSTRUCT.push({ out: f.id, req: f.lv, xp: f.lv * 4 + 20, mats: f.mats, time: 4 + f.w * f.h * 1.5, furn: true });
+});
+const DECO_AREA = { in: { w: 12, h: 8, name: '🏠 House' }, out: { w: 16, h: 10, name: '🌳 Yard' } };
+const FLOORS = { wood: ['Wooden boards', '#a8784a', 1], stone: ['Stone tiles', '#8a8a92', 10], carpet: ['Carpet', '#7a3a4a', 30], checker: ['Checkered', '#d8d0c0', 45], marble: ['Marble', '#e8e4ea', 70] };
+function decoState() { const h = S.home; if (!h.deco) h.deco = { in: [], out: [] }; if (!h.floor) h.floor = 'wood'; return h.deco; }
+function fDims(p) { const f = FURN_BY[p.i]; return p.r % 2 ? [f.h, f.w] : [f.w, f.h]; }
+// comfort: each kind of furniture counts up to 3 times; every 25 comfort is +1% XP, up to +6%
+function comfort() {
+  const d = decoState(), seen = {};
+  let c = 0;
+  for (const p of d.in.concat(d.out)) { const f = FURN_BY[p.i]; if (!f) continue; seen[p.i] = (seen[p.i] || 0) + 1; if (seen[p.i] <= 3) c += f.comfort; }
+  return c;
+}
+function comfortXp() { return Math.min(0.06, Math.floor(comfort() / 25) * 0.01); }
+function decoFree(area, x, y, w, h, skip) {
+  const A = DECO_AREA[area];
+  if (x < 0 || y < 0 || x + w > A.w || y + h > A.h) return false;
+  return !decoState()[area].some(p => { if (p === skip) return false; const [pw, ph] = fDims(p); return x < p.x + pw && p.x < x + w && y < p.y + ph && p.y < y + h; });
+}
+function decoAt(area, x, y) { return decoState()[area].slice().reverse().find(p => { const [w, h] = fDims(p); return x >= p.x && x < p.x + w && y >= p.y && y < p.y + h; }); }
+function decoPlace(area, id, x, y, r) {
+  const f = FURN_BY[id];
+  if (!f || !has(id) || (f.area !== 'any' && f.area !== area)) return false;
+  const [w, h] = r % 2 ? [f.h, f.w] : [f.w, f.h];
+  if (!decoFree(area, x, y, w, h)) return false;
+  take(id, 1); decoState()[area].push({ i: id, x, y, r });
+  S.stats.placed = (S.stats.placed || 0) + 1; sfx('chest');
+  return true;
+}
+function decoPickUp(area, p) { const d = decoState()[area], k = d.indexOf(p); if (k < 0) return; d.splice(k, 1); give(p.i, 1); }
+
+/* --- drawing: a top-down view with a little height, shared by the editor and the item icons --- */
+function furnDraw(c, f, x, y, T, r, ghost) {
+  const w0 = f.w * T, h0 = f.h * T, [fw, fh] = r % 2 ? [h0, w0] : [w0, h0];
+  c.save(); c.translate(x + fw / 2, y + fh / 2); c.rotate(r * Math.PI / 2);
+  if (ghost) c.globalAlpha = 0.6;
+  const W = w0, H = h0, X = -W / 2, Y = -H / 2, col = f.color;
+  const box = (bx, by, bw, bh, fill, rad = T * 0.12) => { c.fillStyle = fill; c.beginPath(); c.roundRect(bx, by, bw, bh, rad); c.fill(); };
+  const sh = (bx, by, bw, bh) => box(bx + T * 0.06, by + T * 0.1, bw, bh, 'rgba(0,0,0,0.25)');
+  const top = (bx, by, bw, bh, fill, lift = T * 0.12) => { sh(bx, by, bw, bh); box(bx, by + lift, bw, bh - lift, shade(fill, -0.3)); box(bx, by, bw, bh - lift, fill); };
+  const dot = (cx, cy, rr, fill) => { c.fillStyle = fill; c.beginPath(); c.arc(cx, cy, rr, 0, 7); c.fill(); };
+  const p = T * 0.1;
+  switch (f.kind) {
+    case 'chair': case 'stool': case 'armchair': case 'throne': {
+      const big = f.kind === 'armchair' || f.kind === 'throne';
+      top(X + p, Y + p, W - 2 * p, H - 2 * p, f.kind === 'armchair' ? col : f.kind === 'throne' ? '#7a1a2a' : col);
+      if (f.kind !== 'stool') box(X + p, Y + p, W - 2 * p, H * 0.28, shade(f.kind === 'throne' ? col : col, -0.15));
+      if (big) { box(X + p, Y + p, W * 0.18, H - 2 * p, shade(col, -0.2)); box(X + W - p - W * 0.18, Y + p, W * 0.18, H - 2 * p, shade(col, -0.2)); }
+      if (f.kind === 'throne') { dot(0, Y + p + H * 0.12, T * 0.09, '#e0453a'); dot(-W * 0.22, Y + p + H * 0.06, T * 0.06, '#4fd6e8'); dot(W * 0.22, Y + p + H * 0.06, T * 0.06, '#5ac85a'); }
+      break;
+    }
+    case 'table': case 'picnic':
+      top(X + p, Y + p, W - 2 * p, H - 2 * p, col);
+      c.strokeStyle = shade(col, -0.2); c.lineWidth = 1;
+      for (let k = 1; k < 4; k++) { c.beginPath(); c.moveTo(X + p, Y + p + (H - 2 * p) * k / 4); c.lineTo(X + W - p, Y + p + (H - 2 * p) * k / 4); c.stroke(); }
+      if (f.kind === 'picnic') { box(X + p, Y - p * 0.2, W - 2 * p, T * 0.18, shade(col, -0.25)); box(X + p, Y + H - T * 0.2, W - 2 * p, T * 0.18, shade(col, -0.25)); box(-W * 0.18, -H * 0.12, W * 0.36, H * 0.24, '#d84a4a'); }
+      else if (W > T * 1.5 && H > T * 1.5) { dot(0, 0, T * 0.22, '#f0e6d0'); dot(0, 0, T * 0.12, '#e8a040'); }
+      else dot(0, -T * 0.05, T * 0.14, '#f0e6d0');
+      break;
+    case 'bed':
+      top(X + p, Y + p, W - 2 * p, H - 2 * p, '#6a4426');
+      box(X + p * 1.6, Y + p * 1.6, W - 3.2 * p, H - 3.2 * p, '#f0ece4');
+      box(X + p * 1.6, Y + H * 0.36, W - 3.2 * p, H * 0.62 - 1.6 * p, col);
+      box(X + p * 1.6, Y + H * 0.36, W - 3.2 * p, T * 0.12, shade(col, 0.25));
+      for (let k = 0; k < Math.max(1, f.w); k++) box(X + p * 2.2 + k * (W - 4.4 * p) / Math.max(1, f.w), Y + p * 2.2, (W - 4.4 * p) / Math.max(1, f.w) - p * 0.6, H * 0.14, '#ffffff');
+      break;
+    case 'rug':
+      sh(X + p, Y + p, W - 2 * p, H - 2 * p); c.globalAlpha *= 1;
+      box(X + p, Y + p, W - 2 * p, H - 2 * p, col, T * 0.06);
+      c.strokeStyle = shade(col, 0.35); c.lineWidth = T * 0.07; c.strokeRect(X + p * 2.4, Y + p * 2.4, W - 4.8 * p, H - 4.8 * p);
+      c.fillStyle = shade(col, 0.2); c.beginPath(); c.moveTo(0, -H * 0.22); c.lineTo(W * 0.18, 0); c.lineTo(0, H * 0.22); c.lineTo(-W * 0.18, 0); c.fill();
+      break;
+    case 'bookcase': case 'wardrobe': {
+      top(X + p * 0.5, Y + p, W - p, H - p * 2, col, T * 0.3);
+      if (f.kind === 'bookcase') { const bc = ['#b53f3f', '#3f6fb5', '#3f9a4f', '#d8a830', '#7a4ab5', '#e8e0d0']; for (let k = 0; k < 10; k++) box(X + p * 1.2 + k * (W - 2.4 * p) / 10, Y + p * 1.4, (W - 2.4 * p) / 10 - 1, H * 0.42, bc[k % 6], 1); }
+      else { c.strokeStyle = shade(col, -0.35); c.lineWidth = 1.2; c.beginPath(); c.moveTo(0, Y + p * 1.3); c.lineTo(0, Y + H - p * 1.3 - T * 0.3); c.stroke(); dot(-T * 0.1, -H * 0.12, T * 0.05, '#f2c94c'); dot(T * 0.1, -H * 0.12, T * 0.05, '#f2c94c'); }
+      break;
+    }
+    case 'lamp': case 'lamppost': {
+      if (!ghost) { const g = c.createRadialGradient(0, 0, 1, 0, 0, T * 0.9); g.addColorStop(0, hexA(col, 0.45)); g.addColorStop(1, hexA(col, 0)); c.fillStyle = g; c.beginPath(); c.arc(0, 0, T * 0.9, 0, 7); c.fill(); }
+      dot(T * 0.06, T * 0.1, T * 0.26, 'rgba(0,0,0,0.25)');
+      dot(0, 0, T * 0.26, f.kind === 'lamppost' ? '#2a2a30' : '#5a5a62'); dot(0, 0, T * 0.15, col); dot(-T * 0.04, -T * 0.04, T * 0.06, '#ffffff');
+      break;
+    }
+    case 'fireplace':
+      top(X, Y + p, W, H - p, '#8a8f98', T * 0.3);
+      for (let k = 0; k < 6; k++) box(X + (k % 3) * W / 3 + 1, Y + p + Math.floor(k / 3) * (H - p - T * 0.3) / 2 + 1, W / 3 - 2, (H - p - T * 0.3) / 2 - 2, shade('#8a8f98', (k * 7 % 5) * 0.04 - 0.08), 1);
+      box(-W * 0.22, -H * 0.05, W * 0.44, H * 0.42, '#1a1210', T * 0.08);
+      dot(-W * 0.06, H * 0.14, T * 0.12, '#ff9a3a'); dot(W * 0.06, H * 0.16, T * 0.1, '#ffd04a'); dot(0, H * 0.1, T * 0.08, '#ff5a2a');
+      break;
+    case 'trophy': case 'statue': case 'dstatue':
+      top(X + p, Y + p, W - 2 * p, H - 2 * p, f.kind === 'trophy' ? '#6a4426' : '#7a7a84', T * 0.18);
+      if (f.kind === 'trophy') { dot(0, -T * 0.08, T * 0.2, col); dot(0, -T * 0.08, T * 0.1, shade(col, 0.3)); }
+      else if (f.kind === 'statue') { dot(0, -T * 0.08, T * 0.24, col); dot(0, -T * 0.18, T * 0.12, shade(col, 0.2)); }
+      else { c.fillStyle = col; c.beginPath(); c.moveTo(-W * 0.3, H * 0.15); c.quadraticCurveTo(-W * 0.1, -H * 0.4, W * 0.25, -H * 0.25); c.lineTo(W * 0.1, -H * 0.05); c.lineTo(W * 0.3, H * 0.15); c.fill();
+        c.fillStyle = shade(col, -0.25); c.beginPath(); c.moveTo(-W * 0.05, -H * 0.1); c.lineTo(-W * 0.35, -H * 0.35); c.lineTo(-W * 0.12, -H * 0.02); c.fill(); dot(W * 0.2, -H * 0.24, T * 0.05, '#ffd04a'); }
+      break;
+    case 'piano':
+      top(X + p * 0.5, Y + p, W - p, H - 2 * p, col, T * 0.2);
+      box(X + p * 1.2, Y + H * 0.45, W - 2.4 * p, H * 0.22, '#f4f4f0', 1);
+      c.fillStyle = '#111'; for (let k = 1; k < 14; k++) if (k % 7 !== 3 && k % 7 !== 0) c.fillRect(X + p * 1.2 + k * (W - 2.4 * p) / 14 - 1.5, Y + H * 0.45, 3, H * 0.12);
+      break;
+    case 'aquarium':
+      top(X + p * 0.5, Y + p, W - p, H - 2 * p, '#5a5a62', T * 0.18);
+      box(X + p * 1.1, Y + p * 1.6, W - 2.2 * p, H - 3.2 * p - T * 0.18, hexA(col, 0.85), 2);
+      for (let k = 0; k < 3; k++) { const fx = X + W * (0.25 + 0.25 * k) + Math.sin((Date.now() / 600) + k) * T * 0.15; dot(fx, Y + H * (0.35 + 0.1 * (k % 2)), T * 0.07, ['#ff8a3a', '#f2e24a', '#e05a8a'][k]); }
+      break;
+    case 'fence':
+      sh(X + p, -T * 0.08, W - 2 * p, T * 0.16);
+      box(X, -T * 0.07, W, T * 0.14, col, 1); dot(0, 0, T * 0.14, shade(col, -0.2));
+      break;
+    case 'path':
+      box(X + p * 0.5, Y + p * 0.5, W - p, H - p, '#b4ac98', T * 0.08);
+      dot(-T * 0.18, -T * 0.16, T * 0.17, col); dot(T * 0.2, -T * 0.1, T * 0.14, shade(col, -0.1)); dot(-T * 0.06, T * 0.2, T * 0.18, shade(col, 0.08));
+      break;
+    case 'bench': case 'hammock':
+      if (f.kind === 'hammock') { dot(X + p, 0, T * 0.12, '#6a4426'); dot(X + W - p, 0, T * 0.12, '#6a4426'); sh(X + p * 2, -H * 0.3, W - 4 * p, H * 0.6);
+        c.fillStyle = col; c.beginPath(); c.moveTo(X + p * 1.5, 0); c.quadraticCurveTo(0, -H * 0.55, X + W - p * 1.5, 0); c.quadraticCurveTo(0, H * 0.55, X + p * 1.5, 0); c.fill();
+        c.strokeStyle = '#d84a4a'; c.lineWidth = 2; c.beginPath(); c.moveTo(-W * 0.2, -H * 0.2); c.lineTo(-W * 0.2, H * 0.2); c.moveTo(W * 0.2, -H * 0.2); c.lineTo(W * 0.2, H * 0.2); c.stroke(); }
+      else { top(X + p, Y + H * 0.25, W - 2 * p, H * 0.6, col); box(X + p, Y + H * 0.1, W - 2 * p, H * 0.2, shade(col, -0.2)); }
+      break;
+    case 'flowers': case 'hedge': case 'tree': case 'plant': {
+      if (f.kind === 'flowers') { box(X + p, Y + p, W - 2 * p, H - 2 * p, '#6a4a2a', T * 0.1); for (let k = 0; k < 5; k++) dot(X + W * (0.25 + 0.25 * (k % 3)), Y + H * (0.3 + 0.35 * Math.floor(k / 3)), T * 0.11, ['#e05a8a', '#f2e24a', '#c070ff', '#ff8a3a', '#ffffff'][k]); }
+      else if (f.kind === 'plant') { dot(T * 0.05, T * 0.08, T * 0.3, 'rgba(0,0,0,0.25)'); dot(0, 0, T * 0.26, '#a8583a'); dot(0, -T * 0.04, T * 0.22, col); dot(-T * 0.08, -T * 0.1, T * 0.1, shade(col, 0.25)); }
+      else { const rr = f.kind === 'tree' ? T * 0.48 : T * 0.42; dot(T * 0.08, T * 0.12, rr, 'rgba(0,0,0,0.3)'); dot(0, 0, rr, col); dot(-rr * 0.3, -rr * 0.3, rr * 0.45, shade(col, 0.22)); }
+      break;
+    }
+    case 'campfire':
+      for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2; dot(Math.cos(a) * T * 0.3, Math.sin(a) * T * 0.3, T * 0.1, '#8a8f98'); }
+      dot(0, 0, T * 0.18, '#3a2a1a'); dot(0, T * 0.02, T * 0.13, '#ff9a3a'); dot(0, -T * 0.02, T * 0.07, '#ffd04a');
+      break;
+    case 'well': case 'fountain': case 'pond': {
+      const R = Math.min(W, H) / 2 - p;
+      dot(T * 0.08, T * 0.12, R, 'rgba(0,0,0,0.25)');
+      if (f.kind === 'pond') { c.fillStyle = '#5a8a3a'; c.beginPath(); c.ellipse(0, 0, R, R * 0.85, 0, 0, 7); c.fill(); c.fillStyle = col; c.beginPath(); c.ellipse(0, 0, R * 0.82, R * 0.68, 0, 0, 7); c.fill();
+        dot(-R * 0.3, -R * 0.1, T * 0.08, '#ff8a3a'); dot(R * 0.25, R * 0.2, T * 0.07, '#f2f2f2'); dot(R * 0.4, -R * 0.3, T * 0.14, '#4aa84a'); }
+      else { dot(0, 0, R, f.kind === 'well' ? '#8a8f98' : col); dot(0, 0, R * 0.72, '#3a8ab8'); dot(0, 0, R * 0.5, '#5aaad8');
+        if (f.kind === 'fountain') { dot(0, 0, R * 0.22, col); dot(0, 0, R * 0.1, '#bfe6ff'); }
+        else { box(-R, -T * 0.06, R * 2, T * 0.12, '#6a4426', 1); dot(0, 0, T * 0.12, '#8a5a30'); } }
+      break;
+    }
+    case 'doghouse':
+      top(X + p, Y + p, W - 2 * p, H - 2 * p, col, T * 0.15);
+      c.fillStyle = shade(col, -0.3); c.beginPath(); c.moveTo(X + p, 0); c.lineTo(X + W - p, 0); c.lineTo(X + W - p, Y + p); c.lineTo(X + p, Y + p); c.fill();
+      box(-T * 0.14, H * 0.05, T * 0.28, H * 0.3, '#1a1210', T * 0.1);
+      break;
+    case 'gazebo':
+      sh(X + p, Y + p, W - 2 * p, H - 2 * p);
+      box(X + p, Y + p, W - 2 * p, H - 2 * p, '#d8c8a8', T * 0.1);
+      for (const [cx, cy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) dot(cx * (W / 2 - p * 2), cy * (H / 2 - p * 2), T * 0.12, '#f0e6d0');
+      c.fillStyle = hexA('#b53f3f', 0.9); c.beginPath(); c.moveTo(0, Y + p * 0.5); c.lineTo(X + W - p * 0.5, 0); c.lineTo(0, Y + H - p * 0.5); c.lineTo(X + p * 0.5, 0); c.fill();
+      c.strokeStyle = shade('#b53f3f', 0.3); c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, Y + p * 0.5); c.lineTo(0, Y + H - p * 0.5); c.moveTo(X + p * 0.5, 0); c.lineTo(X + W - p * 0.5, 0); c.stroke(); dot(0, 0, T * 0.12, '#f2c94c');
+      break;
+    default:
+      top(X + p, Y + p, W - 2 * p, H - 2 * p, col);
+  }
+  c.restore();
+}
+function hexA(h, a) { const v = h.replace('#', ''); return `rgba(${parseInt(v.slice(0, 2), 16)},${parseInt(v.slice(2, 4), 16)},${parseInt(v.slice(4, 6), 16)},${a})`; }
+// bag and recipe icons for furniture come from the same drawing
+function furnIcon(id) {
+  const f = FURN_BY[id], cv = document.createElement('canvas'), n = Math.max(f.w, f.h), T = 60 / n;
+  cv.width = cv.height = 64;
+  furnDraw(cv.getContext('2d'), f, 32 - f.w * T / 2, 32 - f.h * T / 2, T, 0);
+  return cv.toDataURL();
+}
+
+/* --- the editor: tap furniture from your bag, then tap where it goes; tap placed furniture to turn, move or pick it up --- */
+const DECO = { area: 'in', pick: null, rot: 0, sel: null, move: false, ghost: null, drag: null };
+function decoOpen(area, pick) {
+  decoState();
+  if (area) DECO.area = area;
+  DECO.pick = pick && has(pick) ? pick : null; DECO.sel = null; DECO.move = false; DECO.ghost = null; DECO.rot = 0;
+  if (DECO.pick && FURN_BY[DECO.pick].area !== 'any') DECO.area = FURN_BY[DECO.pick].area;
+  openModal(`<div class="deco"><h3>🛋️ My House</h3><div id="deco-ui"></div><canvas id="deco-cv"></canvas><div id="deco-pal"></div></div>`);
+  document.getElementById('modal-body').classList.add('wide');
+  const cv = document.getElementById('deco-cv');
+  cv.addEventListener('pointerdown', decoDown); cv.addEventListener('pointermove', decoMoveEv); cv.addEventListener('pointerup', decoUp); cv.addEventListener('pointercancel', () => { DECO.drag = null; DECO.ghost = null; decoDraw(); });
+  decoRender();
+}
+function decoTile(ev) {
+  const cv = ev.currentTarget, b = cv.getBoundingClientRect(), A = DECO_AREA[DECO.area];
+  return [Math.floor((ev.clientX - b.left) / b.width * A.w), Math.floor((ev.clientY - b.top) / b.height * A.h)];
+}
+function decoDown(ev) {
+  const [x, y] = decoTile(ev);
+  if (DECO.pick) { DECO.ghost = [x, y]; DECO.drag = { pick: true }; decoDraw(); return; }
+  const p = DECO.move && DECO.sel ? DECO.sel : decoAt(DECO.area, x, y);
+  if (p) { DECO.sel = p; DECO.drag = { p, dx: x - p.x, dy: y - p.y, moved: false }; ev.currentTarget.setPointerCapture(ev.pointerId); }
+  else { DECO.sel = null; DECO.move = false; }
+  decoRender();
+}
+function decoMoveEv(ev) {
+  if (!DECO.drag) return;
+  const [x, y] = decoTile(ev);
+  if (DECO.drag.pick) DECO.ghost = [x, y];
+  else { const g = [x - DECO.drag.dx, y - DECO.drag.dy]; if (g[0] !== DECO.drag.p.x || g[1] !== DECO.drag.p.y) { DECO.drag.moved = true; DECO.ghost = g; } }
+  decoDraw();
+}
+function decoUp(ev) {
+  const d = DECO.drag; DECO.drag = null;
+  if (!d) return;
+  if (d.pick && DECO.ghost) {
+    const [x, y] = DECO.ghost, f = FURN_BY[DECO.pick], [w, h] = DECO.rot % 2 ? [f.h, f.w] : [f.w, f.h];
+    // the tap is the middle of the piece
+    const px = x - Math.floor((w - 1) / 2), py = y - Math.floor((h - 1) / 2);
+    if (decoPlace(DECO.area, DECO.pick, px, py, DECO.rot)) { if (!has(DECO.pick)) DECO.pick = null; }
+    else floatMsg('No room there');
+  } else if (d.p && DECO.ghost && d.moved) {
+    const [x, y] = DECO.ghost, [w, h] = fDims(d.p);
+    if (decoFree(DECO.area, x, y, w, h, d.p)) { d.p.x = x; d.p.y = y; sfx('coin'); DECO.move = false; } else floatMsg('No room there');
+  } else if (d.p && DECO.move && !d.moved) {
+    const [x, y] = decoTile(ev), [w, h] = fDims(d.p);
+    if (decoFree(DECO.area, x, y, w, h, d.p)) { d.p.x = x; d.p.y = y; DECO.move = false; sfx('coin'); }
+  }
+  DECO.ghost = null; uiDirty = true; decoRender();
+}
+function floatMsg(t) { const el = document.getElementById('deco-msg'); if (el) { el.textContent = t; el.hidden = false; clearTimeout(floatMsg.t); floatMsg.t = setTimeout(() => { el.hidden = true; }, 1500); } }
+function decoRender() {
+  const ui = document.getElementById('deco-ui'); if (!ui) return;
+  const A = DECO.area, cf = comfort(), sel = DECO.sel && FURN_BY[DECO.sel.i];
+  let h = `<div class="chips">${Object.entries(DECO_AREA).map(([k, a]) => `<button class="${A === k ? 'sel' : ''}" data-a="decoarea" data-id="${k}">${a.name}</button>`).join('')}
+    <span class="muted dcomf">😊 Comfort <b>${cf}</b> · <span class="have">+${Math.round(comfortXp() * 100)}% XP</span></span></div>`;
+  if (DECO.pick) h += `<div class="dbar"><span>Placing ${ico(DECO.pick)} <b>${ITEMS[DECO.pick].name}</b> – tap a spot</span><button data-a="decorot">↻ Turn</button><button data-a="decocancel">✖</button></div>`;
+  else if (sel) h += `<div class="dbar"><span>${ico(DECO.sel.i)} <b>${sel.name}</b>${DECO.move ? ' – tap the new spot' : ''}</span><button data-a="decoturn">↻ Turn</button><button data-a="decomove" class="${DECO.move ? 'sel' : ''}">✥ Move</button><button data-a="decotake">📦 Pick up</button></div>`;
+  else h += `<div class="dbar muted"><span>Pick furniture below, then tap where it goes. Drag placed furniture to move it.</span></div>`;
+  h += `<p class="need" id="deco-msg" hidden></p>`;
+  ui.innerHTML = h;
+  const own = FURN.filter(f => has(f.id) && (f.area === A || f.area === 'any'));
+  let pal = `<h4>Your furniture</h4>` + (own.length ? `<div class="dpal">${own.map(f => `<button class="${DECO.pick === f.id ? 'sel' : ''}" data-a="decopick" data-id="${f.id}">${ico(f.id)}<small>${f.name}</small><small class="muted">×${has(f.id)} · ${f.w}×${f.h}</small></button>`).join('')}</div>`
+    : `<p class="muted">No ${A === 'in' ? 'house' : 'yard'} furniture in your bag. Make it at a 🪚 sawbench: Craft → Construction → ${A === 'in' ? 'House' : 'Yard'}.</p>`);
+  if (A === 'in') pal += `<h4>Floor</h4><div class="chips">${Object.entries(FLOORS).map(([k, f]) => `<button class="${S.home.floor === k ? 'sel' : ''}" data-a="decofloor" data-id="${k}" ${LV.construction < f[2] ? 'disabled' : ''}>${f[0]}${LV.construction < f[2] ? ` (Lv ${f[2]})` : ''}</button>`).join('')}</div>`;
+  pal += `<div class="btns"><button data-a="close">Done</button></div>`;
+  document.getElementById('deco-pal').innerHTML = pal;
+  decoDraw();
+}
+function decoDraw() {
+  const cv = document.getElementById('deco-cv'); if (!cv) return;
+  const A = DECO_AREA[DECO.area], T = 30, dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.width !== A.w * T * dpr || cv.height !== A.h * T * dpr) { cv.width = A.w * T * dpr; cv.height = A.h * T * dpr; cv.style.aspectRatio = `${A.w} / ${A.h}`; }
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // ground
+  if (DECO.area === 'in') {
+    const fl = FLOORS[S.home.floor] || FLOORS.wood, k = S.home.floor;
+    for (let y = 0; y < A.h; y++) for (let x = 0; x < A.w; x++) {
+      c.fillStyle = k === 'checker' ? ((x + y) % 2 ? '#2a2830' : fl[1]) : k === 'wood' ? shade(fl[1], ((x * 7 + y * 3) % 5) * 0.03 - 0.06) : k === 'carpet' ? fl[1] : shade(fl[1], ((x + y * 5) % 4) * 0.025 - 0.04);
+      c.fillRect(x * T, y * T, T, T);
+      if (k === 'wood') { c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(x * T, y * T + T - 1, T, 1); if ((x + y) % 2) c.fillRect(x * T + T / 2, y * T, 1, T); }
+      else if (k !== 'carpet') { c.fillStyle = 'rgba(0,0,0,0.1)'; c.fillRect(x * T, y * T, T, 1); c.fillRect(x * T, y * T, 1, T); }
+    }
+    if (k === 'marble') { c.strokeStyle = 'rgba(120,110,140,0.25)'; c.lineWidth = 1; for (let k2 = 0; k2 < 8; k2++) { c.beginPath(); c.moveTo(k2 * 50, 0); c.quadraticCurveTo(k2 * 50 + 30, 90, k2 * 50 - 20, 240); c.stroke(); } }
+    // walls and a door
+    c.fillStyle = '#5a4030'; c.fillRect(0, 0, A.w * T, 6); c.fillRect(0, 0, 6, A.h * T); c.fillRect(A.w * T - 6, 0, 6, A.h * T); c.fillRect(0, A.h * T - 6, A.w * T, 6);
+    c.fillStyle = '#c8a070'; c.fillRect(A.w * T / 2 - T * 0.8, A.h * T - 6, T * 1.6, 6);
+    c.fillStyle = '#8ab8e0'; for (const wx of [2, 8]) c.fillRect(wx * T, 0, T * 1.5, 4);
+  } else {
+    for (let y = 0; y < A.h; y++) for (let x = 0; x < A.w; x++) { c.fillStyle = shade('#5c9a3c', ((x * 13 + y * 7) % 5) * 0.025 - 0.05); c.fillRect(x * T, y * T, T, T); }
+    c.fillStyle = 'rgba(255,255,255,0.08)'; for (let k = 0; k < 60; k++) c.fillRect((k * 97) % (A.w * T), (k * 53) % (A.h * T), 2, 4);
+    // the house wall along the top
+    c.fillStyle = '#8a6a4a'; c.fillRect(0, 0, A.w * T, 8); c.fillStyle = '#c8a070'; c.fillRect(A.w * T / 2 - T * 0.8, 0, T * 1.6, 8);
+  }
+  // furniture: flat things first
+  const list = decoState()[DECO.area].slice().sort((a, b) => (['rug', 'path'].includes(FURN_BY[b.i].kind) ? 1 : 0) - (['rug', 'path'].includes(FURN_BY[a.i].kind) ? 1 : 0) || a.y - b.y);
+  for (const p of list) {
+    if (DECO.drag && DECO.drag.p === p && DECO.ghost) continue;
+    furnDraw(c, FURN_BY[p.i], p.x * T, p.y * T, T, p.r);
+    if (p === DECO.sel) { const [w, h] = fDims(p); c.strokeStyle = '#ffd24a'; c.lineWidth = 2; c.setLineDash([5, 3]); c.strokeRect(p.x * T + 1, p.y * T + 1, w * T - 2, h * T - 2); c.setLineDash([]); }
+  }
+  // the piece being placed or dragged
+  if (DECO.ghost) {
+    let f, x, y, r, skip = null;
+    if (DECO.pick) { f = FURN_BY[DECO.pick]; r = DECO.rot; const [w, h] = r % 2 ? [f.h, f.w] : [f.w, f.h]; x = DECO.ghost[0] - Math.floor((w - 1) / 2); y = DECO.ghost[1] - Math.floor((h - 1) / 2); }
+    else { const p = DECO.drag ? DECO.drag.p : DECO.sel; f = FURN_BY[p.i]; r = p.r; [x, y] = DECO.ghost; skip = p; }
+    const [w, h] = r % 2 ? [f.h, f.w] : [f.w, f.h], ok = decoFree(DECO.area, x, y, w, h, skip);
+    c.fillStyle = ok ? 'rgba(90,255,120,0.25)' : 'rgba(255,70,70,0.3)'; c.fillRect(x * T, y * T, w * T, h * T);
+    furnDraw(c, f, x * T, y * T, T, r, true);
+  }
+}
+function decoAction(a, id) {
+  const P = DECO.sel;
+  if (a === 'decoarea') { DECO.area = id; DECO.sel = null; DECO.move = false; if (DECO.pick && FURN_BY[DECO.pick].area !== 'any' && FURN_BY[DECO.pick].area !== id) DECO.pick = null; }
+  else if (a === 'decopick') { DECO.pick = DECO.pick === id ? null : id; DECO.sel = null; DECO.rot = 0; }
+  else if (a === 'decorot') DECO.rot = (DECO.rot + 1) % 4;
+  else if (a === 'decocancel') DECO.pick = null;
+  else if (a === 'decoturn' && P) {
+    const r = (P.r + 1) % 4, f = FURN_BY[P.i], [w, h] = r % 2 ? [f.h, f.w] : [f.w, f.h];
+    if (decoFree(DECO.area, P.x, P.y, w, h, P)) P.r = r; else floatMsg('No room to turn it here');
+  }
+  else if (a === 'decomove' && P) DECO.move = !DECO.move;
+  else if (a === 'decotake' && P) { decoPickUp(DECO.area, P); DECO.sel = null; DECO.move = false; }
+  else if (a === 'decofloor' && FLOORS[id] && LV.construction >= FLOORS[id][2]) S.home.floor = id;
+  uiDirty = true; decoRender();
+  if (a === 'decorot' || a === 'decoturn') { const msg = document.getElementById('deco-msg'); if (msg && !msg.hidden) return; }
+}
+
+
 const ROOMS = [
   { id: 'garden',   name: 'Garden',            icon: '🌱', lv: [1, 25, 50, 62, 70],  d: ['2 herb and 2 allotment patches', '+1 herb, +1 allotment and a tree patch', '+1 herb, +1 allotment and a second tree patch', '+1 herb and +1 allotment patch', '+1 herb and +1 allotment patch more'] },
   { id: 'kitchen',  name: 'Kitchen',           icon: '🍳', lv: [5, 30, 55, 67, 75],  d: ['A range: cook at home', 'Burn 25% less food', '+10% Cooking XP', '+15% Cooking XP', '+20% Cooking XP'] },
@@ -3310,7 +3663,7 @@ function accountNudge() {
     <p>🎁 Reward: <b>1,000 gold</b> and the <b>🏴‍☠️ Bandana</b> hat.</p><button data-a="acct">👤 Make an account</button> <button data-a="close">Later</button>`);
 }
 function openModal(html) {
-  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-body').innerHTML = html; document.getElementById('modal-body').classList.remove('wide');
   document.getElementById('modal').hidden = false;
   document.body.classList.add('modal-open');
 }
@@ -7668,7 +8021,10 @@ function htmlRooms(i) {
     <div class="grid"><div class="item ${here ? 'on' : ''}"><div class="top"><span class="ic">🪚</span><span class="nm"><b>Sawbench</b><br>
       <small>Recipe: ${recipeCount(r0) > 1 ? recipeCount(r0) + '× ' : ''}${itemLabel(r0.out)} · ${matsHtml(r0.mats)}</small></span></div>
       <div class="btns">${here ? '<button class="sel" disabled>🪚 Working…</button>' : `<button data-a="station" data-z="${i}" data-id="construction">🪚 Work here</button>`}
-      <button data-tab="construction">Choose recipe</button></div></div></div><h3>Rooms</h3><div class="grid">`;
+      <button data-tab="construction">Choose recipe</button></div></div>
+      <div class="item on"><div class="top"><span class="ic">🛋️</span><span class="nm"><b>Decorate house & yard</b><br>
+      <small>Make furniture at the sawbench and place it where you like. 😊 Comfort ${comfort()} → +${Math.round(comfortXp() * 100)}% XP</small></span></div>
+      <div class="btns"><button data-a="deco" data-id="in">🏠 House</button><button data-a="deco" data-id="out">🌳 Yard</button></div></div></div><h3>Rooms</h3><div class="grid">`;
   h += ROOMS.map(r => {
     const t = room(r.id), max = t >= ROOM_MAX, c = max ? null : roomCost(r, t), lock = !max && LV.construction < r.lv[t];
     return `<div class="item ${t ? 'on' : ''}"><div class="top"><span class="ic">${r.icon}</span><span class="nm"><b>${r.name}</b> <span class="tag">${t ? 'Level ' + t + ' / ' + ROOM_MAX : 'Not built'}</span><br>
@@ -7726,7 +8082,7 @@ function htmlSkills() {
   }).join('') + '</div>' + (Object.keys(SKILLS).every(k => LV[k] >= 99) ? `<div class="skill">👑 <b>Every skill at 99!</b> ${capeBtn('max')}</div>` : '');
 }
 
-let bagSub = 'items', craftSub = 'smithing', smithMetal = null;
+let bagSub = 'items', craftSub = 'smithing', smithMetal = null, conSub = 'mat';
 const SUBNAV_TAB = { craftsub: 'craft', bagsub: 'inventory', questsub: 'quests' };
 function subNav(action, current, list) {
   return `<div class="chips sub">` + list.map(([id, label]) => {
@@ -7853,7 +8209,7 @@ function iconSvg(id) {
   if (!g) g = `<circle cx="16" cy="16" r="13" fill="${c}33"/><text x="16" y="22" font-size="17" text-anchor="middle">${it.icon || '❔'}</text>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${g}</svg>`;
 }
-function iconUrl(id) { return ICON_CACHE[id] || (ICON_CACHE[id] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(iconSvg(id))); }
+function iconUrl(id) { return ICON_CACHE[id] || (ICON_CACHE[id] = ITEMS[id] && ITEMS[id].furn ? furnIcon(id) : 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(iconSvg(id))); }
 // the picture of an item, for HTML; falls back to the emoji for things that are not items
 function ico(id) { return ITEMS[id] ? `<img class="ii" src="${iconUrl(id)}" alt="" draggable="false">` : ''; }
 // OSRS stack numbers: yellow, then white in thousands (K), then green in millions (M)
@@ -7884,7 +8240,7 @@ function eqStatsHtml() {
   if (bon.length) rows.push(['Item bonuses', bon.join(', ')]);
   return '<div class="eqstats">' + rows.map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join('') + '</div>';
 }
-const INV_ORDER = ['Equipment', 'Ammo', 'Runes', 'Potions', 'Food', 'Herbs', 'Seeds', 'Bars', 'Ores', 'Resources', 'Misc'];
+const INV_ORDER = ['Equipment', 'Ammo', 'Runes', 'Potions', 'Food', 'Herbs', 'Seeds', 'Bars', 'Ores', 'Resources', 'Furniture', 'Misc'];
 function invIds() {
   const ord = id => { const k = INV_ORDER.indexOf(ITEMS[id].type); return k < 0 ? 99 : k; };
   return Object.keys(S.inv).filter(id => ITEMS[id] && S.inv[id] > 0).sort((a, b) => ord(a) - ord(b) || (ITEMS[a].tier || 0) - (ITEMS[b].tier || 0) || a.localeCompare(b));
@@ -7904,6 +8260,7 @@ function itemMenu(id) {
       ${it.clue !== undefined ? `<button data-a="readclue" data-id="${id}" data-close="1">📜 Read the clue</button>` : ''}
       ${it.pouch ? `<button data-a="summon" data-id="${id}" data-close="1" ${LV.summoning >= FAM[it.pouch].lvl ? '' : 'disabled'}>${it.icon} Summon${LV.summoning < FAM[it.pouch].lvl ? ' (Summoning ' + FAM[it.pouch].lvl + ')' : ''}</button><button data-a="autopot" data-id="${id}" data-close="1">${S.autoPot[id] ? '✅ Auto-summon is on' : '⬜ Auto-summon when it leaves'}</button>` : ''}
       ${id === 'lamp' ? `<button data-a="lamp">🪔 Rub the lamp</button>` : ''}
+      ${it.furn ? `<button data-a="deco" data-id="${FURN_BY[id].area === 'out' ? 'out' : 'in'}" data-n="${id}" ${isOpen('home') ? '' : 'disabled'}>🛋️ Place it${isOpen('home') ? '' : ' (needs My Home)'}</button>` : ''}
       ${it.potion ? `<button data-a="drink" data-id="${id}" data-close="1">🧪 Drink${S.buffs[id] ? ` (${fmtTime(S.buffs[id])} left)` : ''}</button><button data-a="autopot" data-id="${id}" data-close="1">${S.autoPot[id] ? '✅ Auto-drink is on' : '⬜ Auto-drink when it wears off'}</button>` : ''}
       <button data-a="sell" data-id="${id}" data-n="1" data-close="1">🪙 Sell 1 (${fmt(it.value)} gold)</button>
       ${n > 1 ? `<button data-a="sell" data-id="${id}" data-n="999999" data-close="1">🪙 Sell all (${fmt(it.value * n)} gold)</button>` : ''}
@@ -7960,6 +8317,11 @@ function htmlCraft() {
     h += `<p class="muted">Smelt ores into bars at a 🔥 furnace, then hammer bars into gear at an 🔨 anvil – from Bronze all the way to Skyrite. Smithing level: <b>${LV.smithing}</b></p>`;
     h += subNav('metal', smithMetal, [[-1, '🔥 Smelt bars'], ...METALS.map((mn, m) => [m, `<span class="tier" style="background:${METAL_COLORS[m]}"></span>${mn}`])]);
     list = list.filter(([r]) => smithMetal === -1 ? r.station === 'furnace' : r.station === 'anvil' && r.metal === smithMetal);
+    h += '<div class="grid">';
+  } else if (sk === 'construction') {
+    h += `<p class="muted">Saw planks and make nails, then build furniture and place it in your house and yard (🗺️ Map → My Home → Construction → Decorate). Construction level: <b>${LV.construction}</b></p>`;
+    h += subNav('consub', conSub, [['mat', '🪵 Materials'], ['in', '🏠 House'], ['out', '🌳 Yard']]);
+    list = list.filter(([r]) => conSub === 'mat' ? !r.furn : r.furn && (FURN_BY[r.out].area === conSub || FURN_BY[r.out].area === 'any'));
     h += '<div class="grid">';
   } else h += `<p class="muted">Pick a recipe and your hero works at ${c.place} along the road (${c.time}s each), also while you are away. Better gear of the same kind is equipped automatically. ${SKILLS[sk].name} level: <b>${LV[sk]}</b></p><div class="grid">`;
   return h + list.map(([r, i]) => {
@@ -8433,6 +8795,9 @@ document.addEventListener('click', ev => {
     case 'loc': mapSel = +id; mapAct = null; break;
     case 'mapact': mapAct = id; break;
     case 'build': buildRoom(id); break;
+    case 'deco': decoOpen(id || null, b.dataset.n || null); break;
+    case 'decoarea': case 'decopick': case 'decorot': case 'decocancel': case 'decoturn': case 'decomove': case 'decotake': case 'decofloor': decoAction(b.dataset.a, id); break;
+    case 'consub': conSub = id; break;
     case 'grace': buyGrace(id); break;
     case 'plant': { const sd = bestSeed(patchKind(id)); if (sd && plant(id, sd)) log(`🌱 Planted ${ITEMS[sd].name}.`, 'lg-good'); break; }
     case 'harv': { const r = harvest(id); if (r) { log(`🧺 Harvested ${r[1]}× ${ITEMS[r[0]].name}.`, 'lg-good'); sfx('gather'); } break; }
