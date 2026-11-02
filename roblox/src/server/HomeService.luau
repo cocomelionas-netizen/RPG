@@ -117,36 +117,94 @@ local FURNITURE = {
 	end,
 }
 
--- one room on its cell: floor, four walls with doorways, a flat roof with a coloured trim, props and a label
-local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: string, level: number, color: Color3)
+-- one room on its cell, a small cottage: stone base, timber corners, pastel walls with windows and a doorway on every side
+-- (so rooms that touch become one walkable house), a pitched roof in the room's colour, its icon over the doors and props.
+-- Every level shows: 2 flower boxes, 3 a smoking chimney, 4 a golden ridge, 5 a flag on the roof.
+local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: string, level: number, color: Color3, fresh: boolean?)
 	local f = Instance.new("Model")
 	f.Name = id
-	local h = 9 + level * 0.6
-	local wallMat = level >= 4 and Enum.Material.Marble or (level >= 2 and Enum.Material.Brick or Enum.Material.WoodPlanks)
-	local wallColor = id == "entrance" and hex("#d8cfc0") or color:Lerp(Color3.new(1, 1, 1), 0.35)
-	part({ Name = "Floor", Size = Vector3.new(CELL - 0.2, 0.4, CELL - 0.2), CFrame = cf * CFrame.new(0, 0.45, 0), Color = hex("#c9a878"), Material = Enum.Material.WoodPlanks, Parent = f })
-	local door = 5
-	local seg = (CELL - door) / 2
+	local h = 10
+	local wood = hex("#6b4a2b")
+	local wallColor = id == "entrance" and hex("#f4ead8") or color:Lerp(Color3.new(1, 1, 1), 0.62)
+	local roofColor = id == "entrance" and hex("#c0503a") or color:Lerp(Color3.new(0, 0, 0), 0.15)
+	part({ Name = "Base", Size = Vector3.new(CELL, 1, CELL), CFrame = cf * CFrame.new(0, 0.5, 0), Color = hex("#9a948c"), Material = Enum.Material.Cobblestone, Parent = f })
+	part({ Name = "Floor", Size = Vector3.new(CELL - 1.4, 0.2, CELL - 1.4), CFrame = cf * CFrame.new(0, 1.05, 0), Color = hex("#c9a070"), Material = Enum.Material.WoodPlanks, Parent = f })
+	local door, inset = 5, CELL / 2 - 0.6
+	local seg = (CELL - 1.2 - door) / 2
 	for side = 0, 3 do
 		local rot = cf * CFrame.Angles(0, side * math.pi / 2, 0)
 		for _, s in { -1, 1 } do
-			part({ Size = Vector3.new(seg, h, 0.6), CFrame = rot * CFrame.new(s * (door / 2 + seg / 2), h / 2 + 0.3, CELL / 2 - 0.3), Color = wallColor, Material = wallMat, Parent = f })
+			local wx = s * (door / 2 + seg / 2)
+			part({ Size = Vector3.new(seg, h, 0.8), CFrame = rot * CFrame.new(wx, 1 + h / 2, inset), Color = wallColor, Material = Enum.Material.SmoothPlastic, Parent = f })
+			-- window with a white frame and warm light
+			part({ Size = Vector3.new(2.8, 2.8, 0.9), CFrame = rot * CFrame.new(wx, 6.2, inset), Color = Color3.new(1, 1, 1), Material = Enum.Material.SmoothPlastic, Parent = f })
+			part({ Size = Vector3.new(2.2, 2.2, 1), CFrame = rot * CFrame.new(wx, 6.2, inset), Color = hex("#ffe2a0"), Material = Enum.Material.Neon, Transparency = 0.25, Parent = f })
+			if level >= 2 then
+				part({ Size = Vector3.new(3, 0.8, 1), CFrame = rot * CFrame.new(wx, 4.5, inset + 0.8), Color = wood, Material = Enum.Material.Wood, Parent = f })
+				for k = -1, 1 do
+					part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.8, 0.8, 0.8), CFrame = rot * CFrame.new(wx + k * 0.9, 5.1, inset + 0.8), Color = hex(({ "#ff7aa8", "#ffd84a", "#b07aff" })[k + 2]), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = f })
+				end
+			end
 		end
-		part({ Size = Vector3.new(door, h - 7, 0.6), CFrame = rot * CFrame.new(0, 7.3 + (h - 7) / 2, CELL / 2 - 0.3), Color = wallColor, Material = wallMat, Parent = f })
+		part({ Size = Vector3.new(door, h - 7, 0.8), CFrame = rot * CFrame.new(0, 8 + (h - 7) / 2, inset), Color = wallColor, Material = Enum.Material.SmoothPlastic, Parent = f })
+		-- door frame
+		for _, s in { -1, 1 } do
+			part({ Size = Vector3.new(0.5, 7, 1), CFrame = rot * CFrame.new(s * (door / 2 + 0.25), 4.5, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
+		end
+		part({ Size = Vector3.new(door + 1, 0.5, 1), CFrame = rot * CFrame.new(0, 8.2, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
+		-- timber corner post
+		part({ Size = Vector3.new(1.2, h, 1.2), CFrame = rot * CFrame.new(inset, 1 + h / 2, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
 	end
-	local roof = part({ Name = "Roof", Size = Vector3.new(CELL + 0.6, 0.8, CELL + 0.6), CFrame = cf * CFrame.new(0, h + 0.7, 0), Color = Color3.new(color.R * 0.6, color.G * 0.6, color.B * 0.6), Material = Enum.Material.Slate, Parent = f })
-	part({ Size = Vector3.new(CELL - 3, 0.5, CELL - 3), CFrame = roof.CFrame * CFrame.new(0, 0.5, 0), Color = color, Material = Enum.Material.SmoothPlastic, Parent = f })
+	-- pitched roof with an overhang
+	local top = 1 + h
+	local rise = 5
+	local half = CELL / 2 + 1
+	for _, s in { -1, 1 } do
+		local w = Instance.new("WedgePart")
+		w.Anchored = true
+		w.Size = Vector3.new(CELL + 2, rise, half)
+		w.CFrame = cf * CFrame.new(0, top + rise / 2, s * half / 2) * CFrame.Angles(0, s > 0 and math.pi or 0, 0)
+		w.Color = roofColor
+		w.Material = Enum.Material.SmoothPlastic
+		w.Parent = f
+	end
+	part({ Name = "Ridge", Size = Vector3.new(CELL + 2.4, 0.6, 0.8), CFrame = cf * CFrame.new(0, top + rise, 0), Color = level >= 4 and hex("#ffd24a") or wood, Material = level >= 4 and Enum.Material.Neon or Enum.Material.Wood, Parent = f })
 	local light = Instance.new("PointLight")
 	light.Color = Color3.fromRGB(255, 225, 170)
-	light.Range = 14
-	light.Brightness = 0.8
-	light.Parent = roof
-	if FURNITURE[id] then
-		FURNITURE[id](f, cf)
+	light.Range = 16
+	light.Brightness = 0.9
+	light.Parent = f:FindFirstChild("Floor")
+	if level >= 3 then
+		local chimney = part({ Size = Vector3.new(2, 5, 2), CFrame = cf * CFrame.new(CELL / 4, top + rise, CELL / 4), Color = hex("#a05a40"), Material = Enum.Material.Brick, Parent = f })
+		local smoke = Instance.new("Smoke")
+		smoke.Size = 1.2
+		smoke.RiseVelocity = 3
+		smoke.Opacity = 0.15
+		smoke.Parent = chimney
 	end
-	local bb = billboard(roof, icon .. " " .. name, level > 0 and ("Level " .. level) or "", 70)
-	bb.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
+	if level >= 5 then
+		part({ Size = Vector3.new(0.3, 5, 0.3), CFrame = cf * CFrame.new(-CELL / 2 + 1, top + rise + 2, 0), Color = wood, Material = Enum.Material.Wood, Parent = f })
+		part({ Size = Vector3.new(0.1, 1.8, 2.8), CFrame = cf * CFrame.new(-CELL / 2 + 1, top + rise + 3.6, 1.5), Color = color, Material = Enum.Material.Fabric, Parent = f })
+	end
+	if FURNITURE[id] then
+		FURNITURE[id](f, cf * CFrame.new(0, 0.7, 0))
+	end
+	local bb = billboard(f:FindFirstChild("Ridge"), icon .. " " .. name, level > 0 and ("Level " .. level) or "", 80)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 3.5, 0)
 	f.Parent = parent
+	if fresh then
+		-- a puff of dust and sparkles when the room has just been built
+		local burst = Instance.new("ParticleEmitter")
+		burst.Color = ColorSequence.new(Color3.fromRGB(255, 240, 200))
+		burst.LightEmission = 0.6
+		burst.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.5), NumberSequenceKeypoint.new(1, 0) })
+		burst.Lifetime = NumberRange.new(0.8, 1.4)
+		burst.Speed = NumberRange.new(10, 20)
+		burst.SpreadAngle = Vector2.new(180, 180)
+		burst.Enabled = false
+		burst.Parent = f:FindFirstChild("Floor")
+		burst:Emit(60)
+	end
 	return f
 end
 
@@ -243,7 +301,7 @@ local function makePlot(parent, index: number)
 	return { index = index, center = center, model = model, sign = sign, rooms = rooms, owner = nil }
 end
 
-local function renderHouse(plot)
+local function renderHouse(plot, fresh: string?)
 	plot.rooms:ClearAllChildren()
 	local data = plot.owner and DataService.get(plot.owner)
 	if not data then
@@ -256,26 +314,20 @@ local function renderHouse(plot)
 		local r = Construction.byId[id]
 		local t = data.home.rooms[id] or 0
 		if id == HouseGrid.START then
-			buildRoom(plot.rooms, cellCF(c.x, c.z), "entrance", "Entrance Hall", "🏡", 0, hex("#b0a090"))
+			buildRoom(plot.rooms, cellCF(c.x, c.z), "entrance", "Entrance Hall", "🏡", 0, hex("#b0a090"), fresh == id)
 		elseif r and t > 0 then
-			buildRoom(plot.rooms, cellCF(c.x, c.z), id, r.name, r.icon, t, hex(r.color))
+			buildRoom(plot.rooms, cellCF(c.x, c.z), id, r.name, r.icon, t, hex(r.color), fresh == id)
 		end
-	end
-	if not HouseGrid.started(data.home.layout) then
-		-- nothing built yet: say how to start
-		local marker = part({ Name = "StartHint", Size = Vector3.new(1, 1, 1), Transparency = 1, CanCollide = false, CFrame = CFrame.new(plot.center + Vector3.new(0, 4, 0)), Parent = plot.rooms })
-		local bb = billboard(marker, "🏗️ Your empty plot", "Open House and tap Start my house", 90)
-		bb.Size = UDim2.fromScale(26, 5)
 	end
 	local lvl = HouseGrid.houseLevel(data.home.rooms)
 	plot.sign.Title.Text = plot.owner.DisplayName .. "'s Home"
 	plot.sign.Sub.Text = ("🏠 House Level %d  ·  +%d%% XP"):format(lvl, lvl)
 end
 
-function HomeService.render(player: Player)
+function HomeService.render(player: Player, fresh: string?)
 	local plot = plotOf[player]
 	if plot then
-		renderHouse(plot)
+		renderHouse(plot, fresh)
 	end
 end
 
@@ -359,6 +411,43 @@ function HomeService.craft(player: Player, recipe)
 	GatherService.start(player, bench, recipe)
 end
 
+-- checks and takes the cost of room r at level t; returns true when paid
+local function pay(player: Player, data, r, t: number): boolean
+	if XP.levelFromXp(data.skills.construction) < r.lv[t] then
+		Remotes.Notify:FireClient(player, ("You need Construction level %d."):format(r.lv[t]), "warn")
+		return false
+	end
+	local cost = Construction.cost(r, t)
+	if data.gold < cost.gold then
+		Remotes.Notify:FireClient(player, "Not enough gold.", "warn")
+		return false
+	end
+	for id, n in cost.mats do
+		if (data.inv[id] or 0) < n then
+			Remotes.Notify:FireClient(player, ("You need %d %s."):format(n, Items[id].name), "warn")
+			return false
+		end
+	end
+	for id, n in cost.mats do
+		DataService.addItem(player, id, -n)
+	end
+	DataService.addGold(player, -cost.gold)
+	return true
+end
+
+local function levelUp(player: Player, data, r, t: number)
+	data.home.rooms[r.id] = t
+	local xp = Construction.xp(r, t)
+	local before, after = DataService.addXp(player, "construction", xp)
+	DataService.sync(player)
+	HomeService.render(player, r.id)
+	Remotes.Notify:FireClient(player, ("%s %s is now level %d!  +%d Construction XP  ·  House Level +1"):format(r.icon, r.name, t, xp), "good")
+	if after > before then
+		Remotes.Notify:FireClient(player, ("Construction is now level %d"):format(after), "good")
+	end
+end
+
+-- upgrade a room that already stands in the house
 function HomeService.build(player: Player, roomId)
 	local data = DataService.get(player)
 	local r = type(roomId) == "string" and Construction.byId[roomId]
@@ -369,63 +458,56 @@ function HomeService.build(player: Player, roomId)
 	if t > Construction.ROOM_MAX then
 		return
 	end
-	local lvl = XP.levelFromXp(data.skills.construction)
-	if lvl < r.lv[t] then
-		Remotes.Notify:FireClient(player, ("You need Construction level %d."):format(r.lv[t]), "warn")
+	if t == 1 or not data.home.layout[r.id] then
+		Remotes.Notify:FireClient(player, "Walk onto a ➕ spot next to your house to build this room.", "warn")
 		return
 	end
-	local cost = Construction.cost(r, t)
-	if data.gold < cost.gold then
-		Remotes.Notify:FireClient(player, "Not enough gold.", "warn")
-		return
-	end
-	for id, n in cost.mats do
-		if (data.inv[id] or 0) < n then
-			Remotes.Notify:FireClient(player, ("You need %d %s."):format(n, Items[id].name), "warn")
-			return
-		end
-	end
-	for id, n in cost.mats do
-		DataService.addItem(player, id, -n)
-	end
-	DataService.addGold(player, -cost.gold)
-	data.home.rooms[r.id] = t
-	local xp = Construction.xp(r, t)
-	local before, after = DataService.addXp(player, "construction", xp)
-	DataService.sync(player)
-	HomeService.render(player)
-	Remotes.Notify:FireClient(player, ("%s %s is now level %d!  +%d Construction XP  ·  House Level +1"):format(r.icon, r.name, t, xp), "good")
-	if after > before then
-		Remotes.Notify:FireClient(player, ("Construction is now level %d"):format(after), "good")
-	end
-	if not data.home.layout[r.id] and HouseGrid.started(data.home.layout) then
-		-- a brand new room: let the player pick where it goes
-		Remotes.PlaceRoom:FireClient(player, r.id)
+	if pay(player, data, r, t) then
+		levelUp(player, data, r, t)
 	end
 end
 
--- put a built room on a cell of the player's own plot (also used to move it)
-function HomeService.place(player: Player, roomId, x, z)
+-- a build spot on the plot: start the house there (Entrance Hall, free) or build a new room there
+function HomeService.buildAt(player: Player, roomId, x, z)
 	local data = DataService.get(player)
 	if not data or type(roomId) ~= "string" or type(x) ~= "number" or type(z) ~= "number" then
 		return
 	end
-	if roomId ~= HouseGrid.START and (not Construction.byId[roomId] or (data.home.rooms[roomId] or 0) < 1) then
-		return
+	local layout = data.home.layout
+	if roomId == HouseGrid.START then
+		if layout[HouseGrid.START] then
+			return
+		end
+	else
+		local r = Construction.byId[roomId]
+		if not r or layout[roomId] then
+			return
+		end
 	end
-	local ok, why = HouseGrid.canPlace(data.home.layout, roomId, x, z)
+	local ok, why = HouseGrid.canPlace(layout, roomId, x, z)
 	if not ok then
 		Remotes.Notify:FireClient(player, why, "warn")
 		return
 	end
-	data.home.layout[roomId] = { x = x, z = z }
-	DataService.sync(player)
-	HomeService.render(player)
+	if roomId == HouseGrid.START then
+		layout[roomId] = { x = x, z = z }
+		DataService.sync(player)
+		HomeService.render(player, roomId)
+		Remotes.Notify:FireClient(player, "🏡 Your house starts here! Build rooms on the ➕ spots next to it.", "good")
+		return
+	end
 	local r = Construction.byId[roomId]
-	if r then
-		Remotes.Notify:FireClient(player, ("%s %s placed!"):format(r.icon, r.name), "good")
+	local t = data.home.rooms[r.id] or 0
+	if t == 0 and not pay(player, data, r, 1) then
+		return
+	end
+	layout[r.id] = { x = x, z = z }
+	if t == 0 then
+		levelUp(player, data, r, 1)
 	else
-		Remotes.Notify:FireClient(player, "🏡 Your house starts here! Build rooms next to it.", "good")
+		-- built before the house had a layout: just put it here
+		DataService.sync(player)
+		HomeService.render(player, r.id)
 	end
 end
 

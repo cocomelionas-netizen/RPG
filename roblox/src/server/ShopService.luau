@@ -109,8 +109,8 @@ function ShopService.init()
 			HomeService.craft(player, a)
 		elseif action == "build" then
 			HomeService.build(player, a)
-		elseif action == "place" then
-			HomeService.place(player, a, b, c)
+		elseif action == "buildAt" then
+			HomeService.buildAt(player, a, b, c)
 		elseif action == "home" then
 			HomeService.teleport(player, a == "road" and "road" or "home")
 		end

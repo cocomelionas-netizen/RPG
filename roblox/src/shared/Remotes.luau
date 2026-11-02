@@ -8,9 +8,8 @@ local NAMES = {
 	"ActionState", -- server -> client: gathering started / next swing / stopped
 	"Gathered", -- server -> client: one resource gathered (xp, item, level up)
 	"Offline", -- server -> client: offline progress summary
-	"Request", -- client -> server: (action, ...) sell / upgrade / stop / craft / build / place / home
+	"Request", -- client -> server: (action, ...) sell / upgrade / stop / craft / build / buildAt / home
 	"OpenCraft", -- server -> client: the hero is at a workbench, show the recipe list
-	"PlaceRoom", -- server -> client: a new room was built, pick a cell for it
 }
 
 local Remotes = {}

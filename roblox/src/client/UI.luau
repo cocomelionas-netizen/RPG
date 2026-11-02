@@ -42,6 +42,7 @@ local ACCENT = {
 	tools = Color3.fromRGB(160, 160, 175),
 	house = Color3.fromRGB(110, 200, 110),
 	craft = Color3.fromRGB(190, 140, 80),
+	spot = Color3.fromRGB(230, 170, 40),
 	travel = Color3.fromRGB(200, 110, 200),
 }
 local TITLE = Enum.Font.FredokaOne
@@ -215,7 +216,7 @@ local windowScale = new("UIScale", { Parent = window })
 
 local panels = {}
 local renderers = {}
-local TITLES = { bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏗️ My House", craft = "🔨 Workbench" }
+local TITLES = { bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏗️ My House", craft = "🔨 Workbench", spot = "➕ What to build here?" }
 
 local function showPanel(name)
 	if openPanel == name or not name then
@@ -472,16 +473,27 @@ local function roomAffordable(r, t)
 	end
 	return true
 end
+-- what a room level gives, in words
+local function bonusText(r, t)
+	local b = r.bonus[t]
+	if r.kind == "speed" then
+		return ("+%d%% %s speed"):format(b, r.skill == "construction" and "workbench" or Skills.byId[r.skill].name:lower())
+	elseif r.kind == "offline" then
+		return ("+%dh offline time"):format(b)
+	end
+	return ("+%d%% gold when selling"):format(b)
+end
 do
 	local p = scroller("house")
-	hint(p, "Make 🟫 planks and 📌 nails at the 🔨 workbench in your plot, then build rooms next to your house. Every room level is +1 House Level = +1% XP on every skill.")
-	-- house level and the Entrance Hall (where the house starts)
+	hint(p, "Walk onto a ➕ spot on your plot to build there. Upgrade rooms here. Every room level is +1 House Level = +1% XP on every skill.")
+	-- house level, and a shortcut home
 	local head = card(p, 0, "🏡")
 	head.row.Name = "HouseHead"
 	head.row.BackgroundColor3 = Color3.fromRGB(70, 60, 40)
-	head.go.Name = "StartHouse"
+	head.go.Name = "GoHome"
 	head.go.Activated:Connect(function()
-		UI.onPlace("entrance")
+		request("home", "home")
+		showPanel(nil)
 	end)
 	local rows = {}
 	for _, r in Construction.ROOMS do
@@ -489,25 +501,15 @@ do
 		c.row.Name = "Room_" .. r.id
 		c.go.Name = "Build_" .. r.id
 		c.go.Activated:Connect(function()
-			request("build", r.id)
+			if state and state.layout and state.layout[r.id] then
+				request("build", r.id)
+			else
+				-- new rooms go on a build spot: take the player home to pick one
+				request("home", "home")
+				showPanel(nil)
+			end
 		end)
-		-- second, smaller button: place a built room, or move it
-		c.place = button({ Name = "Place_" .. r.id, Text = "Place", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -148, 0.5, 0), Size = UDim2.fromOffset(74, 40), TextSize = 15, BackgroundColor3 = Color3.fromRGB(230, 170, 40), ZIndex = 3, Parent = c.row }, function()
-			UI.onPlace(r.id)
-		end)
-		c.title.Size = UDim2.new(1, -300, 0, 24)
-		c.info.Size = UDim2.new(1, -300, 0, 18)
-		c.detail.Size = UDim2.new(1, -300, 0, 26)
 		rows[r.id] = c
-	end
-	local function bonusText(r, t)
-		local b = r.bonus[t]
-		if r.kind == "speed" then
-			return ("+%d%% %s speed"):format(b, r.skill == "construction" and "workbench" or Skills.byId[r.skill].name:lower())
-		elseif r.kind == "offline" then
-			return ("+%dh offline time"):format(b)
-		end
-		return ("+%d%% gold when selling"):format(b)
 	end
 	renderers.house = function()
 		if not state then return end
@@ -519,19 +521,12 @@ do
 		end
 		head.title.Text = ("House Level %d"):format(houseLevel)
 		head.info.Text = ("+%d%% XP on every skill"):format(houseLevel)
-		if layout.entrance then
-			head.detail.Text = "Your Entrance Hall stands. New rooms must join the house side by side."
-			setButton(head.go, "Move house start", true, Color3.fromRGB(120, 110, 150))
-		else
-			head.detail.Text = "First pick where your house starts on your plot."
-			setButton(head.go, "Start my house", true, C.good)
-		end
+		head.detail.Text = layout.entrance and "New rooms go on the ➕ spots next to your house." or "Go to your plot and step on a ➕ spot to start your house."
+		setButton(head.go, "🏡 Go home", true, Color3.fromRGB(200, 110, 200))
 		for _, r in Construction.ROOMS do
 			local c, t = rows[r.id], state.rooms and state.rooms[r.id] or 0
+			local placed = layout[r.id] ~= nil
 			c.title.Text = r.name .. (t > 0 and ("  ·  Lv " .. t) or "")
-			c.place.Visible = t > 0 and layout.entrance ~= nil
-			c.place.Text = layout[r.id] and "Move" or "Place"
-			c.place.BackgroundColor3 = layout[r.id] and Color3.fromRGB(120, 110, 150) or Color3.fromRGB(230, 170, 40)
 			if t >= Construction.ROOM_MAX then
 				c.info.Text = "Now: " .. bonusText(r, t)
 				c.detail.Text = "Fully built!"
@@ -541,14 +536,88 @@ do
 			local cost = Construction.cost(r, t + 1)
 			c.info.Text = t > 0 and ("%s  →  %s"):format(bonusText(r, t), bonusText(r, t + 1)) or bonusText(r, 1)
 			c.detail.Text = costText(cost.mats, cost.gold)
-			local need = r.lv[t + 1]
-			if lvl < need then
-				setButton(c.go, ("🔒 Construction %d"):format(need), false)
+			if not placed then
+				setButton(c.go, "Build on ➕ spot", true, Color3.fromRGB(230, 170, 40))
+			elseif lvl < r.lv[t + 1] then
+				setButton(c.go, ("🔒 Construction %d"):format(r.lv[t + 1]), false)
 			else
-				setButton(c.go, t == 0 and "Build" or ("Upgrade to " .. (t + 1)), roomAffordable(r, t + 1))
+				setButton(c.go, "Upgrade to " .. (t + 1), roomAffordable(r, t + 1))
 			end
 		end
 	end
+end
+
+-- --- What to build on a spot ---
+local spotCell = nil
+do
+	local p = scroller("spot")
+	local tip = hint(p, "")
+	local start = card(p, 0, "🏡")
+	start.row.Name = "Spot_entrance"
+	start.title.Text = "Entrance Hall"
+	start.info.Text = "Your house starts here"
+	start.detail.Text = "Free! Every other room joins on to it."
+	start.go.Name = "Build_entrance"
+	start.go.Activated:Connect(function()
+		if spotCell then
+			request("buildAt", "entrance", spotCell.x, spotCell.z)
+			showPanel(nil)
+		end
+	end)
+	local rows = {}
+	for _, r in Construction.ROOMS do
+		local c = card(p, r.order, r.icon)
+		c.row.Name = "Spot_" .. r.id
+		c.title.Text = r.name
+		c.go.Name = "Build_" .. r.id
+		c.go.Activated:Connect(function()
+			local built = state and state.rooms and (state.rooms[r.id] or 0) > 0
+			if spotCell and (built or roomAffordable(r, 1)) then
+				request("buildAt", r.id, spotCell.x, spotCell.z)
+				showPanel(nil)
+			end
+		end)
+		rows[r.id] = c
+	end
+	renderers.spot = function()
+		if not state then return end
+		local layout = state.layout or {}
+		local starting = not layout.entrance
+		start.row.Visible = starting
+		tip.Text = starting and "Start your house on this spot? You can build every room next to it later." or "Pick a room for this spot. Rooms you can afford are green."
+		local first = true
+		for _, r in Construction.ROOMS do
+			local c = rows[r.id]
+			local t = state.rooms and state.rooms[r.id] or 0
+			c.row.Visible = not starting and not layout[r.id]
+			if c.row.Visible then
+				c.info.Text = bonusText(r, math.max(t, 1))
+				if t > 0 then
+					-- built before rooms had places: it goes here for free
+					c.detail.Text = "Already built – place it here for free."
+					setButton(c.go, "Place here", true)
+				else
+					local cost = Construction.cost(r, 1)
+					c.detail.Text = costText(cost.mats, cost.gold)
+					local lvl = XP.levelFromXp(state.skills.construction or 0)
+					if lvl < r.lv[1] then
+						setButton(c.go, ("🔒 Construction %d"):format(r.lv[1]), false)
+					else
+						local ok = roomAffordable(r, 1)
+						-- the first room the player can afford is the suggested one
+						setButton(c.go, (ok and first) and "⭐ Build here" or "Build here", ok)
+						if ok then first = false end
+					end
+				end
+			end
+		end
+	end
+end
+
+function UI.openSpot(x: number, z: number)
+	spotCell = { x = x, z = z }
+	showPanel(nil)
+	showPanel("spot")
 end
 
 -- --- Workbench ---
@@ -781,9 +850,6 @@ end
 function UI.getData()
 	return state
 end
-
--- set by Main: start placing a room (or the Entrance Hall) on the player's plot
-UI.onPlace = function() end
 
 function UI.setRequest(fn)
 	request = fn

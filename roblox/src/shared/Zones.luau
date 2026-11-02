@@ -38,7 +38,7 @@ Zones.LIST = {
 		rect = { -620, -720, -100, -260 },
 		res = { mining = { 0, 1, 2, 3, 4 }, fishing = { 2 } },
 		clusters = { mining = Vector3.new(-430, 0, -480), fishing = Vector3.new(-330, 0, -640) },
-		th = { sky = "#140f1d", sky2 = "#352841", far = "#2a2134", ground = "#4a3f4f", dirt = "#2a2230", decor = "stalag", material = "Slate", clock = 0, cave = true },
+		th = { sky = "#140f1d", sky2 = "#352841", far = "#2a2134", ground = "#6e6278", dirt = "#4a3e52", decor = "stalag", material = "Slate", clock = 0, cave = true },
 	},
 	{
 		id = "ice", name = "Ice Mountains", req = 45, desc = "Rich veins from iron to runite lie under the snow, guarded by orcs and trolls.",

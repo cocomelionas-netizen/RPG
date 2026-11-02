@@ -11,7 +11,7 @@ local Skills = require(Shared.Skills)
 local Items = require(Shared.Items)
 local Zones = require(Shared.Zones)
 local UI = require(script.Parent:WaitForChild("UI"))
-local Builder = require(script.Parent:WaitForChild("Builder"))
+local BuildSpots = require(script.Parent:WaitForChild("BuildSpots"))
 
 local player = Players.LocalPlayer
 
@@ -31,6 +31,7 @@ end)
 
 Remotes.DataSync.OnClientEvent:Connect(function(view)
 	UI.setData(view)
+	BuildSpots.refresh(view)
 end)
 
 Remotes.Notify.OnClientEvent:Connect(function(msg, kind)
@@ -90,38 +91,9 @@ Remotes.Gathered.OnClientEvent:Connect(function(g)
 	end
 end)
 
--- ===== placing rooms on the plot =====
--- the hero is taken home first when needed, so the plot is loaded (the place streams far parts out)
-local function startPlacing(roomId)
-	UI.showPanel(nil)
-	local function plotReady()
-		local town = workspace:FindFirstChild("World") and workspace.World:FindFirstChild("Hometown")
-		for _, plot in town and town.Plots:GetChildren() or {} do
-			if plot:GetAttribute("Owner") == player.UserId and plot:FindFirstChild("Lawn") then
-				return true
-			end
-		end
-		return false
-	end
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hrp or Zones.indexAt(hrp.Position.X, hrp.Position.Z) ~= Zones.byId.home.index or not plotReady() then
-		Remotes.Request:FireServer("home", "home")
-		for _ = 1, 30 do
-			task.wait(0.1)
-			if plotReady() then break end
-		end
-		task.wait(0.3)
-	end
-	Builder.start(roomId, UI.getData(), function(action, ...)
-		Remotes.Request:FireServer(action, ...)
-	end)
-end
-UI.onPlace = function(roomId)
-	task.spawn(startPlacing, roomId)
-end
-Remotes.PlaceRoom.OnClientEvent:Connect(function(roomId)
-	task.spawn(startPlacing, roomId)
+-- ===== build spots on the plot =====
+BuildSpots.init(function(x, z)
+	UI.openSpot(x, z)
 end)
 
 Remotes.OpenCraft.OnClientEvent:Connect(function()
@@ -142,15 +114,16 @@ local function zoneLook(th)
 	local look = {
 		lighting = {
 			ClockTime = th.clock,
-			Brightness = th.cave and 0.4 or (th.lava and 1.4 or 2.2),
-			Ambient = th.cave and Color3.fromRGB(45, 38, 60) or sky:Lerp(Color3.new(0.5, 0.5, 0.5), 0.6),
-			OutdoorAmbient = th.cave and Color3.fromRGB(55, 45, 70) or sky2:Lerp(Color3.new(0.6, 0.6, 0.6), 0.4),
-			ExposureCompensation = th.cave and 0.3 or 0,
+			-- caves: moody purple but bright enough to see every rock clearly
+			Brightness = th.cave and 1.2 or (th.lava and 1.4 or 2.2),
+			Ambient = th.cave and Color3.fromRGB(170, 155, 195) or sky:Lerp(Color3.new(0.5, 0.5, 0.5), 0.6),
+			OutdoorAmbient = th.cave and Color3.fromRGB(180, 165, 205) or sky2:Lerp(Color3.new(0.6, 0.6, 0.6), 0.4),
+			ExposureCompensation = th.cave and 0.7 or 0,
 		},
 		atmosphere = {
 			Color = sky2,
 			Decay = far,
-			Density = th.cave and 0.5 or th.lava and 0.42 or th.snow and 0.33 or 0.3,
+			Density = th.cave and 0.32 or th.lava and 0.42 or th.snow and 0.33 or 0.3,
 			Haze = th.lava and 2.5 or 1.2,
 			Glare = th.snow and 0.4 or 0,
 		},

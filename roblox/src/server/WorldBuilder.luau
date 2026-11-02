@@ -650,6 +650,18 @@ function WorldBuilder.build()
 				local p = Vector3.new(rng:NextNumber(r[1], r[3]), 51, rng:NextNumber(r[2], r[4]))
 				boulder(p, rng:NextNumber(30, 70), rng:NextNumber(14, 40))
 			end
+			-- glowing crystal lamps hanging from the roof light the whole cave
+			for lx = r[1] + 40, r[3] - 20, 70 do
+				for lz = r[2] + 40, r[4] - 20, 70 do
+					local lamp = part({ Name = "CaveLamp", Size = Vector3.new(2.5, 5, 2.5), CFrame = CFrame.new(lx, 44, lz) * CFrame.Angles(0, rng:NextNumber(0, 3), 0), Color = hex("#c8a0ff"), Material = Enum.Material.Neon, CanCollide = false, Parent = folder })
+					local l = Instance.new("PointLight")
+					l.Color = Color3.fromRGB(225, 205, 255)
+					l.Range = 60
+					l.Brightness = 1.6
+					l.Shadows = false
+					l.Parent = lamp
+				end
+			end
 			-- a lit cave mouth
 			torch(folder, Vector3.new(gx - 12, 0, r[4] + 10))
 			torch(folder, Vector3.new(gx + 12, 0, r[4] + 10))

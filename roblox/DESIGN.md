@@ -52,7 +52,12 @@ Visa kita (renkimas, amatai, kova) maitina šias dvi.
   šiaurės vakarai – Shadow Caves, šiaurės rytai – Dragon's Lair, rytai – Hometown.
 - **Sklypas 160×160** su 8×8 kambarių tinkleliu (16 studų langelis). Žaidėjas pats pasirenka, kur pradeda namą
   (Entrance Hall bet kur), o kiekvienas kitas kambarys turi liestis su namu šonu („durys į duris“) – `HouseGrid.luau`.
-  Statant kamera pakyla virš sklypo, galimi langeliai šviečia žaliai. Kambarius galima perkelti (Move).
+  Statoma ant žemės: sklype šviečia ➕ vietos (pradžioje – visur, vėliau – tik šalia namo). Užlipus ant vietos
+  (arba „Build here“) atsidaro „What to build here?“ su kambariais, kuriuos gali statyti; pirmas įperkamas pažymėtas ⭐.
+  Lygiai keliami House lange. Kambarys – namelis: akmens pamatas, sijos, langai, durys į visas puses, šlaitinis stogas
+  kambario spalva; lygiai matosi (2 gėlių dėžutės, 3 kaminas su dūmais, 4 auksinis kraigas, 5 vėliava).
+- **Balanso pastaba:** 4–5 kambario lygiai kainuoja iki ~1,9 mln. aukso (×10 / ×25), o rąstas – 2–40 aukso.
+  Peržiūrėti, kai atsiras kova ir brangesni daiktai.
 - **House Level** = visų kambarių lygių suma, kiekvienas lygis +1 % XP visiems įgūdžiams. Rodomas lentelėje prie vartų
   ir lyderių lentelėje (House).
 
