@@ -730,7 +730,7 @@ local function gearName(slot, t)
 end
 do
 	local p = scroller("combat")
-	hint(p, "Walk up to a monster and tap Attack (F). Your hero fights on their own and eats food (crops) when hurt. Buy gear at the ⚔️ Smithy in Riverbend.")
+	hint(p, "Tap a monster and your hero walks over and fights on their own and eats food (crops) when hurt. Buy gear at the ⚔️ Smithy in Riverbend.")
 	local head = card(p, 0, "⚔️")
 	head.row.Name = "CombatHead"
 	head.go.Visible = false

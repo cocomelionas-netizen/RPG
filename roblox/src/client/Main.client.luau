@@ -12,6 +12,8 @@ local Items = require(Shared.Items)
 local Zones = require(Shared.Zones)
 local UI = require(script.Parent:WaitForChild("UI"))
 local BuildSpots = require(script.Parent:WaitForChild("BuildSpots"))
+local Interact = require(script.Parent:WaitForChild("Interact"))
+Interact.init()
 
 local player = Players.LocalPlayer
 

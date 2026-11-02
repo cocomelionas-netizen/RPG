@@ -130,3 +130,10 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
   Uždirbtas auksas ir Wraith Ether yra „urvo grobis“; išėjus – tavo, mirus – prarandi tik jį (žudikas pasiima).
   Išėjus iš žaidimo kovos metu (15 s) grobis atitenka užpuolikui.
 - Balanso pastaba: Wraith Caves nuo 40 kovos lygio – ilgas kelias; jei per ilgas, mažinti `Combat.WILD_REQ`.
+
+## Valdymas ir pasaulis (atnaujinta)
+
+- **Paspausk ir veik (kaip OSRS):** paspaudus medį, uolą, monstrą, lysvę ar stotelę hero pats nueina ir pradeda;
+  paspaudus žemę – eina ten. Telefone iššokantys E/F mygtukai paslėpti (advisor: aiškumas, mažiau triukšmo).
+- **Haunted Swamp** (pietūs, 20+): Bog Horror, Will-o'-Wisp, žvejyba. Daugiau monstrų stovyklų visose zonose (`Combat.CAMPS`).
+- Medžiai, uolos ir dekoracijos – Synty Nature Pack modeliai.

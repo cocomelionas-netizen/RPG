@@ -9,7 +9,7 @@
 local Zones = {}
 
 Zones.ROAD_WIDTH = 16
-Zones.BOUNDS = { x0 = -340, z0 = -640, x1 = 500, z1 = 265 }
+Zones.BOUNDS = { x0 = -340, z0 = -640, x1 = 500, z1 = 420 }
 Zones.SPAWN = Vector3.new(0, 3, 42)
 
 Zones.LIST = {
@@ -19,6 +19,13 @@ Zones.LIST = {
 		res = { woodcutting = { 0, 1 }, mining = { 0, 1 }, fishing = { 0, 1 } },
 		clusters = { woodcutting = Vector3.new(-250, 0, 140), mining = Vector3.new(-105, 0, 140), fishing = Vector3.new(-190, 0, 232) },
 		th = { sky = "#78c4ff", sky2 = "#dff3ff", far = "#a9cbe0", ground = "#5c9a3c", dirt = "#7a5a3a", decor = "tree", material = "Grass", clock = 14 },
+	},
+	{
+		id = "swamp", name = "Haunted Swamp", req = 20, desc = "Murky bogs south of the Meadow, haunted by wisps.",
+		rect = { -340, 265, 55, 420 },
+		res = { fishing = { 1, 2 } },
+		clusters = { fishing = Vector3.new(-230, 0, 300) },
+		th = { sky = "#4a5a4a", sky2 = "#9aaa8a", far = "#5a6a4a", ground = "#4a5a34", dirt = "#3a3020", decor = "swamp", material = "Mud", clock = 18, swamp = true },
 	},
 	{
 		id = "town", name = "Riverbend", req = 1, desc = "The town at the crossroads. Every road starts here.", town = true,
@@ -77,7 +84,7 @@ end
 
 -- roads: straight segments { from, to } on the ground (y ignored)
 Zones.ROADS = {
-	{ Vector3.new(0, 0, -145), Vector3.new(0, 0, 260) }, -- town north-south and down into the Meadow
+	{ Vector3.new(0, 0, -145), Vector3.new(0, 0, 410) }, -- town north-south, down through the Meadow into the Swamp
 	{ Vector3.new(-335, 0, 0), Vector3.new(0, 0, 0) }, -- town west to the Dark Forest
 	{ Vector3.new(-310, 0, -330), Vector3.new(-310, 0, 0) }, -- forest north into the Shadow Caves
 	{ Vector3.new(0, 0, -630), Vector3.new(0, 0, -145) }, -- up through the Ice Mountains into the Wraith Caves

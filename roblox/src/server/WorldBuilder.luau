@@ -27,6 +27,54 @@ local function part(props)
 	return p
 end
 
+
+-- ===================== Creator Store models =====================
+-- The Synty Nature Pack (free, made official for Roblox by Roblox) lives in ServerStorage.AssetPacks: it is saved
+-- in the place, not in git. Without it every builder below falls back to plain parts.
+local ServerStorage = game:GetService("ServerStorage")
+local pack = ServerStorage:FindFirstChild("AssetPacks") and ServerStorage.AssetPacks:FindFirstChild("SyntyNature")
+
+-- a copy of a pack model scaled to height h, standing on pos, turned rotY; nil when the pack is missing
+local function prop(name: string, parent: Instance, pos: Vector3, h: number, rotY: number?, collide: boolean?)
+	local src = pack and pack:FindFirstChild("Meshes/" .. name)
+	if not src then
+		return nil
+	end
+	local c = src:Clone()
+	for _, d in c:GetDescendants() do
+		if d:IsA("LuaSourceContainer") then
+			d:Destroy() -- never run code that came with a model
+		end
+	end
+	local parts = c:IsA("BasePart") and { c } or {}
+	for _, d in c:GetDescendants() do
+		if d:IsA("BasePart") then
+			table.insert(parts, d)
+		end
+	end
+	for _, bp in parts do
+		bp.Anchored = true
+		bp.CanCollide = collide == true
+		bp.CanTouch = false
+	end
+	local turn = CFrame.Angles(0, rotY or 0, 0)
+	if c:IsA("BasePart") then
+		c.Size *= h / c.Size.Y
+		c.CFrame = CFrame.new(pos + Vector3.new(0, c.Size.Y / 2, 0)) * turn
+	else
+		c:ScaleTo(c:GetScale() * h / c:GetExtentsSize().Y)
+		local box, size = c:GetBoundingBox()
+		local bottom = box.Position - Vector3.new(0, size.Y / 2, 0)
+		c:PivotTo(CFrame.new(pos) * turn * CFrame.new(-pos) * (c:GetPivot() + (pos - bottom)))
+	end
+	c.Parent = parent
+	return c
+end
+
+local function pick(rng, list)
+	return list[rng:NextInteger(1, #list)]
+end
+
 local function darker(c: Color3, f: number): Color3
 	return Color3.new(c.R * f, c.G * f, c.B * f)
 end
@@ -187,9 +235,49 @@ local TREES = {
 	{ trunk = "#4a2a5a", d = 2.1, h = 10, leaves = "#b56cf0", r = 8, form = "round", glow = true }, -- Elder: magic
 }
 
+local TREE_PROP = {
+	[0] = { "Birch_Tree_Birch_01", 16 },
+	{ "PolygonNature_Tree_Round_01", 17 },
+	{ "PolygonNature_Tree_Round_05", 19 },
+	{ "Pine_Tree_Pine_01", 24 },
+	{ "Willow_Tree_Willow_Medium_01", 24 },
+}
+
 local function makeTree(parent, pos, tier, rng)
 	local st = TREES[tier]
 	local model = Instance.new("Model")
+	local tp = TREE_PROP[tier]
+	local tree = prop(tp[1], model, pos, tp[2], rng:NextNumber(0, math.pi * 2), true)
+	if tree then
+		local trunk = part({ Name = "Trunk", Size = Vector3.new(3, 8, 3), CFrame = CFrame.new(pos + Vector3.new(0, 4, 0)), Transparency = 1, CanCollide = false, Parent = model })
+		local crown = part({ Name = "Crown", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(pos + Vector3.new(0, tp[2] * 0.75, 0)), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
+		if st.fall then
+			local e = Instance.new("ParticleEmitter")
+			e.Name = "Leaves"
+			e.Color = ColorSequence.new(hex(st.leaves), hex("#c0402a"))
+			e.Size = NumberSequence.new(0.35)
+			e.Lifetime = NumberRange.new(2.5, 4)
+			e.Rate = 3
+			e.Speed = NumberRange.new(0.5, 1)
+			e.SpreadAngle = Vector2.new(180, 180)
+			e.Acceleration = Vector3.new(0.4, -1.2, 0)
+			e.RotSpeed = NumberRange.new(-90, 90)
+			e.Rotation = NumberRange.new(0, 360)
+			e.Parent = crown
+		end
+		if st.glow then
+			local light = Instance.new("PointLight")
+			light.Color = hex(st.leaves)
+			light.Range = 18
+			light.Brightness = 1.8
+			light.Parent = crown
+			sparkles(crown, Color3.fromRGB(230, 200, 255), 8)
+		end
+		chipEmitter(trunk, hex("#c8a070"))
+		finishNode(model, trunk, "woodcutting", tier, pos + Vector3.new(0, tp[2] + 1.5, 0), 4)
+		model.Parent = parent
+		return model
+	end
 	local h, d = st.h, st.d
 	local trunk = part({
 		Name = "Trunk", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, d, d),
@@ -302,6 +390,14 @@ local function makeRock(parent, pos, tier, rng)
 		light.Parent = base
 		sparkles(base, oreColor, 3 + tier)
 	end
+	if prop("PolygonNature_Rock_Boulder_01", model, pos + Vector3.new(0, -0.6, 0), 4.6 * size, rng:NextNumber(0, math.pi * 2), true) then
+		base.Transparency = 1
+		base.CanCollide = false
+		local second = model:FindFirstChild("Rock2")
+		if second then
+			second:Destroy()
+		end
+	end
 	chipEmitter(base, oreColor)
 	finishNode(model, base, "mining", tier, pos + Vector3.new(0, 6 * size + (form == "crystals" and 1.5 or 0), 0), 4 * size)
 	model.Parent = parent
@@ -338,6 +434,9 @@ end
 
 -- ===================== scenery =====================
 local function decorTree(parent, pos, rng, color)
+	if prop(pick(rng, { "PolygonNature_Tree_01", "PolygonNature_Tree_02", "PolygonNature_Tree_03", "PolygonNature_Tree_Round_02", "PolygonNature_Tree_Round_03", "Birch_Tree_Birch_02", "PolygonNature_Tree_TallRound_01" }), parent, pos, rng:NextNumber(16, 26), rng:NextNumber(0, 6.3), true) then
+		return
+	end
 	local h = rng:NextNumber(8, 14)
 	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, 1.6, 1.6), CFrame = CFrame.new(pos + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#5a3d22"), Material = Enum.Material.Wood, Parent = parent })
 	local r = rng:NextNumber(7, 11)
@@ -345,6 +444,9 @@ local function decorTree(parent, pos, rng, color)
 end
 
 local function decorPine(parent, pos, rng, color)
+	if prop(pick(rng, { "Pine_Tree_Pine_02", "Pine_Tree_Pine_Large_01", "PolygonNature_Tree_PolyPine_01", "PolygonNature_Tree_PolyPine_02", "Pine_Tree_Pine_Small_01" }), parent, pos, rng:NextNumber(18, 34), rng:NextNumber(0, 6.3), true) then
+		return
+	end
 	local h = rng:NextNumber(10, 18)
 	part({ Size = Vector3.new(1.4, h * 0.4, 1.4), CFrame = CFrame.new(pos + Vector3.new(0, h * 0.2, 0)), Color = hex("#4a321c"), Material = Enum.Material.Wood, Parent = parent })
 	for i = 0, 2 do
@@ -368,12 +470,18 @@ local function decorStalag(parent, pos, rng, color)
 end
 
 local function decorRock(parent, pos, rng, color)
+	if prop(pick(rng, { "PolygonNature_Rock_Pile_01", "PolygonNature_Rock_Pile_02", "PolygonNature_Rock_Pile_03", "PolygonNature_Rock_Cluster_Large_04", "PolygonNature_Tree_Pine_Dead_01" }), parent, pos, rng:NextNumber(6, 14), rng:NextNumber(0, 6.3), true) then
+		return
+	end
 	local s = rng:NextNumber(4, 10)
 	local p = part({ Size = Vector3.new(s, s * 0.7, s * 0.9), CFrame = CFrame.new(pos + Vector3.new(0, s * 0.3, 0)) * CFrame.Angles(0.1, rng:NextNumber(0, 3), 0.1), Color = hex("#7f8b98"), Material = Enum.Material.Slate, Parent = parent })
 	part({ Size = Vector3.new(s * 1.02, s * 0.15, s * 0.92), CFrame = p.CFrame * CFrame.new(0, s * 0.35, 0), Color = color, Material = Enum.Material.Snow, Parent = parent })
 end
 
 local function decorSpike(parent, pos, rng, _color)
+	if rng:NextNumber() < 0.5 and prop(pick(rng, { "Leaves_Tree_Dead_01", "Leaves_Tree_Dead_02", "PolygonNature_Tree_Pine_Dead_01", "PolygonNature_Rock_Pile_04" }), parent, pos, rng:NextNumber(8, 18), rng:NextNumber(0, 6.3), true) then
+		return
+	end
 	local h = rng:NextNumber(5, 14)
 	part({ Size = Vector3.new(2.5, h, 2.5), CFrame = CFrame.new(pos + Vector3.new(0, h / 2, 0)) * CFrame.Angles(rng:NextNumber(-0.2, 0.2), rng:NextNumber(0, 3), rng:NextNumber(-0.2, 0.2)), Color = hex("#1c0806"), Material = Enum.Material.Basalt, Parent = parent })
 	if rng:NextNumber() < 0.4 then
@@ -386,11 +494,26 @@ local function decorSpike(parent, pos, rng, _color)
 	end
 end
 
-local DECOR = { tree = decorTree, pine = decorPine, stalag = decorStalag, rock = decorRock, spike = decorSpike }
+local function decorSwamp(parent, pos, rng, color)
+	local name = pick(rng, { "PolygonNature_Tree_Swamp_01", "PolygonNature_Tree_Swamp_02", "PolygonNature_Tree_Swamp_03", "PolygonNature_Tree_Swamp_04", "PolygonNature_Tree_Swamp_Stump_02", "Willow_Tree_Willow_Small_01" })
+	if prop(name, parent, pos, rng:NextNumber(14, 26), rng:NextNumber(0, 6.3), true) then
+		if rng:NextNumber() < 0.5 then
+			prop(pick(rng, { "PolygonNature_Plant_Reeds_01", "PolygonNature_Plant_Reeds_02", "PolygonNature_Plant_Mushrooms_05" }), parent, pos + Vector3.new(rng:NextNumber(-5, 5), 0, rng:NextNumber(-5, 5)), rng:NextNumber(2, 4), rng:NextNumber(0, 6.3))
+		end
+		return
+	end
+	decorPine(parent, pos, rng, color)
+end
+
+local DECOR = { tree = decorTree, pine = decorPine, stalag = decorStalag, rock = decorRock, spike = decorSpike, swamp = decorSwamp }
 
 -- flower patches and bushes for the grassy zones
 local FLOWERS = { "#ff7aa8", "#ffd84a", "#b07aff", "#ffffff", "#ff8a4a" }
 local function decorFlowers(parent, pos, rng)
+	local plant = pick(rng, { "PurpleFlower", "PolygonNature_Plant_Flowers_01", "Bush_Plant_Bush_Leaves_03", "PolygonNature_Plant_Bush_01", "PolygonNature_Plant_Bush_02", "Fern_Plant_Fern_Leaves_01", "PolygonNature_Plant_Mushrooms_02", "PolygonNature_Plant_06" })
+	if prop(plant, parent, pos, rng:NextNumber(2, 5), rng:NextNumber(0, 6.3)) then
+		return
+	end
 	if rng:NextNumber() < 0.4 then
 		local s = rng:NextNumber(3, 6)
 		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(s, s * 0.7, s), CFrame = CFrame.new(pos + Vector3.new(0, s * 0.25, 0)), Color = hex("#4a8f38"), Material = Enum.Material.Grass, CanCollide = false, Parent = parent })
@@ -795,6 +918,7 @@ function WorldBuilder.build()
 		archGate(roads, pos, alongX, z.name, z.id == "meadow" and "Your journey begins" or z.id == "home" and "Build your house here" or ("Recommended Lv " .. z.req))
 	end
 	zoneArch("meadow", Vector3.new(0, 0, 59), false)
+	zoneArch("swamp", Vector3.new(0, 0, 269), false)
 	zoneArch("forest", Vector3.new(-59, 0, 0), true)
 	zoneArch("caves", Vector3.new(-310, 0, -149), false)
 	zoneArch("ice", Vector3.new(0, 0, -149), false)

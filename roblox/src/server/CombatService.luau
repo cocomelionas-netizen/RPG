@@ -496,7 +496,8 @@ local function spawnEnemies(world: Instance)
 	local folder = Instance.new("Folder")
 	folder.Name = "Enemies"
 	folder.Parent = world
-	for zoneId, sp in Combat.SPAWNS do
+	for _, sp in Combat.CAMPS do
+		local zoneId = sp.zone
 		local spread = sp.spread or 32
 		for k, id in sp.enemies do
 			local def = Combat.ENEMIES[id]

@@ -21,6 +21,8 @@ Combat.ENEMIES = {
 	lizard = { name = "Fire Lizard", hp = 1200, maxHit = 50, atk = 68, def = 68, speed = 2.2, gold = { 50, 90 }, shape = "quad", size = 1.2, color = "#d8562a" },
 	imp = { name = "Fire Imp", hp = 1000, maxHit = 46, atk = 64, def = 62, speed = 1.8, gold = { 45, 80 }, shape = "flyer", size = 1, color = "#c43a2a" },
 	drakeknight = { name = "Dragon Knight", hp = 1300, maxHit = 52, atk = 70, def = 72, speed = 2.6, gold = { 55, 95 }, shape = "humanoid", size = 1.2, color = "#c8a080", body = "#7a1e14" },
+	bog = { name = "Bog Horror", hp = 300, maxHit = 18, atk = 28, def = 26, speed = 2.4, gold = { 15, 30 }, shape = "blob", size = 1.4, color = "#5a7a3a" },
+	wisp = { name = "Will-o'-Wisp", hp = 220, maxHit = 22, atk = 30, def = 22, speed = 2.0, gold = { 12, 26 }, shape = "flyer", size = 1, color = "#a8f0ff", ghost = true },
 	revimp = { name = "Wraith Imp", hp = 160, maxHit = 14, atk = 40, def = 30, speed = 2.2, gold = { 20, 45 }, shape = "flyer", size = 0.9, color = "#8aa07a", ghost = true },
 	revgob = { name = "Wraith Goblin", hp = 420, maxHit = 24, atk = 52, def = 46, speed = 2.4, gold = { 40, 90 }, shape = "humanoid", size = 0.9, color = "#a8d098", body = "#3a4a3a", ghost = true },
 	revknight = { name = "Wraith Knight", hp = 1600, maxHit = 46, atk = 74, def = 76, speed = 2.6, gold = { 120, 240 }, shape = "humanoid", size = 1.3, color = "#c8e8c0", body = "#2a3a2a", ghost = true },
@@ -31,14 +33,20 @@ for id, e in Combat.ENEMIES do
 	e.level = math.max(1, math.floor((e.atk + e.def) / 2 + e.hp / 40))
 end
 
--- where each zone's enemies live: { zone id = { center, enemy ids } }
-Combat.SPAWNS = {
-	meadow = { center = Vector3.new(-55, 0, 200), enemies = { "slime", "rat" }, each = 3 },
-	forest = { center = Vector3.new(-265, 0, -90), enemies = { "goblin", "gobarcher", "wolf" }, each = 2 },
-	caves = { center = Vector3.new(-120, 0, -200), enemies = { "bat", "skeleton", "cultist" }, each = 2 },
-	ice = { center = Vector3.new(130, 0, -230), enemies = { "orc", "icemage", "troll", "yeti" }, each = 2 },
-	dragon = { center = Vector3.new(430, 0, -330), enemies = { "lizard", "imp", "drakeknight" }, each = 2 },
-	wild = { center = Vector3.new(0, 0, -520), enemies = { "revimp", "revgob", "revknight", "revdragon" }, each = 2, spread = 150 },
+-- monster camps: { zone, centre, enemies, how many of each, spread }
+Combat.CAMPS = {
+	{ zone = "meadow", center = Vector3.new(-55, 0, 200), enemies = { "slime", "rat" }, each = 3 },
+	{ zone = "meadow", center = Vector3.new(-300, 0, 88), enemies = { "slime" }, each = 3, spread = 18 },
+	{ zone = "swamp", center = Vector3.new(-90, 0, 355), enemies = { "bog", "wisp" }, each = 3 },
+	{ zone = "swamp", center = Vector3.new(-280, 0, 385), enemies = { "bog" }, each = 2, spread = 18 },
+	{ zone = "forest", center = Vector3.new(-265, 0, -90), enemies = { "goblin", "gobarcher", "wolf" }, each = 2 },
+	{ zone = "forest", center = Vector3.new(-110, 0, 35), enemies = { "wolf" }, each = 3, spread = 14 },
+	{ zone = "caves", center = Vector3.new(-120, 0, -200), enemies = { "bat", "skeleton", "cultist" }, each = 2 },
+	{ zone = "caves", center = Vector3.new(-280, 0, -372), enemies = { "skeleton", "bat" }, each = 2, spread = 18 },
+	{ zone = "ice", center = Vector3.new(130, 0, -230), enemies = { "orc", "icemage", "troll", "yeti" }, each = 2 },
+	{ zone = "dragon", center = Vector3.new(430, 0, -330), enemies = { "lizard", "imp", "drakeknight" }, each = 2 },
+	{ zone = "dragon", center = Vector3.new(255, 0, -250), enemies = { "lizard" }, each = 3, spread = 18 },
+	{ zone = "wild", center = Vector3.new(0, 0, -520), enemies = { "revimp", "revgob", "revknight", "revdragon" }, each = 2, spread = 150 },
 }
 
 -- gear: one weapon and one armour set, by metal tier (web METAL_EQUIP / METAL_POWER / METAL_ARMOUR)

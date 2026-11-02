@@ -32,3 +32,10 @@ Pasaulis (kelias, 5 zonos, medžiai, uolos, tvenkiniai) sukuriamas kodu paleidus
 - **Construction** įgūdis ir 6 kambariai po 5 lygius (🏠 House langas): greitesnis renkimas, ilgesnis offline, daugiau aukso pardavus.
 - Visas planas (kova, Wraith Caves PvP, Robux) – `DESIGN.md`.
 - Emoji: naudok tik senesnius (iki Unicode 12). 🪙 🪵 🪨 ✕ Roblox šriftuose rodomi kaip kvadratėliai.
+
+## Modeliai iš Creator Store
+
+- `ServerStorage.AssetPacks.SyntyNature` – oficialus Roblox „Synty Nature Pack“ (asset 6933438443, nemokamas, licencijuotas
+  visiems Roblox žaidimams). Jis yra **place faile, ne git'e** (Rojo jo neliečia). Įkeltas per Studio MCP `insert_asset`.
+- `WorldBuilder.prop()` klonuoja modelius, **ištrina visus skriptus** ir pastato; jei paketo nėra, lieka paprastos detalės.
+- Naujus modelius imti tik iš patvirtintų kūrėjų (geriausia „Roblox“), botų keliamuose dažnai būna kenkėjiškų skriptų.
