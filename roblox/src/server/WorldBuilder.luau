@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Zones = require(Shared.Zones)
 local G = require(Shared.Gathering)
 local Tiers = require(Shared.Tiers)
+local Remotes = require(Shared.Remotes)
 
 local WorldBuilder = {}
 
@@ -582,6 +583,36 @@ local function buildTown(folder)
 	for i, s in spots do
 		cottage(folder, Vector3.new(s[1], 0, s[2]), s[3], hex(colors[(i - 1) % #colors + 1]))
 	end
+
+	-- the Seed Stall on the plaza: buy seeds and saplings
+	local stall = Instance.new("Model")
+	stall.Name = "SeedStall"
+	local base = CFrame.new(-20, 0, -20) * CFrame.Angles(0, math.rad(45), 0)
+	local counter = part({ Name = "Counter", Size = Vector3.new(8, 3, 3), CFrame = base * CFrame.new(0, 1.5, 0), Color = hex("#a0703a"), Material = Enum.Material.WoodPlanks, Parent = stall })
+	for _, x in { -3.6, 3.6 } do
+		part({ Size = Vector3.new(0.5, 8, 0.5), CFrame = base * CFrame.new(x, 4, -1.2), Color = hex("#6b4a2b"), Material = Enum.Material.Wood, Parent = stall })
+	end
+	for i = 0, 3 do
+		part({ Size = Vector3.new(2.25, 0.3, 4), CFrame = base * CFrame.new(-3.4 + i * 2.25, 8.2, 0.4) * CFrame.Angles(math.rad(-12), 0, 0), Color = i % 2 == 0 and hex("#5ab84a") or Color3.new(1, 1, 1), Material = Enum.Material.Fabric, Parent = stall })
+	end
+	for i, c in { "#c8a060", "#e04a3a", "#7ac85a", "#f2d24a" } do
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.2, 1.2, 1.2), CFrame = base * CFrame.new(-3 + i * 1.3, 3.5, 0), Color = hex(c), Material = Enum.Material.SmoothPlastic, Parent = stall })
+	end
+	stall.PrimaryPart = counter
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Shop"
+	prompt.ObjectText = "Seed Stall"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.Parent = counter
+	prompt.Triggered:Connect(function(player)
+		Remotes.OpenCraft:FireClient(player, "seeds")
+	end)
+	local bb = label(counter, "🌱 Seed Stall", "Seeds & saplings", 70)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 9, 0)
+	stall.Parent = folder
 end
 
 -- ===================== the whole map =====================
@@ -693,7 +724,7 @@ function WorldBuilder.build()
 		end
 
 		-- flowers and bushes on the grass
-		if th.material == "Grass" then
+		if th.material == "Grass" and not zone.home then -- plots have their own flower beds
 			local count = math.floor(size.X * size.Z / 2200)
 			for _ = 1, count do
 				local p = Vector3.new(rng:NextNumber(r[1] + 6, r[3] - 6), 0, rng:NextNumber(r[2] + 6, r[4] - 6))

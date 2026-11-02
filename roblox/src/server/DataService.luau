@@ -53,7 +53,8 @@ local function defaultData()
 		inv = {},
 		gold = 0,
 		tools = { axe = 0, pick = 0, rod = 0 },
-		home = { rooms = {}, layout = {} }, -- rooms: [roomId] = level 1..5; layout: [roomId] = { x, z } cell on the plot
+		home = { rooms = {}, layout = {} },
+		farm = { patches = {} }, -- ["p1".."p6"] = { seed, planted = os.time() } -- rooms: [roomId] = level 1..5; layout: [roomId] = { x, z } cell on the plot
 		activity = nil, -- { skill, tier } while gathering: used for offline progress
 		lastSeen = 0,
 		created = os.time(),
@@ -110,6 +111,9 @@ local function reconcile(data)
 			data.stats[k] = v
 		end
 	end
+	if type(data.farm) ~= "table" or type(data.farm.patches) ~= "table" then
+		data.farm = def.farm
+	end
 	if type(data.goal) ~= "number" then
 		data.goal = 1
 	end
@@ -139,7 +143,8 @@ end
 function DataService.view(data)
 	return {
 		skills = data.skills, inv = data.inv, gold = data.gold, tools = data.tools, rooms = data.home.rooms, layout = data.home.layout,
-		stats = { sold = data.stats.sold, homeTrips = data.stats.homeTrips, made = data.stats.made }, goal = data.goal,
+		stats = { sold = data.stats.sold, homeTrips = data.stats.homeTrips, made = data.stats.made, planted = data.stats.planted, harvested = data.stats.harvested, seedsBought = data.stats.seedsBought },
+		goal = data.goal, farm = data.farm.patches, now = os.time(),
 		memoryOnly = memoryOnly,
 	}
 end

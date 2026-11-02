@@ -33,7 +33,7 @@ for i, s in Skills.LIST do
 end
 
 -- skills that can be trained in this part of the Roblox version
-Skills.GATHERING = { "woodcutting", "mining", "fishing", "construction" }
-Skills.ACTIVE = { woodcutting = true, mining = true, fishing = true, construction = true }
+Skills.GATHERING = { "woodcutting", "mining", "fishing", "farming", "construction" }
+Skills.ACTIVE = { woodcutting = true, mining = true, fishing = true, farming = true, construction = true }
 
 return Skills

@@ -5,10 +5,12 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local G = require(Shared.Gathering)
 local Items = require(Shared.Items)
 local Construction = require(Shared.Construction)
+local Farming = require(Shared.Farming)
 local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local GatherService = require(script.Parent.GatherService)
 local HomeService = require(script.Parent.HomeService)
+local FarmService = require(script.Parent.FarmService)
 
 local ShopService = {}
 
@@ -55,7 +57,7 @@ local function sellAll(player: Player)
 	local gold, count = 0, 0
 	for id, n in data.inv do
 		local it = Items[id]
-		if it and (it.type == "Resources" or it.type == "Ores") then
+		if it and (it.type == "Resources" or it.type == "Ores" or it.type == "Crops") then
 			gold += worth(data, it, n)
 			count += n
 			data.inv[id] = nil
@@ -68,6 +70,31 @@ local function sellAll(player: Player)
 	data.stats.sold += 1
 	DataService.sync(player)
 	Remotes.Notify:FireClient(player, ("Sold %d resources for %s gold"):format(count, fmt(gold)), "gold")
+end
+
+-- the Seed Stall in Riverbend
+local function buySeeds(player: Player, index)
+	local data = DataService.get(player)
+	local offer = type(index) == "number" and Farming.SHOP[index]
+	if not data or not offer then
+		return
+	end
+	local stall = workspace:FindFirstChild("SeedStall", true)
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not stall or not hrp or (hrp.Position - stall:GetPivot().Position).Magnitude > 18 then
+		Remotes.Notify:FireClient(player, "Visit the 🌱 Seed Stall in Riverbend to buy seeds.", "warn")
+		return
+	end
+	local id, n, cost = offer[1], offer[2], offer[3]
+	if data.gold < cost then
+		Remotes.Notify:FireClient(player, "Not enough gold.", "warn")
+		return
+	end
+	DataService.addGold(player, -cost)
+	DataService.addItem(player, id, n)
+	data.stats.seedsBought = (data.stats.seedsBought or 0) + 1
+	DataService.sync(player)
+	Remotes.Notify:FireClient(player, ("Bought %d × %s"):format(n, Items[id].name), "gold")
 end
 
 local function upgrade(player: Player, tool)
@@ -110,6 +137,10 @@ function ShopService.init()
 			HomeService.craft(player, a)
 		elseif action == "build" then
 			HomeService.build(player, a)
+		elseif action == "buySeeds" then
+			buySeeds(player, a)
+		elseif action == "plant" then
+			FarmService.plant(player, a, b)
 		elseif action == "buildAt" then
 			HomeService.buildAt(player, a, b, c)
 		elseif action == "home" then

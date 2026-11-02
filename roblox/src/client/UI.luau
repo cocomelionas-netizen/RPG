@@ -43,6 +43,8 @@ local ACCENT = {
 	house = Color3.fromRGB(110, 200, 110),
 	craft = Color3.fromRGB(190, 140, 80),
 	spot = Color3.fromRGB(230, 170, 40),
+	seeds = Color3.fromRGB(90, 180, 70),
+	plant = Color3.fromRGB(90, 180, 70),
 	travel = Color3.fromRGB(200, 110, 200),
 }
 local TITLE = Enum.Font.FredokaOne
@@ -179,7 +181,7 @@ local _, goalFill = bar(goalCard, { Position = UDim2.new(0, 0, 1, -4), Size = UD
 -- ===== bottom-left: skills being trained =====
 local hud = new("Frame", {
 	Name = "SkillHud", LayoutOrder = 3, BackgroundColor3 = C.bg, BackgroundTransparency = 0.1,
-	Size = UDim2.fromOffset(240, 4 * 36 + 16), Parent = left,
+	Size = UDim2.fromOffset(240, #Skills.GATHERING * 36 + 16), Parent = left,
 }, { corner(12), stroke(), pad(8), new("UIListLayout", { Padding = UDim.new(0, 4) }) })
 local hudRows = {}
 for _, id in Skills.GATHERING do
@@ -216,7 +218,7 @@ local windowScale = new("UIScale", { Parent = window })
 
 local panels = {}
 local renderers = {}
-local TITLES = { bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏗️ My House", craft = "🔨 Workbench", spot = "➕ What to build here?" }
+local TITLES = { bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏗️ My House", craft = "🔨 Workbench", spot = "➕ What to build here?", seeds = "🌱 Seed Stall", plant = "🌱 Plant" }
 
 local function showPanel(name)
 	if openPanel == name or not name then
@@ -614,6 +616,89 @@ do
 	end
 end
 
+-- --- Seed Stall ---
+local Farming = require(Shared.Farming)
+local function seedLine(s)
+	return ("Farming %d  ·  %s  ·  grows in %s"):format(s.lvl, Farming.KIND_NAME[s.kind], Farming.fmtTime(s.time))
+end
+do
+	local p = scroller("seeds")
+	hint(p, "Plant seeds in the patches along the south fence of your plot. They grow even while you are away!")
+	local rows = {}
+	for i, offer in Farming.SHOP do
+		local s = Farming.byId[offer[1]]
+		local c = card(p, i, Items[s.id].icon)
+		c.row.Name = "Offer_" .. i
+		c.go.Name = "Buy_" .. i
+		c.title.Text = ("%s  ×%d"):format(s.name, offer[2])
+		c.go.Activated:Connect(function()
+			request("buySeeds", i)
+		end)
+		rows[i] = c
+	end
+	renderers.seeds = function()
+		if not state then return end
+		local lvl = XP.levelFromXp(state.skills.farming or 0)
+		for i, offer in Farming.SHOP do
+			local s, c = Farming.byId[offer[1]], rows[i]
+			c.info.Text = seedLine(s)
+			c.info.TextColor3 = lvl >= s.lvl and C.good or C.warn
+			c.detail.Text = costText({}, offer[3]) .. ("   <font color=\"#aaa4b4\">you have %d</font>"):format(state.inv[s.id] or 0)
+			setButton(c.go, "Buy", state.gold >= offer[3])
+		end
+	end
+end
+
+-- --- Plant (a patch was tapped) ---
+local plantPatch, plantKind = nil, nil
+do
+	local p = scroller("plant")
+	local tip = hint(p, "")
+	local rows = {}
+	for _, s in Farming.SEEDS do
+		local c = card(p, s.order, "🌱")
+		c.row.Name = "Seed_" .. s.id
+		c.go.Name = "Plant_" .. s.id
+		c.title.Text = s.name
+		c.go.Activated:Connect(function()
+			if plantPatch then
+				request("plant", plantPatch, s.id)
+				showPanel(nil)
+			end
+		end)
+		rows[s.id] = c
+	end
+	renderers.plant = function()
+		if not state then return end
+		local lvl = XP.levelFromXp(state.skills.farming or 0)
+		local shown = 0
+		for _, s in Farming.SEEDS do
+			local c, have = rows[s.id], state.inv[s.id] or 0
+			c.row.Visible = s.kind == plantKind and have > 0
+			if c.row.Visible then
+				shown += 1
+				local out = Items[s.out]
+				c.icon.Text = out.icon
+				c.info.Text = seedLine(s)
+				c.detail.Text = ("Gives %d–%d %s  ·  you have %d seeds"):format(s.n[1], s.n[2], out.name, have)
+				if lvl < s.lvl then
+					setButton(c.go, "🔒 Farming " .. s.lvl, false)
+				else
+					setButton(c.go, "Plant", true)
+				end
+			end
+		end
+		tip.Text = shown > 0 and ("Pick a seed for this %s."):format(Farming.KIND_NAME[plantKind or "allot"]:lower())
+			or ("You have no seeds for a %s. Buy some at the 🌱 Seed Stall in Riverbend, or find them while gathering."):format(Farming.KIND_NAME[plantKind or "allot"]:lower())
+	end
+end
+
+function UI.openPlant(i: number, kind: string)
+	plantPatch, plantKind = i, kind
+	showPanel(nil)
+	showPanel("plant")
+end
+
 function UI.openSpot(x: number, z: number)
 	spotCell = { x = x, z = z }
 	showPanel(nil)
@@ -722,8 +807,8 @@ function UI.toast(msg, kind)
 	end)
 end
 
-local banner = text({ ZIndex = 20, Text = "", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.36), Size = UDim2.fromOffset(700, 60), Font = TITLE, TextSize = 46, TextColor3 = C.gold, TextStrokeTransparency = 0, TextTransparency = 1, TextStrokeColor3 = Color3.fromRGB(40, 20, 0), Parent = wgui })
-local bannerSub = text({ ZIndex = 20, Text = "", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.36, 44), Size = UDim2.fromOffset(700, 30), Font = TITLE, TextSize = 22, TextStrokeTransparency = 0.2, TextTransparency = 1, Parent = wgui })
+local banner = text({ ZIndex = 2, Text = "", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.36), Size = UDim2.fromOffset(700, 60), Font = TITLE, TextSize = 46, TextColor3 = C.gold, TextStrokeTransparency = 0, TextTransparency = 1, TextStrokeColor3 = Color3.fromRGB(40, 20, 0), Parent = wgui })
+local bannerSub = text({ ZIndex = 2, Text = "", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.36, 44), Size = UDim2.fromOffset(700, 30), Font = TITLE, TextSize = 22, TextStrokeTransparency = 0.2, TextTransparency = 1, Parent = wgui })
 local bannerScale = new("UIScale", { Parent = banner })
 local bannerId = 0
 function UI.banner(main, sub, color)
@@ -881,7 +966,8 @@ local function layout(phone: boolean)
 			f.Size = UDim2.fromOffset(phone and 120 or 150, phone and 34 or 38)
 		end
 	end
-	hud.Size = UDim2.fromOffset(phone and 150 or 240, phone and (4 * 24 + 12) or (4 * 36 + 16))
+	local rows = #Skills.GATHERING
+	hud.Size = UDim2.fromOffset(phone and 150 or 240, phone and (rows * 24 + 12) or (rows * 36 + 16))
 	for _, r in hudRows do
 		r.name.Visible = not phone
 		r.row.Size = UDim2.new(1, 0, 0, phone and 20 or 32)

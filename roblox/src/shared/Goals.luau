@@ -38,6 +38,14 @@ Goals.LIST = {
 		progress = function(v) return math.min(XP.levelFromXp(v.skills.woodcutting), 15), 15 end },
 	{ text = "Build the Ore Cellar on a ➕ spot next to your house", target = "home", reward = 250,
 		progress = function(v) return v.layout and v.layout.cellar and 1 or 0, 1 end },
+	{ text = "Buy seeds at the 🌱 Seed Stall in Riverbend", target = "stall", reward = 50,
+		progress = function(v) return math.min(stat(v, "seedsBought"), 1), 1 end },
+	{ text = "Plant seeds in a patch in your garden", target = "home", reward = 50,
+		progress = function(v) return math.min(stat(v, "planted"), 1), 1 end },
+	{ text = "Harvest your first crops", target = "home", reward = 100,
+		progress = function(v) return math.min(stat(v, "harvested"), 1), 1 end },
+	{ text = "Reach Farming level 10", target = "home", reward = 300,
+		progress = function(v) return math.min(XP.levelFromXp(v.skills.farming), 10), 10 end },
 }
 
 function Goals.done(i: number, view): boolean

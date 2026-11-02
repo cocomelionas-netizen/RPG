@@ -101,3 +101,18 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
 | 🔨 Workshop | Dar vienas Workbench |
 | 🏦 Treasury | Sell all |
 | 🛏️ Bedroom | Rest – parodo offline laiką |
+
+## Farming (padaryta)
+
+- Kiekvieno sklypo pietinėje pusėje 6 lysvės: 3 daržai (bulvės → arbūzai), 2 žolelių (Greenleaf → Starbloom), 1 medžio (Farming 15).
+- Auga realiu laiku (5 min – 4 h), todėl ir kai neprisijungęs. Derlius nepūva (advisor: reward > punishment).
+- Sėklos: 🌱 Seed Stall Riverbend aikštėje ir 4 % šansas rasti sėklą renkant (geresni taškai – retesnės sėklos).
+- Advisor: tai trumpasis „30 sekundžių“ ciklas (užeik, nuimk, pasodink) šalia ilgojo (renkimas, statymas).
+
+## Toliau (ko dar trūksta)
+
+1. **Cooking** – žuvis ir daržovės → maistas (reikės kovai).
+2. **Kova + Wraith Caves PvP** (3 dalis).
+3. **Herblore** – žolelės → eliksyrai (boost'ai, tinka ir Robux parduotuvės „ne pay-to-win“ taisyklei).
+4. **Garden kambarys** – daugiau lysvių (kaip web žaidime PATCH_N pagal lygį).
+5. **Robux parduotuvė**.

@@ -1,5 +1,6 @@
 -- Item definitions (same ids and values as the web game's defItem calls)
 local G = require(script.Parent.Gathering)
+local Farming = require(script.Parent.Farming)
 
 local Items = {}
 local ORDER = 0
@@ -36,6 +37,18 @@ for t = 0, 4 do
 	defItem("plank" .. t, { name = PLANK_N[t], icon = "🟫", tier = t, value = PLANK_VALUE[t], type = "Materials", color = WOOD_COLOR[t] })
 end
 defItem("nails", { name = "Nails", icon = "📌", tier = 0, value = 1, type = "Materials", color = "#9aa0a8" })
+-- farming: seeds and what they grow into
+for i, c in Farming.CROPS do
+	local lvl = c[4]
+	defItem("crop_" .. c[1], { name = c[2], icon = c[3], tier = math.min(i - 1, 6), value = math.floor(2 + lvl * 0.35 + 0.5), type = "Crops", color = c[5] })
+end
+for i, h in Farming.HERBS do
+	local lvl = h[3]
+	defItem("herb_" .. h[1], { name = h[2], icon = "🌿", tier = math.min(math.floor((i - 1) / 2), 6), value = math.floor(6 + lvl * 1.4 + 0.5), type = "Herbs", color = h[4] })
+end
+for _, sd in Farming.SEEDS do
+	defItem(sd.id, { name = sd.name, icon = "🌱", tier = math.min(math.floor(sd.lvl / 15), 6), value = sd.kind == "tree" and math.floor(sd.value / 4) or sd.value, type = "Seeds", color = sd.color })
+end
 -- cooking arrives in part 3; defined now so saves stay compatible
 for t = 0, 4 do
 	defItem("cooked" .. t, { name = COOKED_N[t], icon = "🍽️", tier = t, value = COOKED_VALUE[t], heal = HEAL[t], type = "Food" })

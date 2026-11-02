@@ -79,7 +79,8 @@ end)
 Remotes.Gathered.OnClientEvent:Connect(function(g)
 	local s = Skills.byId[g.skill]
 	emit(g.node, 14)
-	UI.floatText(("+%d XP %s   +%d %s"):format(g.xp, s.icon, g.count or 1, Items[g.item].icon), Color3.fromRGB(150, 230, 150))
+	local gain = (g.count or 1) > 0 and ("   +%d %s"):format(g.count or 1, Items[g.item].icon) or ""
+	UI.floatText(("+%d XP %s%s"):format(g.xp, s.icon, gain), Color3.fromRGB(150, 230, 150))
 	if g.levelUp then
 		UI.banner("Level up!", ("%s %s is now level %d"):format(s.icon, s.name, g.levelUp))
 		local sound = Instance.new("Sound")
@@ -97,7 +98,11 @@ BuildSpots.init(function(x, z)
 end)
 
 -- a station asks to open a window (workbench by default, the house plans from the Entrance Hall)
-Remotes.OpenCraft.OnClientEvent:Connect(function(panel)
+Remotes.OpenCraft.OnClientEvent:Connect(function(panel, a, b)
+	if panel == "plant" then
+		UI.openPlant(a, b)
+		return
+	end
 	UI.showPanel(nil)
 	UI.showPanel(panel or "craft")
 end)
@@ -231,6 +236,8 @@ task.spawn(function()
 				target = nearestNode("mining", 0, hrp.Position)
 			elseif goal.target == "bench" then
 				target = myBench()
+			elseif goal.target == "stall" then
+				target = workspace:FindFirstChild("SeedStall", true)
 			end
 		end
 		-- no arrow once the hero is already working right there

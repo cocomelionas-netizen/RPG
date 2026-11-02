@@ -11,6 +11,7 @@ local Skills = require(Shared.Skills)
 local XP = require(Shared.XP)
 local Remotes = require(Shared.Remotes)
 local HouseGrid = require(Shared.HouseGrid)
+local Farming = require(Shared.Farming)
 local DataService = require(script.Parent.DataService)
 local ToolFactory = require(script.Parent.ToolFactory)
 
@@ -18,6 +19,8 @@ local GatherService = {}
 
 local MAX_DIST = 14 -- studs from the node before the hero counts as having walked away
 local SWING_EVERY = 0.9
+local SEED_CHANCE = 0.04 -- per gathered resource
+local seedRng = Random.new()
 local active = {} -- [Player] = { token, node, skill, tier }
 
 local function root(player: Player)
@@ -131,6 +134,15 @@ local function grant(player: Player, st)
 	data.stats.actions += 1
 	if info.inputs then
 		data.stats.made[info.item] = (data.stats.made[info.item] or 0) + out
+	end
+	-- now and then a seed turns up while gathering (better nodes, rarer seeds)
+	if not info.inputs and seedRng:NextNumber() < SEED_CHANCE then
+		local seed = Farming.dropFor(st.tier or 0, seedRng)
+		if seed then
+			local n = seedRng:NextInteger(1, 2)
+			DataService.addItem(player, seed, n)
+			Remotes.Notify:FireClient(player, ("🌱 You found %d × %s!"):format(n, Items[seed].name), "good")
+		end
 	end
 	DataService.sync(player)
 	Remotes.Gathered:FireClient(player, {

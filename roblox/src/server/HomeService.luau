@@ -12,6 +12,7 @@ local Items = require(Shared.Items)
 local XP = require(Shared.XP)
 local Zones = require(Shared.Zones)
 local G = require(Shared.Gathering)
+local Farming = require(Shared.Farming)
 local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local GatherService = require(script.Parent.GatherService)
@@ -29,6 +30,7 @@ local PLOT_Z = { -85, 70, 200 }
 local plots = {} -- array of { index, center, model, sign, rooms, owner }
 local makeWorkbenchModel -- defined with the plots, also used by the Workshop room
 HomeService.onSellAll = function(_player) end -- set by ShopService (it requires this module)
+HomeService.onPatch = function(_player, _plotModel, _i) end -- set by FarmService
 local plotOf = {} -- [Player] = plot
 
 local function part(props)
@@ -361,7 +363,7 @@ local function makePlot(parent, index: number)
 	for i = 1, 10 do
 		local side = i % 4
 		local t = rng:NextNumber(-half + 10, half - 10)
-		local off = side == 0 and Vector3.new(t, 0, -half + 4) or side == 1 and Vector3.new(t, 0, half - 4) or side == 2 and Vector3.new(half - 4, 0, t) or Vector3.new(t, 0, half - 4)
+		local off = (side == 0 or side == 3) and Vector3.new(t, 0, -half + 4) or Vector3.new(half - 4, 0, t * 0.6)
 		local flower = ({ "#ff7aa8", "#ffd84a", "#b07aff", "#ff8a4a" })[i % 4 + 1]
 		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(4, 3, 4), CFrame = CFrame.new(center + off + Vector3.new(0, 1.2, 0)), Color = hex("#4f9a3c"), Material = Enum.Material.Grass, CanCollide = false, Parent = model })
 		for k = 1, 3 do
@@ -388,6 +390,28 @@ local function makePlot(parent, index: number)
 	sign.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
 	-- workbench just inside the gate
 	makeWorkbenchModel(model, center + Vector3.new(-half + 7, 0, gate / 2 + 8), math.pi / 2)
+	-- the vegetable garden: soil patches along the south fence (FarmService grows things in them)
+	local patches = Instance.new("Folder")
+	patches.Name = "Patches"
+	for i, def in Farming.PATCHES do
+		local w = def.kind == "tree" and 12 or 11
+		local soil = part({ Name = "Patch_" .. i, Size = Vector3.new(w, 0.6, 7), CFrame = CFrame.new(center + Vector3.new(def.x, 0.35, half - 5.5)), Color = hex("#6b4a2b"), Material = Enum.Material.Ground, Parent = patches })
+		soil:SetAttribute("Kind", def.kind)
+		part({ Size = Vector3.new(w + 0.8, 0.5, 7.8), CFrame = soil.CFrame * CFrame.new(0, -0.1, 0), Color = hex("#8a6a44"), Material = Enum.Material.WoodPlanks, Parent = patches })
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "PatchPrompt"
+		prompt.ActionText = "Plant"
+		prompt.ObjectText = Farming.KIND_NAME[def.kind]
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = 9
+		prompt.RequiresLineOfSight = false
+		prompt.KeyboardKeyCode = Enum.KeyCode.E
+		prompt.Parent = soil
+		prompt.Triggered:Connect(function(player)
+			HomeService.onPatch(player, model, i)
+		end)
+	end
+	patches.Parent = model
 	local rooms = Instance.new("Folder")
 	rooms.Name = "Rooms"
 	rooms.Parent = model
@@ -447,6 +471,16 @@ local function freePlot(player: Player)
 		plot.sign.Title.Text = "For rent"
 		plot.sign.Sub.Text = "A free plot"
 		plot.rooms:ClearAllChildren()
+		-- the next owner starts with an empty garden
+		for _, soil in plot.model.Patches:GetChildren() do
+			for _, n in { "Plants", "Ready" } do
+				local x = soil:FindFirstChild(n)
+				if x then
+					x:Destroy()
+				end
+			end
+			soil:SetAttribute("Key", nil)
+		end
 	end
 end
 
