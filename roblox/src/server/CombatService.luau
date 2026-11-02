@@ -1,6 +1,8 @@
--- Combat: enemies in every zone and PvP in the Wraith Caves.
--- Tap an enemy (or, in the Wraith Caves, another player) and the hero fights on their own until one side falls
--- or the hero walks away. Food is eaten automatically when health runs low. Hitpoints use the web game's scale.
+-- Combat: monster camps in every zone and PvP in the Wraith Caves.
+-- No buttons: walk up to a monster (or tap it) and the hero draws their sword and fights on their own until one side
+-- falls or the hero walks away. Monsters wander about their camp and come for heroes who get close, unless the hero
+-- is more than twice their level (as in OSRS). Food is eaten automatically when health runs low.
+-- The server moves an invisible Root box; every client animates the monster's model after it (MobAnim.luau).
 --
 -- Wraith Caves rules (DESIGN.md): gold and items won in there are "cave loot", carried separately. Walk out and
 -- it goes to your bag. Die and you lose only the cave loot: a player who killed you takes it.
@@ -18,6 +20,7 @@ local DataService = require(script.Parent.DataService)
 local GatherService = require(script.Parent.GatherService)
 
 local CombatService = {}
+local monsterStep, autoFight -- moving about (defined with the enemy models)
 
 local hex = Color3.fromHex
 local rng = Random.new()
@@ -26,6 +29,7 @@ local fights = {} -- [Player] = { token, kind = "enemy" | "player", enemy, victi
 local lastHurt = {} -- [Player] = os.clock() of the last damage taken (no regen in combat)
 local lastPvpBy = {} -- [Player] = { by = Player, at = os.clock() }
 local inWild = {} -- [Player] = true while inside the Wraith Caves
+local noAutoUntil = {} -- [Player] = os.clock(): no auto-fighting right after the player stopped a fight
 
 local function part(props)
 	local p = Instance.new("Part")
@@ -201,6 +205,9 @@ function CombatService.stop(player: Player, reason: string?)
 	if not f then
 		return
 	end
+	if reason == "player" then
+		noAutoUntil[player] = os.clock() + 4 -- pressed stop: give them time to walk away
+	end
 	fights[player] = nil
 	if f.enemy then
 		f.enemy.attackers[player] = nil
@@ -223,11 +230,18 @@ end
 
 local function killEnemy(e, killer: Player?)
 	e.alive = false
+	e.chase = nil
 	for p in e.attackers do
 		CombatService.stop(p, "won")
 	end
 	e.attackers = {}
-	e.model.Parent = nil
+	-- clients play the fall; the body goes a moment later
+	e.model:SetAttribute("Dead", true)
+	task.delay(1.1, function()
+		if not e.alive then
+			e.model.Parent = nil
+		end
+	end)
 	if killer then
 		local data = DataService.get(killer)
 		if data then
@@ -246,6 +260,8 @@ local function killEnemy(e, killer: Player?)
 		e.hp = e.def.hp
 		e.alive = true
 		e.model:PivotTo(CFrame.new(e.home))
+		e.pos = e.home
+		e.model:SetAttribute("Dead", false)
 		e.model.Parent = e.folder
 	end)
 end
@@ -286,9 +302,12 @@ local function fightLoop(player: Player, f)
 				CombatService.stop(player, "moved")
 				return
 			end
-			-- face the target and swing
+			-- face the target and swing: Roblox's own sword slash, a lunge every third swing (clients add the sound)
 			hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(targetRoot.Position.X, hrp.Position.Y, targetRoot.Position.Z))
-			GatherService.swing(player)
+			local char = player.Character
+			local n = (char:GetAttribute("Swing") or 0) + 1
+			char:SetAttribute("Swing", n)
+			GatherService.swing(player, n % 3 == 0 and "Lunge" or "Slash")
 			local a = Combat.attackerStats(data)
 			local chance = Combat.hitChance(a.acc, defend.def + (defend.armour or 0) * 0.5)
 			if rng:NextNumber() >= chance then
@@ -299,6 +318,7 @@ local function fightLoop(player: Player, f)
 					local e = f.enemy
 					dmg = math.min(dmg, e.hp)
 					e.hp -= dmg
+					e.model:SetAttribute("Hurt", (e.model:GetAttribute("Hurt") or 0) + 1)
 					splat(targetRoot, dmg, "hit")
 					combatXp(player, data, dmg)
 					if e.hp <= 0 then
@@ -381,7 +401,7 @@ local function enemyLoop(e)
 				local hum, hrp = humanoidOf(p)
 				local data = DataService.get(p)
 				if hum and data and flat(hrp.Position, e.root.Position) <= Combat.REACH + 4 then
-					e.model:PivotTo(CFrame.lookAt(e.root.Position, Vector3.new(hrp.Position.X, e.root.Position.Y, hrp.Position.Z)))
+					e.model:SetAttribute("Atk", (e.model:GetAttribute("Atk") or 0) + 1)
 					local d = Combat.defenderStats(data)
 					if rng:NextNumber() < Combat.enemyHitChance(e.def.atk, d) then
 						local dmg = math.max(1, math.floor(rng:NextInteger(1, e.def.maxHit) * (1 - d.dr)))
@@ -456,6 +476,9 @@ local function buildEnemy(def, pos: Vector3, folder: Folder)
 		root = part({ Name = "Root", Size = Vector3.new(3.5 * s, assetH, 3.5 * s), CFrame = cf * CFrame.new(0, lift + assetH / 2, 0), Transparency = 1, Parent = model })
 		asset.Name = "Look"
 		asset.Parent = model
+		model:SetAttribute("LookOffset", root.CFrame:ToObjectSpace(asset:GetPivot()))
+		model:SetAttribute("Height", assetH)
+		model:SetAttribute("Flyer", def.shape == "flyer")
 	elseif def.shape == "blob" then
 		root = part({ Name = "Root", Shape = Enum.PartType.Ball, Size = Vector3.new(3, 2.4, 3) * s, CFrame = cf * CFrame.new(0, 1.2 * s, 0), Color = color, Material = Enum.Material.Glass, Transparency = 0.2, Parent = model })
 	elseif def.shape == "quad" then
@@ -530,17 +553,196 @@ local function buildEnemy(def, pos: Vector3, folder: Folder)
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = Combat.REACH
 	prompt.RequiresLineOfSight = false
-	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.Style = Enum.ProximityPromptStyle.Custom -- nothing to press: walking up starts the fight, the prompt only serves taps
 	prompt.Parent = root
 	model.Parent = folder
 	return model, root, fill, prompt
+end
+
+-- ===================== moving about =====================
+-- put the monster at pos, facing a point: the Root box when a client animates the model, the whole model otherwise
+local function placeEnemy(e, pos: Vector3, face: Vector3?)
+	local look = face and Vector3.new(face.X, pos.Y, face.Z) or nil
+	local cf = (look and (look - pos).Magnitude > 0.1) and CFrame.lookAt(pos, look) or (CFrame.new(pos) * e.root.CFrame.Rotation)
+	if e.look then
+		e.root.CFrame = cf
+	else
+		e.model:PivotTo(cf)
+	end
+	e.pos = pos
+end
+
+local function safeZone(pos: Vector3): boolean
+	local z = Zones.LIST[Zones.indexAt(pos.X, pos.Z)]
+	return z.town == true or z.home == true
+end
+
+-- step towards a point at a speed (studs a second), stopping `stop` studs short
+local function walkTowards(e, target: Vector3, speed: number, dt: number, stop: number)
+	local to = Vector3.new(target.X - e.pos.X, 0, target.Z - e.pos.Z)
+	local d = to.Magnitude
+	if d <= stop then
+		placeEnemy(e, e.pos, target)
+		return true
+	end
+	local step = math.min(speed * dt, d - stop)
+	placeEnemy(e, e.pos + to.Unit * step, target)
+	return false
+end
+
+-- the nearest hero a monster would go for: close, alive, not in a safe zone, and not more than twice its level
+local function preyFor(e)
+	local best, bestD = nil, Combat.AGGRO
+	for _, p in Players:GetPlayers() do
+		local hum, hrp = humanoidOf(p)
+		local data = DataService.get(p)
+		-- one monster at a time comes for a hero: no crowding round someone already busy
+		local busy = fights[p] ~= nil
+		for _, other in enemies do
+			if other.chase == p and other ~= e then
+				busy = true
+				break
+			end
+		end
+		if hum and data and not busy and not safeZone(hrp.Position) then
+			local d = flat(hrp.Position, e.pos)
+			local weak = Combat.combatLevel(data.skills) <= e.def.level * 2 or e.zone == "wild"
+			if d < bestD and weak then
+				best, bestD = p, d
+			end
+		end
+	end
+	return best
+end
+
+function monsterStep(e, dt: number)
+	local fromHome = flat(e.pos, e.home)
+	local fighting = next(e.attackers) ~= nil
+	if fighting then
+		-- stand close to the hero being fought
+		local p = e.target and e.attackers[e.target] and e.target or next(e.attackers)
+		local _, hrp = humanoidOf(p)
+		if hrp and fromHome < Combat.LEASH then
+			walkTowards(e, hrp.Position, 10, dt, 4.5 + e.def.size * 1.5)
+		end
+		return
+	end
+	-- chasing someone who came too close
+	if e.chase then
+		local _, hrp = humanoidOf(e.chase)
+		if not hrp or fromHome > Combat.LEASH or safeZone(hrp.Position) then
+			e.chase = nil
+		else
+			walkTowards(e, hrp.Position, 12, dt, 4.5 + e.def.size * 1.5)
+			return
+		end
+	end
+	if fromHome > 2 and not e.wander then
+		e.wander = e.home -- go back home after a chase
+	end
+	local prey = preyFor(e)
+	if prey and fromHome < Combat.LEASH - 6 then
+		e.chase = prey
+		e.wander = nil
+		return
+	end
+	-- wander about the camp spot
+	if e.wander then
+		if walkTowards(e, e.wander, e.wander == e.home and 10 or 4, dt, 0.3) then
+			e.wander = nil
+			e.rest = os.clock() + rng:NextNumber(2, 6)
+		end
+	elseif os.clock() > (e.rest or 0) then
+		local a = rng:NextNumber(0, math.pi * 2)
+		local r = rng:NextNumber(2, 8)
+		e.wander = e.home + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+	end
+end
+
+-- heroes who walk up to a monster (or a monster that came for them) fight it on their own
+function autoFight()
+	for _, p in Players:GetPlayers() do
+		if not fights[p] and os.clock() > (noAutoUntil[p] or 0) then
+			local hum, hrp = humanoidOf(p)
+			if hum and not safeZone(hrp.Position) then
+				local best, bestD = nil, Combat.AUTO
+				for _, e in enemies do
+					if e.alive then
+						local d = flat(hrp.Position, e.root.Position)
+						if d < bestD or (e.chase == p and d < Combat.REACH) then
+							best, bestD = e, math.min(d, bestD)
+						end
+					end
+				end
+				-- a hero busy gathering only stops for a monster that came for them
+				if best and (best.chase == p or not GatherService.isGathering(p)) then
+					CombatService.attackEnemy(p, best)
+				end
+			end
+		end
+	end
+end
+
+-- a camp is a marked spot: a ring of trampled ground, a campfire and a sign with its name and levels
+local function buildCamp(parent: Instance, camp)
+	if camp.zone == "wild" then
+		return -- the Wraith Caves are one big hunting ground
+	end
+	local zone = Zones.byId[camp.zone]
+	local c = camp.center
+	local r = (camp.spread or 32) + 6
+	local ground = Color3.fromHex(zone.th.dirt or zone.th.ground)
+	part({ Name = "CampGround", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, r * 2, r * 2), CFrame = CFrame.new(c + Vector3.new(0, 0.08, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = ground, Material = Enum.Material.Ground, Transparency = 0.15, CanQuery = false, Parent = parent })
+	-- campfire
+	for i = 0, 3 do
+		part({ Size = Vector3.new(0.7, 0.7, 4), CFrame = CFrame.new(c + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, i * math.pi / 4, 0), Color = hex("#6b4a2b"), Material = Enum.Material.Wood, Parent = parent })
+	end
+	local fire = part({ Name = "Fire", Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(c + Vector3.new(0, 1.2, 0)), Transparency = 1, CanQuery = false, Parent = parent })
+	local f = Instance.new("Fire")
+	f.Size = 4
+	f.Heat = 6
+	f.Parent = fire
+	local l = Instance.new("PointLight")
+	l.Color = Color3.fromRGB(255, 170, 90)
+	l.Range = 20
+	l.Brightness = 1.4
+	l.Parent = fire
+	-- sign with crossed swords
+	local post = part({ Name = "CampSign", Size = Vector3.new(0.6, 9, 0.6), CFrame = CFrame.new(c + Vector3.new(r - 3, 4.5, 0)), Color = hex("#6b4a2b"), Material = Enum.Material.Wood, Parent = parent })
+	part({ Size = Vector3.new(5, 2.4, 0.4), CFrame = post.CFrame * CFrame.new(0, 3, 0), Color = hex("#8a5a32"), Material = Enum.Material.WoodPlanks, Parent = parent })
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.fromScale(14, 3)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
+	bb.MaxDistance = 160
+	bb.LightInfluence = 0
+	local t = Instance.new("TextLabel")
+	t.BackgroundTransparency = 1
+	t.Size = UDim2.fromScale(1, 0.6)
+	t.Font = Enum.Font.FredokaOne
+	t.TextScaled = true
+	t.TextColor3 = Color3.fromRGB(255, 120, 100)
+	t.TextStrokeTransparency = 0.2
+	t.Text = "⚔️ " .. camp.name
+	t.Parent = bb
+	local sub = t:Clone()
+	sub.Position = UDim2.fromScale(0, 0.6)
+	sub.Size = UDim2.fromScale(1, 0.4)
+	sub.Font = Enum.Font.GothamBold
+	sub.TextColor3 = Color3.fromRGB(255, 220, 160)
+	sub.Text = camp.lo == camp.hi and ("Level %d"):format(camp.lo) or ("Levels %d–%d"):format(camp.lo, camp.hi)
+	sub.Parent = bb
+	bb.Parent = post
 end
 
 local function spawnEnemies(world: Instance)
 	local folder = Instance.new("Folder")
 	folder.Name = "Enemies"
 	folder.Parent = world
+	local camps = Instance.new("Folder")
+	camps.Name = "Camps"
+	camps.Parent = world
 	for _, sp in Combat.CAMPS do
+		buildCamp(camps, sp)
 		local zoneId = sp.zone
 		local spread = sp.spread or 32
 		for k, id in sp.enemies do
@@ -549,8 +751,11 @@ local function spawnEnemies(world: Instance)
 				local a = (k * 2.1 + j * 1.3)
 				local r = spread * (0.35 + 0.65 * ((k + j) % 3) / 2)
 				local pos = sp.center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+				local zr = Zones.byId[zoneId].rect
+				pos = Vector3.new(math.clamp(pos.X, zr[1] + 12, zr[3] - 12), 0, math.clamp(pos.Z, zr[2] + 12, zr[4] - 12))
 				local model, root, fill, prompt = buildEnemy(def, pos, folder)
-				local e = { def = def, model = model, root = root, fill = fill, hp = def.hp, alive = true, home = model:GetPivot().Position, attackers = {}, folder = folder, zone = zoneId }
+				local home = model:GetPivot().Position
+				local e = { def = def, model = model, root = root, fill = fill, hp = def.hp, alive = true, home = home, pos = home, attackers = {}, folder = folder, zone = zoneId, look = model:FindFirstChild("Look") ~= nil, camp = sp }
 				prompt.Triggered:Connect(function(player)
 					CombatService.attackEnemy(player, e)
 				end)
@@ -559,22 +764,19 @@ local function spawnEnemies(world: Instance)
 			end
 		end
 	end
-	-- health bars and a gentle idle bob
+	-- health bars, wandering, chasing and auto-fighting
 	task.spawn(function()
-		local t = 0
+		local STEP = 0.2
 		while true do
-			t += 0.25
-			for i, e in enemies do
+			task.wait(STEP)
+			for _, e in enemies do
 				if e.alive then
 					e.fill.Size = UDim2.fromScale(math.max(0, e.hp / e.def.hp), 1)
 					e.fill.BackgroundColor3 = e.hp / e.def.hp > 0.5 and Color3.fromRGB(90, 220, 90) or e.hp / e.def.hp > 0.25 and Color3.fromRGB(240, 190, 60) or Color3.fromRGB(230, 70, 60)
-					if not next(e.attackers) then
-						local bob = (e.def.shape == "flyer") and math.sin(t + i) * 0.8 or 0
-						e.model:PivotTo(CFrame.new(e.home + Vector3.new(0, bob, 0)) * CFrame.Angles(0, (t * 0.2 + i) % (math.pi * 2), 0))
-					end
+					monsterStep(e, STEP)
 				end
 			end
-			task.wait(0.25)
+			autoFight()
 		end
 	end)
 end

@@ -65,11 +65,11 @@ local function equip(player: Player, skill: string)
 end
 
 -- the default Animate script plays the tool slash animation when a "toolanim" value appears in the held tool
-local function swing(tool: Tool?)
+local function swing(tool: Tool?, kind: string?)
 	if tool and tool.Parent then
 		local v = Instance.new("StringValue")
 		v.Name = "toolanim"
-		v.Value = "Slash"
+		v.Value = kind or "Slash"
 		v.Parent = tool
 	end
 end
@@ -160,18 +160,23 @@ end
 function GatherService.equipWeapon(player: Player)
 	clearTools(player)
 	local data = DataService.get(player)
+	-- everyone has at least the wooden training sword (-1)
 	local w = data and data.gear and data.gear.weapon or -1
-	if w >= 0 and player.Character then
+	if player.Character then
 		local tool = ToolFactory.make("sword", w)
 		tool.Parent = player.Character
 	end
 end
 
-function GatherService.swing(player: Player)
+function GatherService.isGathering(player: Player): boolean
+	return active[player] ~= nil
+end
+
+function GatherService.swing(player: Player, kind: string?)
 	local char = player.Character
 	for _, t in char and char:GetChildren() or {} do
 		if t:IsA("Tool") and t:GetAttribute("EndlessRoadTool") then
-			swing(t)
+			swing(t, kind)
 		end
 	end
 end

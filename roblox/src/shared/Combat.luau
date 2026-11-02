@@ -33,21 +33,37 @@ for id, e in Combat.ENEMIES do
 	e.level = math.max(1, math.floor((e.atk + e.def) / 2 + e.hp / 40))
 end
 
--- monster camps: { zone, centre, enemies, how many of each, spread }
+-- monster camps: { name, zone, centre, enemies, how many of each, spread }. Each camp is a marked area on the ground
+-- with a campfire and a sign; its monsters wander about it and attack heroes who come close (CombatService).
 Combat.CAMPS = {
-	{ zone = "meadow", center = Vector3.new(-55, 0, 200), enemies = { "slime", "rat" }, each = 3 },
-	{ zone = "meadow", center = Vector3.new(-300, 0, 88), enemies = { "slime" }, each = 3, spread = 18 },
-	{ zone = "swamp", center = Vector3.new(-90, 0, 355), enemies = { "bog", "wisp" }, each = 3 },
-	{ zone = "swamp", center = Vector3.new(-280, 0, 385), enemies = { "bog" }, each = 2, spread = 18 },
-	{ zone = "forest", center = Vector3.new(-265, 0, -90), enemies = { "goblin", "gobarcher", "wolf" }, each = 2 },
-	{ zone = "forest", center = Vector3.new(-110, 0, 35), enemies = { "wolf" }, each = 3, spread = 14 },
-	{ zone = "caves", center = Vector3.new(-120, 0, -200), enemies = { "bat", "skeleton", "cultist" }, each = 2 },
-	{ zone = "caves", center = Vector3.new(-280, 0, -372), enemies = { "skeleton", "bat" }, each = 2, spread = 18 },
-	{ zone = "ice", center = Vector3.new(130, 0, -230), enemies = { "orc", "icemage", "troll", "yeti" }, each = 2 },
-	{ zone = "dragon", center = Vector3.new(430, 0, -330), enemies = { "lizard", "imp", "drakeknight" }, each = 2 },
-	{ zone = "dragon", center = Vector3.new(255, 0, -250), enemies = { "lizard" }, each = 3, spread = 18 },
-	{ zone = "wild", center = Vector3.new(0, 0, -520), enemies = { "revimp", "revgob", "revknight", "revdragon" }, each = 2, spread = 150 },
+	{ name = "Slime Field", zone = "meadow", center = Vector3.new(-55, 0, 200), enemies = { "slime", "rat" }, each = 4 },
+	{ name = "Slime Pond", zone = "meadow", center = Vector3.new(-300, 0, 88), enemies = { "slime" }, each = 5, spread = 18 },
+	{ name = "Rat Burrows", zone = "meadow", center = Vector3.new(32, 0, 175), enemies = { "rat" }, each = 5, spread = 14 },
+	{ name = "Haunted Bog", zone = "swamp", center = Vector3.new(-90, 0, 355), enemies = { "bog", "wisp" }, each = 4 },
+	{ name = "Bog Pit", zone = "swamp", center = Vector3.new(-280, 0, 385), enemies = { "bog" }, each = 4, spread = 18 },
+	{ name = "Goblin Camp", zone = "forest", center = Vector3.new(-265, 0, -90), enemies = { "goblin", "gobarcher", "wolf" }, each = 3 },
+	{ name = "Wolf Den", zone = "forest", center = Vector3.new(-110, 0, 35), enemies = { "wolf" }, each = 5, spread = 16 },
+	{ name = "Bone Hall", zone = "caves", center = Vector3.new(-120, 0, -200), enemies = { "bat", "skeleton", "cultist" }, each = 3 },
+	{ name = "Cultist Crypt", zone = "caves", center = Vector3.new(-100, 0, -325), enemies = { "cultist", "skeleton" }, each = 3, spread = 16 },
+	{ name = "Bat Roost", zone = "caves", center = Vector3.new(-280, 0, -372), enemies = { "skeleton", "bat" }, each = 3, spread = 18 },
+	{ name = "Frost Camp", zone = "ice", center = Vector3.new(130, 0, -230), enemies = { "orc", "icemage", "troll", "yeti" }, each = 2 },
+	{ name = "Dragon's Nest", zone = "dragon", center = Vector3.new(430, 0, -330), enemies = { "lizard", "imp", "drakeknight" }, each = 3 },
+	{ name = "Lizard Flats", zone = "dragon", center = Vector3.new(255, 0, -250), enemies = { "lizard" }, each = 4, spread = 18 },
+	{ name = "Wraith Caves", zone = "wild", center = Vector3.new(0, 0, -520), enemies = { "revimp", "revgob", "revknight", "revdragon" }, each = 3, spread = 150 },
 }
+-- the camp's level range, for its sign and the map
+for _, camp in Combat.CAMPS do
+	local lo, hi = math.huge, 0
+	for _, id in camp.enemies do
+		lo = math.min(lo, Combat.ENEMIES[id].level)
+		hi = math.max(hi, Combat.ENEMIES[id].level)
+	end
+	camp.lo, camp.hi = lo, hi
+end
+
+Combat.AGGRO = 14 -- studs: a monster notices a hero this close (if the hero isn't more than twice its level)
+Combat.AUTO = 9 -- studs: walk this close to a monster and the hero draws their sword and fights
+Combat.LEASH = 34 -- studs from its camp spot a monster will chase before going home
 
 -- gear: one weapon and one armour set, by metal tier (web METAL_EQUIP / METAL_POWER / METAL_ARMOUR)
 Combat.METALS = { [0] = "Bronze", "Iron", "Steel", "Cobalt", "Verdite", "Skyrite", "Wyrmsteel" }

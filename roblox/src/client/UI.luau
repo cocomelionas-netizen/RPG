@@ -756,13 +756,13 @@ end
 local Combat = require(Shared.Combat)
 local function gearName(slot, t)
 	if t < 0 then
-		return slot == "weapon" and "Bare hands" or "No armour"
+		return slot == "weapon" and "Training Sword" or "No armour"
 	end
 	return Combat.METALS[t] .. (slot == "weapon" and " Sword" or " Armour")
 end
 do
 	local p = scroller("combat")
-	hint(p, "Tap a monster and your hero walks over and fights on their own and eats food (crops) when hurt. Buy gear at the ⚔️ Smithy in Riverbend.")
+	hint(p, "Walk up to a monster (or tap it) and your hero draws their sword and fights on their own, eating food (crops) when hurt. Monsters come for you if you get close! Better gear: ⚔️ Smithy in Riverbend.")
 	local head = card(p, 0, "⚔️")
 	head.row.Name = "CombatHead"
 	head.go.Visible = false

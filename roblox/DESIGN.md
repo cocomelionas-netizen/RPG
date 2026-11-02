@@ -148,3 +148,13 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
   – langinėse ir gėlių dėžėse. Stogai nepersidengia (tarp kambarių 1 stud tarpelis), todėl niekas nemirga.
 - Sklypai: akmeninis bortelis, balta tvorelė su vartais ir žibintais, pašto dėžutė, Synty krūmai, gėlės ir medžiai,
   medžiai palei gatves. Pasaulio kraštas – miškas, uolos ir kalvos, kad žemėlapis nesibaigtų dangumi.
+
+## Kova be mygtukų (atnaujinta)
+
+- Nereikia spausti F: priėjus prie monstro (9 stud) herojus pats išsitraukia kardą ir kovoja; bakstelėjus monstrą – nueina ir kovoja.
+- Monstrai vaikšto po savo stovyklą ir puola artėjantį herojų (14 stud), jei herojus ne daugiau nei 2× jų lygio (kaip OSRS).
+  Vienu metu herojų puola vienas monstras; nuo stovyklos jie toliau 34 stud nesivaiko. Mieste ir Hometown – saugu.
+- Stovyklos pažymėtos: išmintas ratas žemėje, laužas ir lentelė su pavadinimu ir lygiais (`Combat.CAMPS`, 14 stovyklų, ~100 monstrų).
+- Kardas – sugeneruotas modelis (`ServerStorage.AssetPacks.Weapons.Sword`), laikomas kaip įprasta Roblox; smūgis – Roblox'o
+  Slash, kas trečias – Lunge, plius metalo spalvos pėdsakas ir garsai. Visi turi bent „Training Sword“.
+- Monstrų animacijos klientuose (`MobAnim.luau`): kvėpavimas, ėjimas, šuolis pulti, raudonas blyksnis gavus smūgį, kritimas mirus.

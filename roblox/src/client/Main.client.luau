@@ -13,6 +13,8 @@ local Zones = require(Shared.Zones)
 local UI = require(script.Parent:WaitForChild("UI"))
 local BuildSpots = require(script.Parent:WaitForChild("BuildSpots"))
 local Interact = require(script.Parent:WaitForChild("Interact"))
+require(script.Parent:WaitForChild("MobAnim")).init()
+require(script.Parent:WaitForChild("HeroAnim")).init()
 Interact.init()
 
 local player = Players.LocalPlayer
