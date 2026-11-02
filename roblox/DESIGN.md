@@ -158,3 +158,13 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
 - Kardas – sugeneruotas modelis (`ServerStorage.AssetPacks.Weapons.Sword`), laikomas kaip įprasta Roblox; smūgis – Roblox'o
   Slash, kas trečias – Lunge, plius metalo spalvos pėdsakas ir garsai. Visi turi bent „Training Sword“.
 - Monstrų animacijos klientuose (`MobAnim.luau`): kvėpavimas, ėjimas, šuolis pulti, raudonas blyksnis gavus smūgį, kritimas mirus.
+
+## Įrankiai ir animacijos (atnaujinta)
+
+- Visi įrankiai – tikri modeliai (`AssetPacks.Weapons`): kardas 6,2 stud, kirvis, kirtiklis, meškerė 7 stud. Metalo lygis
+  matomas: kirvio/kirtiklio galvos spalva, kardo kibirkštys (daugiau – geresnis metalas) ir pėdsakas smūgio metu.
+- Savo animacijos (`Anims.luau`, 13 vnt., kuria `AnimBuilder`): laikymo pozos kiekvienam įrankiui (kardas nuleistas prie
+  šono, ašmenys į priekį kaip katanų žaidimuose; kirvis ant peties; kirtiklis abiem rankom; meškerė virš vandens) ir
+  veiksmai: 4 kardo smūgiai (įstrižas kirtis, kirtis iš viršaus, dūris, platus mostas – parenkami atsitiktinai, du kartus
+  iš eilės tas pats nesikartoja), kirvio kirtis į šoną, kirtiklio smūgis iš viršaus, meškerės užmetimas, pjūklo stūmis.
+- `HeroMotion` groja jas serveryje, todėl mato visi žaidėjai; laikymas prasideda paėmus įrankį ir baigiasi jį padėjus.

@@ -266,33 +266,6 @@ local function killEnemy(e, killer: Player?)
 	end)
 end
 
--- our sword slash animation on the hero (played on the server, so every player sees it); false if there is none
-local slashTracks = setmetatable({}, { __mode = "k" }) -- [Humanoid] = AnimationTrack
-local function playSlash(char: Model): boolean
-	if Combat.SLASH_ANIM == 0 then
-		return false
-	end
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	local animator = hum and hum:FindFirstChildOfClass("Animator")
-	if not animator then
-		return false
-	end
-	local track = slashTracks[hum]
-	if not track then
-		local anim = Instance.new("Animation")
-		anim.AnimationId = "rbxassetid://" .. Combat.SLASH_ANIM
-		local ok, t = pcall(animator.LoadAnimation, animator, anim)
-		if not ok then
-			return false
-		end
-		track = t
-		track.Priority = Enum.AnimationPriority.Action
-		slashTracks[hum] = track
-	end
-	track:Play(0.05, 1, rng:NextNumber(0.95, 1.1))
-	return true
-end
-
 -- the hero swings on their own until the fight ends
 local function fightLoop(player: Player, f)
 	task.spawn(function()
@@ -329,14 +302,12 @@ local function fightLoop(player: Player, f)
 				CombatService.stop(player, "moved")
 				return
 			end
-			-- face the target and swing: Roblox's own sword slash, a lunge every third swing (clients add the sound)
+			-- face the target and swing (clients add the sound)
 			hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(targetRoot.Position.X, hrp.Position.Y, targetRoot.Position.Z))
 			local char = player.Character
 			local n = (char:GetAttribute("Swing") or 0) + 1
 			char:SetAttribute("Swing", n)
-			if not playSlash(char) then
-				GatherService.swing(player, n % 3 == 0 and "Lunge" or "Slash")
-			end
+			GatherService.swing(player, n % 3 == 0 and "Lunge" or "Slash") -- one of our sword moves (HeroMotion)
 			local a = Combat.attackerStats(data)
 			local chance = Combat.hitChance(a.acc, defend.def + (defend.armour or 0) * 0.5)
 			if rng:NextNumber() >= chance then

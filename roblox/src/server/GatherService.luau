@@ -14,6 +14,7 @@ local HouseGrid = require(Shared.HouseGrid)
 local Farming = require(Shared.Farming)
 local DataService = require(script.Parent.DataService)
 local ToolFactory = require(script.Parent.ToolFactory)
+local HeroMotion = require(script.Parent.HeroMotion)
 
 local GatherService = {}
 
@@ -64,8 +65,12 @@ local function equip(player: Player, skill: string)
 	return tool
 end
 
--- the default Animate script plays the tool slash animation when a "toolanim" value appears in the held tool
+-- our own move for the tool (HeroMotion); without one, the default Animate script plays the tool slash animation
+-- when a "toolanim" value appears in the held tool
 local function swing(tool: Tool?, kind: string?)
+	if tool and tool.Parent and HeroMotion.act(tool.Parent, tool:GetAttribute("Kind")) then
+		return
+	end
 	if tool and tool.Parent then
 		local v = Instance.new("StringValue")
 		v.Name = "toolanim"

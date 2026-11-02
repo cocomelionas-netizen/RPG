@@ -43,4 +43,10 @@ Pasaulis (kelias, 5 zonos, medžiai, uolos, tvenkiniai) sukuriamas kodu paleidus
   pritaiko dydį; Wraith Caves monstrai – tie patys modeliai, permatomi. Jei modelio nėra (pvz. Will-o'-Wisp), lieka detalės.
 - UI ikonos – Google „Noto Emoji“ 3D paveikslėliai (Apache License 2.0), įkelti į Roblox; ID sąrašas `src/shared/Icons.luau`.
   `UI.luau` `iconize()` pakeičia etiketę su vienu emoji tokiu paveikslėliu.
+- `ServerStorage.AssetPacks.Weapons` – kardas, kirvis, kirtiklis ir meškerė, sugeneruoti Roblox mesh generatoriumi
+  (place faile). `ToolFactory` juos klonuoja kaip įrankio Handle; jei jų nėra, įrankis sudedamas iš detalių.
+- `ServerStorage.Animations` – mūsų animacijų šaltiniai (KeyframeSequence), kuriuos sukuria `src/server/AnimBuilder.luau`
+  (Studio komandų juostoje: `require(game.ServerScriptService.Server.AnimBuilder)()`). Pakeitus pozą: perstatyti,
+  dešiniu klavišu > Save / Export > Save to Roblox, naują ID įrašyti į `src/shared/Anims.luau`. Animacijas groti gali tik
+  jų savininkas, todėl jos įkeltos žaidimo savininko vardu.
 - Naujus modelius imti tik iš patvirtintų kūrėjų (geriausia „Roblox“), botų keliamuose dažnai būna kenkėjiškų skriptų.
