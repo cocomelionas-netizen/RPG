@@ -46,7 +46,8 @@ local ACCENT = {
 	spot = Color3.fromRGB(230, 170, 40),
 	seeds = Color3.fromRGB(90, 180, 70),
 	plant = Color3.fromRGB(90, 180, 70),
-	travel = Color3.fromRGB(200, 110, 200),
+	travel = Color3.fromRGB(60, 180, 200),
+	home = Color3.fromRGB(200, 110, 200),
 	combat = Color3.fromRGB(220, 80, 80),
 	smithy = Color3.fromRGB(150, 150, 165),
 }
@@ -272,7 +273,7 @@ local windowScale = new("UIScale", { Parent = window })
 
 local panels = {}
 local renderers = {}
-local TITLES = { bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏗️ My House", craft = "🔨 Workbench", spot = "➕ What to build here?", seeds = "🌱 Seed Stall", plant = "🌱 Plant", combat = "⚔️ Combat", smithy = "⚔️ Smithy" }
+local TITLES = { bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏗️ My House", craft = "🔨 Workbench", spot = "➕ What to build here?", seeds = "🌱 Seed Stall", plant = "🌱 Plant", combat = "⚔️ Combat", smithy = "⚔️ Smithy", travel = "🗺️ Map" }
 
 local function showPanel(name)
 	if openPanel == name or not name then
@@ -315,14 +316,14 @@ local function menuButton(name, icon, label, color, onClick)
 	menuButtons[name] = { button = b, stroke = st, icon = i, label = l, dot = dot, color = color }
 	return menuButtons[name]
 end
-for _, m in { { "bag", "🎒", "Bag" }, { "skills", "📊", "Skills" }, { "tools", "🛠️", "Tools" }, { "house", "🏗️", "House" }, { "combat", "⚔️", "Combat" } } do
+for _, m in { { "bag", "🎒", "Bag" }, { "skills", "📊", "Skills" }, { "tools", "🛠️", "Tools" }, { "house", "🏗️", "House" }, { "combat", "⚔️", "Combat" }, { "travel", "🗺️", "Map" } } do
 	menuButton(m[1], m[2], m[3], ACCENT[m[1]], function()
 		showPanel(m[1])
 	end)
 end
 -- travel between Hometown and the road (the button flips depending on where the hero is)
 local travelGoesHome = true
-local travel = menuButton("home", "🏡", "Go home", ACCENT.travel, function()
+local travel = menuButton("home", "🏡", "Go home", ACCENT.home, function()
 	request("home", travelGoesHome and "home" or "road")
 end)
 task.spawn(function()
@@ -834,6 +835,73 @@ do
 				c.detail.Text = "Now: " .. gearName(slot, g[slot]) .. "   " .. costText({}, cost)
 				local ok = XP.levelFromXp(state.skills[skill] or 0) >= Combat.EQUIP_REQ[t] and state.gold >= cost
 				setButton(c.go, "Buy", ok)
+			end
+		end
+	end
+end
+
+-- --- Map: teleport to any zone whose waystone you have found ---
+do
+	local p = scroller("travel")
+	hint(p, "Walk into a zone once to unlock its 🗺️ Waystone. Then teleport there from here, or tap any waystone.")
+	local ALWAYS = { town = true, meadow = true, home = true }
+	local ORDER = { "home", "town", "meadow", "forest", "swamp", "caves", "ice", "dragon", "wild" }
+	-- what each zone holds: monsters from the camps, resources from the zone's nodes
+	local monsters = {}
+	for _, camp in Combat.CAMPS do
+		monsters[camp.zone] = monsters[camp.zone] or {}
+		for _, id in camp.enemies do
+			local name = Combat.ENEMIES[id].name
+			if not table.find(monsters[camp.zone], name) then
+				table.insert(monsters[camp.zone], name)
+			end
+		end
+	end
+	local rows = {}
+	for i, id in ORDER do
+		local z = Zones.byId[id]
+		local c = card(p, i, z.icon)
+		c.row.Name = "Zone_" .. id
+		c.go.Name = "Go_" .. id
+		c.go.Activated:Connect(function()
+			request("travel", id)
+			showPanel(nil)
+		end)
+		local found = {}
+		for _, skill in { "woodcutting", "mining", "fishing" } do
+			if z.res[skill] then
+				table.insert(found, Skills.byId[skill].icon .. " " .. ({ woodcutting = "Trees", mining = "Rocks", fishing = "Fish" })[skill])
+			end
+		end
+		if z.home then
+			found = { "🏡 Your house", "🌱 Garden", "🔨 Workbench" }
+		elseif z.town then
+			found = { "⚔️ Smithy", "🌱 Seed Stall" }
+		end
+		c.detail.Text = table.concat(found, "  ·  ")
+		rows[id] = { card = c, zone = z }
+	end
+	renderers.travel = function()
+		if not state then return end
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local here = hrp and Zones.LIST[Zones.indexAt(hrp.Position.X, hrp.Position.Z)].id
+		local lvl = Combat.combatLevel(state.skills)
+		for id, r in rows do
+			local z, c = r.zone, r.card
+			c.title.Text = z.name .. ((z.home or z.town) and "" or ("  ·  Lv " .. z.req .. "+"))
+			local mobs = monsters[id]
+			c.info.Text = mobs and ("Monsters: " .. table.concat(mobs, ", ")) or z.desc
+			c.info.TextColor3 = z.wild and C.warn or (mobs and Color3.fromRGB(255, 160, 140) or C.good)
+			local open = ALWAYS[id] or (state.visited and state.visited[id])
+			if id == here and not z.home then
+				setButton(c.go, "You are here", false)
+			elseif z.wild and lvl < Combat.WILD_REQ then
+				setButton(c.go, ("🔒 Combat %d"):format(Combat.WILD_REQ), false)
+			elseif not open then
+				setButton(c.go, "🔒 Find it first", false)
+			else
+				setButton(c.go, z.home and "🏡 Go home" or "Teleport", true, z.wild and Color3.fromRGB(200, 70, 70) or Color3.fromRGB(60, 170, 190))
 			end
 		end
 	end

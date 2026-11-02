@@ -71,6 +71,8 @@ local function prop(name: string, parent: Instance, pos: Vector3, h: number, rot
 	return c
 end
 
+WorldBuilder.prop = prop -- Hometown dresses its plots with the same pack
+
 local function pick(rng, list)
 	return list[rng:NextInteger(1, #list)]
 end
@@ -928,6 +930,86 @@ function WorldBuilder.build()
 	-- the north gate: Wraith Caves (PvP) come later
 	local b = Zones.BOUNDS
 	archGate(roads, Vector3.new(0, 0, -392), false, "☠️ Wraith Caves", ("PvP zone · Combat %d+"):format(Zones.byId.wild.req))
+
+	-- the edge of the world: a band of ground in the next zone's colours, a thick wood (or rocks in the mountains,
+	-- caves and lava) and big hills behind it, so the map never just ends in the sky
+	local edge = Instance.new("Folder")
+	edge.Name = "WorldEdge"
+	edge.Parent = world
+	local erng = Random.new(77)
+	local BAND = 140
+	local function themeAt(x, z)
+		x, z = math.clamp(x, b.x0 + 1, b.x1 - 1), math.clamp(z, b.z0 + 1, b.z1 - 1)
+		local zone = Zones.LIST[Zones.indexAt(x, z)]
+		if not Zones.contains(zone, x, z) then -- the corners beside the Wraith Caves
+			return x < 0 and Zones.byId.caves.th or Zones.byId.dragon.th
+		end
+		return zone.th
+	end
+	-- ground tiles (clipped at the band's end) a little below the zones' ground, so the two never fight
+	local TILE = 70
+	local function band(x0, z0, x1, z1)
+		for x = x0, x1 - 1, TILE do
+			for z = z0, z1 - 1, TILE do
+				local w, d = math.min(TILE, x1 - x), math.min(TILE, z1 - z)
+				local th = themeAt(x + w / 2, z + d / 2)
+				part({ Name = "EdgeGround", Size = Vector3.new(w, 4, d), CFrame = CFrame.new(x + w / 2, -2.3, z + d / 2), Color = hex(th.ground), Material = Enum.Material[th.material], Parent = edge })
+			end
+		end
+	end
+	band(b.x0 - BAND, b.z0 - BAND, b.x1 + BAND, b.z0) -- north
+	band(b.x0 - BAND, b.z1, b.x1 + BAND, b.z1 + BAND) -- south
+	band(b.x0 - BAND, b.z0, b.x0, b.z1) -- west
+	band(b.x1, b.z0, b.x1 + BAND, b.z1) -- east
+	-- the two corners beside the Wraith Caves belong to no zone: rocky high ground in the colours of the zone below
+	local wildRect = Zones.byId.wild.rect
+	for _, c in { { b.x0, wildRect[1], Zones.byId.caves.th }, { wildRect[3], b.x1, Zones.byId.dragon.th } } do
+		local x0, x1, th = c[1], c[2], c[3]
+		part({ Name = "EdgeGround", Size = Vector3.new(x1 - x0, 4, wildRect[4] - b.z0), CFrame = CFrame.new((x0 + x1) / 2, -2.3, (b.z0 + wildRect[4]) / 2), Color = hex(th.ground), Material = Enum.Material[th.material], Parent = edge })
+		for x = x0 + 20, x1 - 20, 36 do
+			for z = b.z0 + 20, wildRect[4] - 20, 36 do
+				prop("PolygonNature_Rock_Cluster_Large_04", edge, Vector3.new(x + erng:NextNumber(-8, 8), 0, z + erng:NextNumber(-8, 8)), erng:NextNumber(30, 70), erng:NextNumber(0, 6.3), true)
+			end
+		end
+	end
+	local function around(step, offset, fn)
+		local pts = {}
+		for x = b.x0 - offset, b.x1 + offset, step do
+			table.insert(pts, Vector3.new(x, 0, b.z0 - offset))
+			table.insert(pts, Vector3.new(x, 0, b.z1 + offset))
+		end
+		for z = b.z0 - offset, b.z1 + offset, step do
+			table.insert(pts, Vector3.new(b.x0 - offset, 0, z))
+			table.insert(pts, Vector3.new(b.x1 + offset, 0, z))
+		end
+		for _, p in pts do
+			fn(p + Vector3.new(erng:NextNumber(-5, 5), 0, erng:NextNumber(-5, 5)), themeAt(p.X, p.Z))
+		end
+	end
+	local function rocky(th)
+		return th.cave or th.snow or th.lava
+	end
+	for _, row in { { 16, 12 }, { 20, 34 }, { 24, 58 } } do
+		around(row[1], row[2], function(p, th)
+			if rocky(th) then
+				prop(pick(erng, { "PolygonNature_Rock_Cluster_Large_04", "PolygonNature_Rock_Pile_01", "PolygonNature_Rock_Pile_03" }), edge, p, erng:NextNumber(14, 30), erng:NextNumber(0, 6.3))
+			elseif th.swamp then
+				prop(pick(erng, { "PolygonNature_Tree_Swamp_01", "PolygonNature_Tree_Swamp_03", "Willow_Tree_Willow_Medium_01" }), edge, p, erng:NextNumber(20, 30), erng:NextNumber(0, 6.3))
+			else
+				prop(pick(erng, { "Pine_Tree_Pine_02", "Pine_Tree_Pine_Large_01", "PolygonNature_Tree_PolyPine_01", "PolygonNature_Tree_Round_03", "PolygonNature_Tree_02" }), edge, p, erng:NextNumber(22, 36), erng:NextNumber(0, 6.3))
+			end
+		end)
+	end
+	around(48, 110, function(p, th)
+		local hill = prop("PolygonNature_Rock_Cluster_Large_04", edge, p, erng:NextNumber(55, 95), erng:NextNumber(0, 6.3))
+		if hill and not rocky(th) then
+			for _, d in hill:GetDescendants() do
+				if d:IsA("BasePart") then
+					d.Color = hex(th.ground):Lerp(Color3.fromRGB(70, 90, 60), 0.4)
+				end
+			end
+		end
+	end)
 
 	-- invisible walls around the map
 	local function wall(cf, s)

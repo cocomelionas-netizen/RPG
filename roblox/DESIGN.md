@@ -137,3 +137,14 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
   paspaudus žemę – eina ten. Telefone iššokantys E/F mygtukai paslėpti (advisor: aiškumas, mažiau triukšmo).
 - **Haunted Swamp** (pietūs, 20+): Bog Horror, Will-o'-Wisp, žvejyba. Daugiau monstrų stovyklų visose zonose (`Combat.CAMPS`).
 - Medžiai, uolos ir dekoracijos – Synty Nature Pack modeliai.
+
+## Kelionės ir Hometown (atnaujinta)
+
+- 🗺️ Waystone kiekvienoje zonoje prie kelio (`Zones.stone`, `TravelService`). Užėjus į zoną pirmą kartą akmuo atsirakina
+  (`data.visited`); tada 🗺️ Map lange arba bakstelėjus bet kurį akmenį – teleportas. Riverbend, Meadow ir namai atviri visada.
+  Kaip OSRS: iš kovos Wraith Caves teleportuotis negalima (10 s po smūgio), Wraith Caves – tik nuo kovos lygio 20.
+- Map lange kiekviena zona rodo lygį, monstrus ir ką galima rinkti. Swamp gavo medžius, Wraith Caves – geriausias rūdas.
+- Namas – vienas pastatas: tarp gretimų kambarių nėra sienų, visi kambariai su tuo pačiu stogu ir sienomis, kambario spalva
+  – langinėse ir gėlių dėžėse. Stogai nepersidengia (tarp kambarių 1 stud tarpelis), todėl niekas nemirga.
+- Sklypai: akmeninis bortelis, balta tvorelė su vartais ir žibintais, pašto dėžutė, Synty krūmai, gėlės ir medžiai,
+  medžiai palei gatves. Pasaulio kraštas – miškas, uolos ir kalvos, kad žemėlapis nesibaigtų dangumi.

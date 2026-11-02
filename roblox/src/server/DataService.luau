@@ -63,6 +63,7 @@ local function defaultData()
 		created = os.time(),
 		stats = { actions = 0, offlineSeconds = 0, sold = 0, homeTrips = 0, made = {} },
 		goal = 1, -- index into Goals.LIST: the next-goal guide
+		visited = {}, -- [zoneId] = true: waystones unlocked by walking into the zone (TravelService)
 	}
 end
 
@@ -135,6 +136,9 @@ local function reconcile(data)
 	if type(data.farm) ~= "table" or type(data.farm.patches) ~= "table" then
 		data.farm = def.farm
 	end
+	if type(data.visited) ~= "table" then
+		data.visited = {}
+	end
 	if type(data.goal) ~= "number" then
 		data.goal = 1
 	end
@@ -167,6 +171,7 @@ function DataService.view(data)
 		stats = { sold = data.stats.sold, homeTrips = data.stats.homeTrips, made = data.stats.made, planted = data.stats.planted, harvested = data.stats.harvested, seedsBought = data.stats.seedsBought },
 		goal = data.goal, farm = data.farm.patches, now = os.time(),
 		gear = data.gear, combat = data.combat, caveLoot = data.caveLoot, kills = data.stats.kills or 0,
+		visited = data.visited,
 		memoryOnly = memoryOnly,
 	}
 end

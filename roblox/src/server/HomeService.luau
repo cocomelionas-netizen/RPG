@@ -16,6 +16,7 @@ local Farming = require(Shared.Farming)
 local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local GatherService = require(script.Parent.GatherService)
+local WorldBuilder = require(script.Parent.WorldBuilder)
 
 local HomeService = {}
 
@@ -210,28 +211,41 @@ local STATIONS = {
 	end,
 }
 
--- one room on its cell, a small cottage: stone base, timber corners, pastel walls with windows and a doorway on every side
--- (so rooms that touch become one walkable house), a pitched roof in the room's colour, its icon over the doors and props.
+-- one room on its cell. Rooms that touch have no wall between them, and every room shares the same cream walls and
+-- red roof, so the rooms read as one house; the room's own colour is on its shutters and flower boxes, its icon over the roof.
+-- open[side] = a neighbouring room on that side (0 = +Z, 1 = +X, 2 = -Z, 3 = -X). Only the Entrance Hall has front doors.
 -- Every level shows: 2 flower boxes, 3 a smoking chimney, 4 a golden ridge, 5 a flag on the roof.
-local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: string, level: number, color: Color3, fresh: boolean?)
+local HOUSE_WALL = hex("#f4ead8")
+local HOUSE_ROOF = hex("#c0503a")
+local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: string, level: number, color: Color3, fresh: boolean?, open)
+	open = open or {}
 	local f = Instance.new("Model")
 	f.Name = id
 	local h = 10
 	local wood = hex("#6b4a2b")
-	local wallColor = id == "entrance" and hex("#f4ead8") or color:Lerp(Color3.new(1, 1, 1), 0.62)
-	local roofColor = id == "entrance" and hex("#c0503a") or color:Lerp(Color3.new(0, 0, 0), 0.15)
+	local wallColor = HOUSE_WALL
+	local roofColor = HOUSE_ROOF
+	local accent = id == "entrance" and hex("#4a8ad0") or color
 	part({ Name = "Base", Size = Vector3.new(CELL, 1, CELL), CFrame = cf * CFrame.new(0, 0.5, 0), Color = hex("#9a948c"), Material = Enum.Material.Cobblestone, Parent = f })
 	part({ Name = "Floor", Size = Vector3.new(CELL - 1.4, 0.2, CELL - 1.4), CFrame = cf * CFrame.new(0, 1.05, 0), Color = hex("#c9a070"), Material = Enum.Material.WoodPlanks, Parent = f })
 	local door, inset = 5, CELL / 2 - 0.6
 	local seg = (CELL - 1.2 - door) / 2
 	for side = 0, 3 do
 		local rot = cf * CFrame.Angles(0, side * math.pi / 2, 0)
+		-- timber corner post
+		part({ Size = Vector3.new(1.2, h, 1.2), CFrame = rot * CFrame.new(inset, 1 + h / 2, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
+		if open[side] then
+			continue -- the next room carries on here
+		end
 		for _, s in { -1, 1 } do
 			local wx = s * (door / 2 + seg / 2)
 			part({ Size = Vector3.new(seg, h, 0.8), CFrame = rot * CFrame.new(wx, 1 + h / 2, inset), Color = wallColor, Material = Enum.Material.SmoothPlastic, Parent = f })
 			-- window with a white frame and warm light
 			part({ Size = Vector3.new(2.8, 2.8, 0.9), CFrame = rot * CFrame.new(wx, 6.2, inset), Color = Color3.new(1, 1, 1), Material = Enum.Material.SmoothPlastic, Parent = f })
 			part({ Size = Vector3.new(2.2, 2.2, 1), CFrame = rot * CFrame.new(wx, 6.2, inset), Color = hex("#ffe2a0"), Material = Enum.Material.Neon, Transparency = 0.25, Parent = f })
+			for _, k in { -1, 1 } do -- shutters in the room's colour
+				part({ Size = Vector3.new(1.1, 2.8, 0.3), CFrame = rot * CFrame.new(wx + k * 2.1, 6.2, inset + 0.5), Color = accent, Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = f })
+			end
 			if level >= 2 then
 				part({ Size = Vector3.new(3, 0.8, 1), CFrame = rot * CFrame.new(wx, 4.5, inset + 0.8), Color = wood, Material = Enum.Material.Wood, Parent = f })
 				for k = -1, 1 do
@@ -240,28 +254,48 @@ local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: str
 			end
 		end
 		part({ Size = Vector3.new(door, h - 7, 0.8), CFrame = rot * CFrame.new(0, 8 + (h - 7) / 2, inset), Color = wallColor, Material = Enum.Material.SmoothPlastic, Parent = f })
-		-- door frame
-		for _, s in { -1, 1 } do
-			part({ Size = Vector3.new(0.5, 7, 1), CFrame = rot * CFrame.new(s * (door / 2 + 0.25), 4.5, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
+		if id == "entrance" then
+			-- an open front door in a wooden frame, with a doormat
+			for _, s in { -1, 1 } do
+				part({ Size = Vector3.new(0.5, 7, 1), CFrame = rot * CFrame.new(s * (door / 2 + 0.25), 4.5, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
+			end
+			part({ Size = Vector3.new(door + 1, 0.5, 1), CFrame = rot * CFrame.new(0, 8.2, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
+			part({ Size = Vector3.new(0.3, 7, door - 0.4), CFrame = rot * CFrame.new(door / 2 - 0.1, 4.5, inset + door / 2 - 0.2), Color = accent, Material = Enum.Material.WoodPlanks, CanCollide = false, Parent = f })
+			part({ Size = Vector3.new(door - 1, 0.1, 2.4), CFrame = rot * CFrame.new(0, 1.05, inset + 1.8), Color = hex("#a0603a"), Material = Enum.Material.Fabric, CanCollide = false, Parent = f })
+		else
+			-- no door here: the wall goes on, with a flower box in the room's colour
+			part({ Size = Vector3.new(door, 7, 0.8), CFrame = rot * CFrame.new(0, 4.5, inset), Color = wallColor, Material = Enum.Material.SmoothPlastic, Parent = f })
+			part({ Size = Vector3.new(door - 1, 0.6, 1.2), CFrame = rot * CFrame.new(0, 3.2, inset + 0.6), Color = accent, Material = Enum.Material.WoodPlanks, Parent = f })
 		end
-		part({ Size = Vector3.new(door + 1, 0.5, 1), CFrame = rot * CFrame.new(0, 8.2, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
-		-- timber corner post
-		part({ Size = Vector3.new(1.2, h, 1.2), CFrame = rot * CFrame.new(inset, 1 + h / 2, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
+		-- a strip of timber along the top of the outside walls
+		part({ Size = Vector3.new(CELL - 1.2, 0.7, 1), CFrame = rot * CFrame.new(0, 1 + h - 0.35, inset), Color = wood, Material = Enum.Material.Wood, Parent = f })
 	end
-	-- pitched roof with an overhang
+	-- pitched roof with an overhang; the ridge runs along the row of rooms so neighbours share one long roof
 	local top = 1 + h
 	local rise = 5
-	local half = CELL / 2 + 1
+	local turned = (open[0] or open[2]) and not (open[1] or open[3])
+	local roofCf = turned and cf * CFrame.Angles(0, math.pi / 2, 0) or cf
+	-- roof edges: 1 stud of overhang over the garden, and stopping half a stud short of a neighbouring room, so two
+	-- roofs never overlap (overlapping parts flicker) and a thin gap shows where one room ends
+	local px, nx, pz, nz = 1, 3, 0, 2 -- the side each roof-local direction (+X, -X, +Z, -Z) faces
+	if turned then
+		px, nx, pz, nz = 2, 0, 1, 3
+	end
+	local function edge(side)
+		return CELL / 2 + (open[side] and -0.5 or 1)
+	end
+	local len, mid = edge(px) + edge(nx), (edge(px) - edge(nx)) / 2
 	for _, s in { -1, 1 } do
+		local depth = edge(s > 0 and pz or nz)
 		local w = Instance.new("WedgePart")
 		w.Anchored = true
-		w.Size = Vector3.new(CELL, rise, half) -- no overhang along the ridge: neighbours' roofs would overlap and flicker
-		w.CFrame = cf * CFrame.new(0, top + rise / 2, s * half / 2) * CFrame.Angles(0, s > 0 and math.pi or 0, 0)
+		w.Size = Vector3.new(len, rise, depth)
+		w.CFrame = roofCf * CFrame.new(mid, top + rise / 2, s * depth / 2) * CFrame.Angles(0, s > 0 and math.pi or 0, 0)
 		w.Color = roofColor
 		w.Material = Enum.Material.SmoothPlastic
 		w.Parent = f
 	end
-	part({ Name = "Ridge", Size = Vector3.new(CELL - 0.1, 0.6, 0.8), CFrame = cf * CFrame.new(0, top + rise, 0), Color = level >= 4 and hex("#ffd24a") or wood, Material = level >= 4 and Enum.Material.Neon or Enum.Material.Wood, Parent = f })
+	part({ Name = "Ridge", Size = Vector3.new(len - 0.2, 0.6, 0.8), CFrame = roofCf * CFrame.new(mid, top + rise, 0), Color = level >= 4 and hex("#ffd24a") or wood, Material = level >= 4 and Enum.Material.Neon or Enum.Material.Wood, Parent = f })
 	local light = Instance.new("PointLight")
 	light.Color = Color3.fromRGB(255, 225, 170)
 	light.Range = 16
@@ -277,7 +311,7 @@ local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: str
 	end
 	if level >= 5 then
 		part({ Size = Vector3.new(0.3, 5, 0.3), CFrame = cf * CFrame.new(-CELL / 2 + 1, top + rise + 2, 0), Color = wood, Material = Enum.Material.Wood, Parent = f })
-		part({ Size = Vector3.new(0.1, 1.8, 2.8), CFrame = cf * CFrame.new(-CELL / 2 + 1, top + rise + 3.6, 1.5), Color = color, Material = Enum.Material.Fabric, Parent = f })
+		part({ Size = Vector3.new(0.1, 1.8, 2.8), CFrame = cf * CFrame.new(-CELL / 2 + 1, top + rise + 3.6, 1.5), Color = accent, Material = Enum.Material.Fabric, Parent = f })
 	end
 	if FURNITURE[id] then
 		FURNITURE[id](f, cf * CFrame.new(0, 0.7, 0))
@@ -357,28 +391,54 @@ local function makePlot(parent, index: number)
 	model.Name = "Plot_" .. index
 	model:SetAttribute("PlotIndex", index)
 	local half = PLOT / 2
+	part({ Name = "Kerb", Size = Vector3.new(PLOT + 3, 0.5, PLOT + 3), CFrame = CFrame.new(center + Vector3.new(0, -0.05, 0)), Color = hex("#b8b0a4"), Material = Enum.Material.Cobblestone, Parent = model })
 	part({ Name = "Lawn", Size = Vector3.new(PLOT, 0.4, PLOT), CFrame = CFrame.new(center + Vector3.new(0, 0.05, 0)), Color = hex("#74b850"), Material = Enum.Material.Grass, Parent = model })
-	-- a few flower beds and bushes along the fence so an empty plot still looks like a garden
+	-- the garden strip between the fence and the house: bushes and flowers along the north and east fences,
+	-- two small trees in the north corners (the south strip is the vegetable garden)
 	local rng = Random.new(index * 7)
-	for i = 1, 10 do
-		local side = i % 4
-		local t = rng:NextNumber(-half + 10, half - 10)
-		local off = (side == 0 or side == 3) and Vector3.new(t, 0, -half + 4) or Vector3.new(half - 4, 0, t * 0.6)
-		local flower = ({ "#ff7aa8", "#ffd84a", "#b07aff", "#ff8a4a" })[i % 4 + 1]
-		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(4, 3, 4), CFrame = CFrame.new(center + off + Vector3.new(0, 1.2, 0)), Color = hex("#4f9a3c"), Material = Enum.Material.Grass, CanCollide = false, Parent = model })
-		for k = 1, 3 do
-			part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.9, 0.9, 0.9), CFrame = CFrame.new(center + off + Vector3.new(rng:NextNumber(-1.5, 1.5), 2.6, rng:NextNumber(-1.5, 1.5))), Color = hex(flower), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = model })
+	local prop = WorldBuilder.prop
+	local PLANTS = { "PurpleFlower", "PolygonNature_Plant_Flowers_01", "Bush_Plant_Bush_Leaves_03", "PolygonNature_Plant_Bush_01", "PolygonNature_Plant_Bush_02", "Fern_Plant_Fern_Leaves_01" }
+	for t = -half + 14, half - 14, 9 do
+		for _, off in { Vector3.new(t, 0, -half + 4), Vector3.new(half - 4, 0, t * 0.75) } do
+			prop(PLANTS[rng:NextInteger(1, #PLANTS)], model, center + off, rng:NextNumber(2.2, 3.6), rng:NextNumber(0, 6.3))
 		end
 	end
-	-- fence with a gate on the west side, facing the street
-	local fence = hex("#f0ece4")
-	part({ Size = Vector3.new(PLOT, 2.4, 0.5), CFrame = CFrame.new(center + Vector3.new(0, 1.2, -half)), Color = fence, Material = Enum.Material.Wood, Parent = model })
-	part({ Size = Vector3.new(PLOT, 2.4, 0.5), CFrame = CFrame.new(center + Vector3.new(0, 1.2, half)), Color = fence, Material = Enum.Material.Wood, Parent = model })
-	part({ Size = Vector3.new(0.5, 2.4, PLOT), CFrame = CFrame.new(center + Vector3.new(half, 1.2, 0)), Color = fence, Material = Enum.Material.Wood, Parent = model })
-	local gate = 14
-	for _, s in { -1, 1 } do
-		part({ Size = Vector3.new(0.5, 2.4, half - gate / 2), CFrame = CFrame.new(center + Vector3.new(-half, 1.2, s * (gate / 2 + (half - gate / 2) / 2))), Color = fence, Material = Enum.Material.Wood, Parent = model })
+	for _, x in { -1, 1 } do
+		prop("Birch_Tree_Birch_02", model, center + Vector3.new(x * (half - 5), 0, -half + 5), 11, rng:NextNumber(0, 6.3), true)
 	end
+	-- a white picket fence with a gate on the west side, facing the street
+	local fence = hex("#f4f0e8")
+	local gate = 14
+	local function fenceRun(a: Vector3, b: Vector3)
+		local len = (b - a).Magnitude
+		local mid = center + (a + b) / 2
+		local look = CFrame.lookAt(mid, mid + (b - a))
+		for _, y in { 1, 2.1 } do
+			part({ Size = Vector3.new(0.3, 0.4, len), CFrame = look * CFrame.new(0, y, 0), Color = fence, Material = Enum.Material.SmoothPlastic, Parent = model })
+		end
+		for d = 0, len, 2.4 do
+			part({ Size = Vector3.new(0.5, 2.8, 0.5), CFrame = look * CFrame.new(0, 1.4, -len / 2 + d), Color = fence, Material = Enum.Material.SmoothPlastic, Parent = model })
+		end
+	end
+	fenceRun(Vector3.new(-half, 0, -half), Vector3.new(half, 0, -half))
+	fenceRun(Vector3.new(-half, 0, half), Vector3.new(half, 0, half))
+	fenceRun(Vector3.new(half, 0, -half), Vector3.new(half, 0, half))
+	fenceRun(Vector3.new(-half, 0, -half), Vector3.new(-half, 0, -gate / 2))
+	fenceRun(Vector3.new(-half, 0, gate / 2), Vector3.new(-half, 0, half))
+	for _, s in { -1, 1 } do -- gate posts with lanterns
+		local post = part({ Size = Vector3.new(1.2, 4.5, 1.2), CFrame = CFrame.new(center + Vector3.new(-half, 2.25, s * (gate / 2 + 0.6))), Color = hex("#8a6a44"), Material = Enum.Material.Wood, Parent = model })
+		local lantern = part({ Size = Vector3.new(0.9, 0.9, 0.9), CFrame = post.CFrame * CFrame.new(0, 2.7, 0), Color = hex("#ffe6a0"), Material = Enum.Material.Neon, CanCollide = false, Parent = model })
+		local l = Instance.new("PointLight")
+		l.Range = 12
+		l.Brightness = 0.8
+		l.Color = lantern.Color
+		l.Parent = lantern
+	end
+	-- a mailbox by the gate
+	local mail = center + Vector3.new(-half - 3, 0, gate / 2 + 4)
+	part({ Size = Vector3.new(0.5, 3.4, 0.5), CFrame = CFrame.new(mail + Vector3.new(0, 1.7, 0)), Color = hex("#6b4a2b"), Material = Enum.Material.Wood, Parent = model })
+	part({ Size = Vector3.new(2.2, 1.4, 1.3), CFrame = CFrame.new(mail + Vector3.new(0, 4, 0)), Color = hex("#4a8ad0"), Material = Enum.Material.SmoothPlastic, Parent = model })
+	part({ Size = Vector3.new(0.15, 0.9, 0.5), CFrame = CFrame.new(mail + Vector3.new(0.6, 4.6, -0.75)), Color = hex("#e04a4a"), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = model })
 	-- path from the street through the gate to the foundation
 	local streetX = center.X - half - 23
 	local pathEnd = center.X - HouseGrid.SIZE * CELL / 2
@@ -428,13 +488,22 @@ local function renderHouse(plot, fresh: string?)
 	local function cellCF(x, z)
 		return CFrame.new(plot.center + HouseGrid.cellOffset(x, z))
 	end
+	-- which sides of a cell have another room next to them
+	local cells = HouseGrid.occupied(data.home.layout)
+	local function openSides(c)
+		local o = {}
+		for side, d in { [0] = { 0, 1 }, { 1, 0 }, { 0, -1 }, { -1, 0 } } do
+			o[side] = cells[(c.x + d[1]) .. "," .. (c.z + d[2])] ~= nil
+		end
+		return o
+	end
 	for id, c in data.home.layout do
 		local r = Construction.byId[id]
 		local t = data.home.rooms[id] or 0
 		if id == HouseGrid.START then
-			buildRoom(plot.rooms, cellCF(c.x, c.z), "entrance", "Entrance Hall", "🏡", 0, hex("#b0a090"), fresh == id)
+			buildRoom(plot.rooms, cellCF(c.x, c.z), "entrance", "Entrance Hall", "🏡", 0, hex("#b0a090"), fresh == id, openSides(c))
 		elseif r and t > 0 then
-			buildRoom(plot.rooms, cellCF(c.x, c.z), id, r.name, r.icon, t, hex(r.color), fresh == id)
+			buildRoom(plot.rooms, cellCF(c.x, c.z), id, r.name, r.icon, t, hex(r.color), fresh == id, openSides(c))
 		end
 	end
 	local lvl = HouseGrid.houseLevel(data.home.rooms)
@@ -493,6 +562,21 @@ function HomeService.buildTown(world: Instance)
 	plotsFolder.Parent = folder
 	for i = 1, #PLOT_X * #PLOT_Z do
 		table.insert(plots, makePlot(plotsFolder, i))
+	end
+	-- trees along the east side of every street, between the street lamps and the plots, away from the gates
+	local rng = Random.new(99)
+	for _, x in { 67, 212, 357 } do
+		for z = -125, 250, 26 do
+			local nearGate = false
+			for _, pz in PLOT_Z do
+				if math.abs(z - pz) < 14 then
+					nearGate = true
+				end
+			end
+			if not nearGate and math.abs(z + 8) > 14 then
+				WorldBuilder.prop(rng:NextNumber() < 0.5 and "PolygonNature_Tree_Round_03" or "Birch_Tree_Birch_01", folder, Vector3.new(x + 16, 0, z), rng:NextNumber(14, 18), rng:NextNumber(0, 6.3), true)
+			end
+		end
 	end
 	for _, x in { 67, 212, 357 } do
 		for z = -135, 255, 40 do

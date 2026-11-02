@@ -724,6 +724,11 @@ function CombatService.init(world: Instance)
 	end)
 end
 
+-- was the player hit in the last `seconds`? (no teleporting out of a fight)
+function CombatService.hurtWithin(player: Player, seconds: number): boolean
+	return os.clock() - (lastHurt[player] or -math.huge) < seconds
+end
+
 function CombatService.inWild(player: Player): boolean
 	return inWild[player] == true
 end

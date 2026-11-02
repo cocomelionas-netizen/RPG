@@ -12,6 +12,7 @@ local GatherService = require(script.Parent.GatherService)
 local HomeService = require(script.Parent.HomeService)
 local FarmService = require(script.Parent.FarmService)
 local CombatService = require(script.Parent.CombatService)
+local TravelService = require(script.Parent.TravelService)
 
 local ShopService = {}
 
@@ -155,7 +156,9 @@ function ShopService.init()
 		elseif action == "buildAt" then
 			HomeService.buildAt(player, a, b, c)
 		elseif action == "home" then
-			HomeService.teleport(player, a == "road" and "road" or "home")
+			TravelService.travel(player, a == "road" and "town" or "home")
+		elseif action == "travel" then
+			TravelService.travel(player, a)
 		end
 	end)
 	game:GetService("Players").PlayerRemoving:Connect(function(player)
