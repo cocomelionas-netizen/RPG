@@ -73,7 +73,7 @@ end
 
 Combat.PLAYER_SPEED = 1.8 -- seconds per swing
 Combat.REACH = 12 -- studs: how close you must stand to fight
-Combat.WILD_REQ = 40 -- combat level to enter the Wraith Caves
+Combat.WILD_REQ = 20 -- combat level to enter the Wraith Caves
 
 local function lv(skills, id)
 	return XP.levelFromXp(skills[id] or 0)

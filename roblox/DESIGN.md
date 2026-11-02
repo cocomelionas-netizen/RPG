@@ -24,7 +24,7 @@ Visa kita (renkimas, amatai, kova) maitina šias dvi.
 
 1. ✅ Kelias, renkimas, krepšys, išsaugojimas, offline progresas.
 2. **Namas** – Construction įgūdis, Hometown su sklypais, kambariai su bonusais.
-3. **Kova + Wraith Caves PvP** – ginklai, šarvai, priešai, PvP urvai (combat 40+).
+3. **Kova + Wraith Caves PvP** – ginklai, šarvai, priešai, PvP urvai (combat 20+).
 4. **Robux parduotuvė** – gamepass'ai, boost'ai, kosmetika, augintiniai, enchantai.
 5. Vėliau: questai, agility, klanai, kiti amatai.
 
@@ -63,7 +63,7 @@ Visa kita (renkimas, amatai, kova) maitina šias dvi.
 
 ## 3 dalis: kova ir Wraith Caves
 
-- Wraith Caves – atskira zona kelio gale, combat 40+, wraith priešai (Wraith Imp, Goblin, Knight, Dragon).
+- Wraith Caves – atskira zona kelio gale, combat 20+, wraith priešai (Wraith Imp, Goblin, Knight, Dragon).
 - **PvP tik urvuose.** Mirus prarandi tik tai, ką surinkai urve šį kartą (urvo grobis), krepšys ir įranga saugūs.
   Grobis iškrenta žudikui. Išėjus iš urvo grobis tampa tavo.
 - Robux urvuose galios neduoda: jokių pirktų ginklų, šarvų ar PvP bonusų.
@@ -126,10 +126,10 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
 - Priešai visose zonose (Slime, Rat → Dragon Knight), atsiranda po 12 s. Mūšis vyksta pats, maistas (daržovės) valgomas
   automatiškai, kai HP < 40 %.
 - ⚔️ Smithy Riverbend aikštėje: kardai ir šarvai Bronze → Wyrmsteel (reikia Attack / Defence lygio).
-- ☠️ Wraith Caves – šiaurėje už Ice Mountains, nuo kovos lygio 40. PvP: „Attack“ ant kitų žaidėjų, auto-atsakymas.
+- ☠️ Wraith Caves – šiaurėje už Ice Mountains, nuo kovos lygio 20. PvP: „Attack“ ant kitų žaidėjų, auto-atsakymas.
   Uždirbtas auksas ir Wraith Ether yra „urvo grobis“; išėjus – tavo, mirus – prarandi tik jį (žudikas pasiima).
   Išėjus iš žaidimo kovos metu (15 s) grobis atitenka užpuolikui.
-- Balanso pastaba: Wraith Caves nuo 40 kovos lygio – ilgas kelias; jei per ilgas, mažinti `Combat.WILD_REQ`.
+- Wraith Caves nuo 20 kovos lygio (buvo 40 – vaikams per ilgas kelias); keisti `Combat.WILD_REQ`.
 
 ## Valdymas ir pasaulis (atnaujinta)
 

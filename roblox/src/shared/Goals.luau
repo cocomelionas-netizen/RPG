@@ -55,8 +55,8 @@ Goals.LIST = {
 		progress = function(v) return (v.gear and v.gear.armour or -1) >= 0 and 1 or 0, 1 end },
 	{ text = "Reach combat level 15", target = "combat", reward = 400,
 		progress = function(v) return math.min(Combat.combatLevel(v.skills), 15), 15 end },
-	{ text = "Reach combat level 40 to enter the ☠️ Wraith Caves", target = "combat", reward = 2000,
-		progress = function(v) return math.min(Combat.combatLevel(v.skills), 40), 40 end },
+	{ text = "Reach combat level 20 to enter the ☠️ Wraith Caves", target = "combat", reward = 1000,
+		progress = function(v) return math.min(Combat.combatLevel(v.skills), Combat.WILD_REQ), Combat.WILD_REQ end },
 }
 
 function Goals.done(i: number, view): boolean

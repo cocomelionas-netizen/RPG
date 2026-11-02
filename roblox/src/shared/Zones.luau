@@ -63,7 +63,7 @@ Zones.LIST = {
 	},
 	{
 		-- the Wilderness: PvP is on in here (CombatService); north of the Ice Mountains through a cave mouth
-		id = "wild", name = "Wraith Caves", req = 40, desc = "PvP zone · Combat 40+ · loot you carry can be lost", wild = true,
+		id = "wild", name = "Wraith Caves", req = 20, desc = "PvP zone · Combat 20+ · loot you carry can be lost", wild = true,
 		rect = { -200, -640, 200, -400 }, mouthX = 0,
 		res = {},
 		th = { sky = "#0a0806", sky2 = "#2a3a2a", far = "#2a3a28", ground = "#4a5a48", dirt = "#2a3226", decor = "stalag", material = "Slate", clock = 0, cave = true, ghostly = true },
