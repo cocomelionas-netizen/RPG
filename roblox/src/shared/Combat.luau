@@ -88,6 +88,8 @@ for _, s in Combat.STYLES do
 end
 
 Combat.PLAYER_SPEED = 1.8 -- seconds per swing
+-- our own sword slash (KeyframeSequence ServerStorage.SwordSlash, uploaded as an Animation); 0 = Roblox's tool slash
+Combat.SLASH_ANIM = 91661055017727
 Combat.REACH = 12 -- studs: how close you must stand to fight
 Combat.WILD_REQ = 20 -- combat level to enter the Wraith Caves
 
