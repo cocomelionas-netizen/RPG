@@ -161,7 +161,8 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
 
 ## Įrankiai ir animacijos (atnaujinta)
 
-- Visi įrankiai – tikri modeliai (`AssetPacks.Weapons`): kardas 6,2 stud, kirvis, kirtiklis, meškerė 7 stud. Metalo lygis
+- Visi įrankiai – tikri modeliai (`AssetPacks.Weapons`): kardas 4,3 stud, kirvis ir kirtiklis 3, meškerė 5,5 (× avataro ūgio
+  mastelis). Rankena rankoje tiksliai: `GripFX`/`GripFZ` atributai modeliuose rodo, kur modelyje yra kotas. Metalo lygis
   matomas: kirvio/kirtiklio galvos spalva, kardo kibirkštys (daugiau – geresnis metalas) ir pėdsakas smūgio metu.
 - Savo animacijos (`Anims.luau`, 13 vnt., kuria `AnimBuilder`): laikymo pozos kiekvienam įrankiui (kardas nuleistas prie
   šono, ašmenys į priekį kaip katanų žaidimuose; kirvis ant peties; kirtiklis abiem rankom; meškerė virš vandens) ir

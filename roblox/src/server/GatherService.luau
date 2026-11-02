@@ -60,7 +60,7 @@ local function equip(player: Player, skill: string)
 	clearTools(player)
 	local data = DataService.get(player)
 	local kind = G.TOOL_OF[skill]
-	local tool = ToolFactory.make(kind, data and data.tools[kind] or 0)
+	local tool = ToolFactory.make(kind, data and data.tools[kind] or 0, player.Character)
 	tool.Parent = player.Character -- parenting to the character equips it
 	return tool
 end
@@ -168,7 +168,7 @@ function GatherService.equipWeapon(player: Player)
 	-- everyone has at least the wooden training sword (-1)
 	local w = data and data.gear and data.gear.weapon or -1
 	if player.Character then
-		local tool = ToolFactory.make("sword", w)
+		local tool = ToolFactory.make("sword", w, player.Character)
 		tool.Parent = player.Character
 	end
 end
