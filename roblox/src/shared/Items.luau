@@ -37,10 +37,11 @@ for t = 0, 4 do
 	defItem("plank" .. t, { name = PLANK_N[t], icon = "🟫", tier = t, value = PLANK_VALUE[t], type = "Materials", color = WOOD_COLOR[t] })
 end
 defItem("nails", { name = "Nails", icon = "📌", tier = 0, value = 1, type = "Materials", color = "#9aa0a8" })
--- farming: seeds and what they grow into
+-- farming: seeds and what they grow into (crops are food too: web game heal values)
+local CROP_HEAL = { potato = 10, onion = 14, cabbage = 18, tomato = 25, sweetcorn = 35, strawberry = 50, watermelon = 75 }
 for i, c in Farming.CROPS do
 	local lvl = c[4]
-	defItem("crop_" .. c[1], { name = c[2], icon = c[3], tier = math.min(i - 1, 6), value = math.floor(2 + lvl * 0.35 + 0.5), type = "Crops", color = c[5] })
+	defItem("crop_" .. c[1], { name = c[2], icon = c[3], tier = math.min(i - 1, 6), value = math.floor(2 + lvl * 0.35 + 0.5), type = "Crops", color = c[5], heal = CROP_HEAL[c[1]] })
 end
 for i, h in Farming.HERBS do
 	local lvl = h[3]
@@ -49,6 +50,8 @@ end
 for _, sd in Farming.SEEDS do
 	defItem(sd.id, { name = sd.name, icon = "🌱", tier = math.min(math.floor(sd.lvl / 15), 6), value = sd.kind == "tree" and math.floor(sd.value / 4) or sd.value, type = "Seeds", color = sd.color })
 end
+-- dropped by the wraiths of the Wraith Caves
+defItem("wraith_ether", { name = "Wraith Ether", icon = "👻", tier = 4, value = 25, type = "Loot", color = "#9fff9f" })
 -- cooking arrives in part 3; defined now so saves stay compatible
 for t = 0, 4 do
 	defItem("cooked" .. t, { name = COOKED_N[t], icon = "🍽️", tier = t, value = COOKED_VALUE[t], heal = HEAL[t], type = "Food" })

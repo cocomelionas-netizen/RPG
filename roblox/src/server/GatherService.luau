@@ -156,6 +156,28 @@ local function grant(player: Player, st)
 end
 
 -- tier: only for workbenches, where the player picks the recipe; other nodes carry their own tier
+-- for fights (CombatService): hold the sword, and play a swing
+function GatherService.equipWeapon(player: Player)
+	clearTools(player)
+	local data = DataService.get(player)
+	local w = data and data.gear and data.gear.weapon or -1
+	if w >= 0 and player.Character then
+		local tool = ToolFactory.make("sword", w)
+		tool.Parent = player.Character
+	end
+end
+
+function GatherService.swing(player: Player)
+	local char = player.Character
+	for _, t in char and char:GetChildren() or {} do
+		if t:IsA("Tool") and t:GetAttribute("EndlessRoadTool") then
+			swing(t)
+		end
+	end
+end
+
+GatherService.onStart = function(_player) end -- set by CombatService: gathering ends a fight
+
 function GatherService.start(player: Player, node: Model, tier: number?)
 	local data = DataService.get(player)
 	if not data or not node or not node.Parent then
@@ -189,6 +211,7 @@ function GatherService.start(player: Player, node: Model, tier: number?)
 	if current then
 		GatherService.stop(player, "switch")
 	end
+	GatherService.onStart(player)
 
 	local st = { token = {}, node = node, skill = skill, tier = tier }
 	active[player] = st

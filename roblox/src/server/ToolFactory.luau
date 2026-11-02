@@ -39,12 +39,17 @@ function ToolFactory.make(kind: string, level: number): Tool
 	tool.RequiresHandle = true
 	tool:SetAttribute("EndlessRoadTool", true)
 
-	local len = kind == "rod" and 6 or kind == "saw" and 1.2 or 3
+	local len = kind == "rod" and 6 or (kind == "saw" or kind == "sword") and 1.2 or 3
 	local handle = part("Handle", Vector3.new(0.3, len, 0.3), wood, Enum.Material.Wood)
 	handle.CFrame = CFrame.new(0, 50, 0)
 	handle.Parent = tool
 
-	if kind == "saw" then
+	if kind == "sword" then
+		handle.Size = Vector3.new(0.35, 1.4, 0.35)
+		attach(handle, part("Guard", Vector3.new(1.4, 0.3, 0.4), metal, Enum.Material.Metal), CFrame.new(0, 0.8, 0))
+		attach(handle, part("Blade", Vector3.new(0.25, 3.6, 0.6), metal:Lerp(Color3.new(1, 1, 1), 0.25), Enum.Material.Metal), CFrame.new(0, 2.75, 0))
+		tool.Grip = CFrame.new(0, -0.3, 0)
+	elseif kind == "saw" then
 		attach(handle, part("Blade", Vector3.new(0.08, 0.9, 2.6), metal, Enum.Material.Metal), CFrame.new(0, 0.2, -1.4))
 		tool.Grip = CFrame.new(0, -0.3, 0)
 	elseif kind == "axe" then

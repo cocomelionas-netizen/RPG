@@ -28,7 +28,7 @@ G.METAL_COLORS = { [0] = "#b07a45", "#8a8f98", "#b8bec8", "#5a68b8", "#4a9a5a", 
 -- tool upgrades: level 0 (Bronze) .. 4 (Verdite); each level is 12% faster
 G.TOOL_COST = { [0] = 300, 3000, 20000, 80000 }
 G.TOOL_MAX = 4
-G.TOOL_NAMES = { axe = "Axe", pick = "Pickaxe", rod = "Fishing Rod", saw = "Saw" }
+G.TOOL_NAMES = { axe = "Axe", pick = "Pickaxe", rod = "Fishing Rod", saw = "Saw", sword = "Sword" }
 G.TOOL_OF = { woodcutting = "axe", mining = "pick", fishing = "rod", construction = "saw" }
 G.TOOL_ORDER = { "axe", "pick", "rod" }
 

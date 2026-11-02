@@ -9,7 +9,7 @@
 local Zones = {}
 
 Zones.ROAD_WIDTH = 16
-Zones.BOUNDS = { x0 = -340, z0 = -400, x1 = 500, z1 = 265 }
+Zones.BOUNDS = { x0 = -340, z0 = -640, x1 = 500, z1 = 265 }
 Zones.SPAWN = Vector3.new(0, 3, 42)
 
 Zones.LIST = {
@@ -35,7 +35,7 @@ Zones.LIST = {
 	},
 	{
 		id = "caves", name = "Shadow Caves", req = 25, desc = "Tunnels full of ore veins, rune essence and the restless dead.",
-		rect = { -340, -400, -55, -145 },
+		rect = { -340, -400, -55, -145 }, mouthX = -310,
 		res = { mining = { 0, 1, 2, 3, 4 }, fishing = { 2 } },
 		clusters = { mining = Vector3.new(-185, 0, -265), fishing = Vector3.new(-170, 0, -365) },
 		th = { sky = "#140f1d", sky2 = "#352841", far = "#2a2134", ground = "#6e6278", dirt = "#4a3e52", decor = "stalag", material = "Slate", clock = 0, cave = true },
@@ -53,6 +53,13 @@ Zones.LIST = {
 		res = { mining = { 3, 5, 6 }, woodcutting = { 4 } },
 		clusters = { mining = Vector3.new(350, 0, -280), woodcutting = Vector3.new(300, 0, -355) },
 		th = { sky = "#2a0808", sky2 = "#c2481e", far = "#5a1a14", ground = "#2b1a17", dirt = "#140b09", decor = "spike", material = "Basalt", clock = 18.5, lava = true },
+	},
+	{
+		-- the Wilderness: PvP is on in here (CombatService); north of the Ice Mountains through a cave mouth
+		id = "wild", name = "Wraith Caves", req = 40, desc = "PvP zone · Combat 40+ · loot you carry can be lost", wild = true,
+		rect = { -200, -640, 200, -400 }, mouthX = 0,
+		res = {},
+		th = { sky = "#0a0806", sky2 = "#2a3a2a", far = "#2a3a28", ground = "#4a5a48", dirt = "#2a3226", decor = "stalag", material = "Slate", clock = 0, cave = true, ghostly = true },
 	},
 	{
 		id = "home", name = "Hometown", req = 1, desc = "Build your house and live here.", home = true,
@@ -73,7 +80,7 @@ Zones.ROADS = {
 	{ Vector3.new(0, 0, -145), Vector3.new(0, 0, 260) }, -- town north-south and down into the Meadow
 	{ Vector3.new(-335, 0, 0), Vector3.new(0, 0, 0) }, -- town west to the Dark Forest
 	{ Vector3.new(-310, 0, -330), Vector3.new(-310, 0, 0) }, -- forest north into the Shadow Caves
-	{ Vector3.new(0, 0, -395), Vector3.new(0, 0, -145) }, -- up through the Ice Mountains to the Wraith gate
+	{ Vector3.new(0, 0, -630), Vector3.new(0, 0, -145) }, -- up through the Ice Mountains into the Wraith Caves
 	{ Vector3.new(0, 0, -190), Vector3.new(495, 0, -190) }, -- across the mountains to the Dragon's Lair
 	{ Vector3.new(0, 0, -8), Vector3.new(495, 0, -8) }, -- Hometown main street
 	{ Vector3.new(67, 0, -140), Vector3.new(67, 0, 260) }, -- Hometown streets

@@ -2,6 +2,7 @@
 -- Checks only use numbers that never go back down (xp, counters, rooms, tools), so a step can't un-complete.
 -- view is the DataSync view (skills, inv, gold, tools, rooms, stats).
 local XP = require(script.Parent.XP)
+local Combat = require(script.Parent.Combat)
 
 local Goals = {}
 
@@ -46,6 +47,16 @@ Goals.LIST = {
 		progress = function(v) return math.min(stat(v, "harvested"), 1), 1 end },
 	{ text = "Reach Farming level 10", target = "home", reward = 300,
 		progress = function(v) return math.min(XP.levelFromXp(v.skills.farming), 10), 10 end },
+	{ text = "Buy a sword at the ⚔️ Smithy in Riverbend", target = "smithy", reward = 50,
+		progress = function(v) return (v.gear and v.gear.weapon or -1) >= 0 and 1 or 0, 1 end },
+	{ text = "Defeat 5 monsters (Slimes and Rats in the Meadow)", target = "combat", reward = 100,
+		progress = function(v) return math.min(v.kills or 0, 5), 5 end },
+	{ text = "Buy armour at the ⚔️ Smithy", target = "smithy", reward = 100,
+		progress = function(v) return (v.gear and v.gear.armour or -1) >= 0 and 1 or 0, 1 end },
+	{ text = "Reach combat level 15", target = "combat", reward = 400,
+		progress = function(v) return math.min(Combat.combatLevel(v.skills), 15), 15 end },
+	{ text = "Reach combat level 40 to enter the ☠️ Wraith Caves", target = "combat", reward = 2000,
+		progress = function(v) return math.min(Combat.combatLevel(v.skills), 40), 40 end },
 }
 
 function Goals.done(i: number, view): boolean

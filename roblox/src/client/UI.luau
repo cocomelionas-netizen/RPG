@@ -46,6 +46,8 @@ local ACCENT = {
 	seeds = Color3.fromRGB(90, 180, 70),
 	plant = Color3.fromRGB(90, 180, 70),
 	travel = Color3.fromRGB(200, 110, 200),
+	combat = Color3.fromRGB(220, 80, 80),
+	smithy = Color3.fromRGB(150, 150, 165),
 }
 local TITLE = Enum.Font.FredokaOne
 local BOLD = Enum.Font.GothamBold
@@ -178,9 +180,30 @@ local goalText = text({ Text = "", Position = UDim2.fromOffset(0, 18), Size = UD
 local goalCount = text({ Text = "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 18), Size = UDim2.fromOffset(50, 22), Font = TITLE, TextSize = 17, TextColor3 = C.goal, TextXAlignment = Enum.TextXAlignment.Right, Parent = goalCard })
 local _, goalFill = bar(goalCard, { Position = UDim2.new(0, 0, 1, -4), Size = UDim2.new(1, 0, 0, 5) }, C.goal)
 
+-- ===== health (and cave loot in the Wraith Caves) =====
+local vitals = new("Frame", { Name = "Vitals", LayoutOrder = 3, BackgroundTransparency = 1, Size = UDim2.fromOffset(330, 30), Parent = left }, {
+	new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+local healthBox = new("Frame", { Name = "Health", LayoutOrder = 1, BackgroundColor3 = C.bg, BackgroundTransparency = 0.08, Size = UDim2.fromOffset(240, 30), Parent = vitals }, { corner(15), stroke(Color3.fromRGB(230, 80, 80), 2) })
+text({ Text = "❤️", Position = UDim2.fromOffset(6, 0), Size = UDim2.fromOffset(24, 30), TextSize = 17, Parent = healthBox })
+local _, healthFill = bar(healthBox, { Position = UDim2.fromOffset(34, 9), Size = UDim2.new(1, -110, 0, 12) }, Color3.fromRGB(230, 70, 70))
+local healthText = text({ Text = "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 0), Size = UDim2.fromOffset(70, 30), Font = TITLE, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Right, Parent = healthBox })
+local lootBox = new("Frame", { Name = "CaveLoot", LayoutOrder = 2, BackgroundColor3 = Color3.fromRGB(30, 50, 30), BackgroundTransparency = 0.05, Size = UDim2.fromOffset(82, 30), Visible = false, Parent = vitals }, { corner(15), stroke(Color3.fromRGB(150, 255, 150), 2) })
+local lootText = text({ Text = "", Size = UDim2.fromScale(1, 1), Font = TITLE, TextSize = 14, TextColor3 = Color3.fromRGB(190, 255, 190), Parent = lootBox })
+task.spawn(function()
+	while true do
+		local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if hum and hum.MaxHealth > 0 then
+			healthFill.Size = UDim2.new(math.clamp(hum.Health / hum.MaxHealth, 0, 1), 0, 1, 0)
+			healthText.Text = ("%d/%d"):format(math.ceil(hum.Health), hum.MaxHealth)
+		end
+		task.wait(0.2)
+	end
+end)
+
 -- ===== bottom-left: skills being trained =====
 local hud = new("Frame", {
-	Name = "SkillHud", LayoutOrder = 3, BackgroundColor3 = C.bg, BackgroundTransparency = 0.1,
+	Name = "SkillHud", LayoutOrder = 4, BackgroundColor3 = C.bg, BackgroundTransparency = 0.1,
 	Size = UDim2.fromOffset(240, #Skills.GATHERING * 36 + 16), Parent = left,
 }, { corner(12), stroke(), pad(8), new("UIListLayout", { Padding = UDim.new(0, 4) }) })
 local hudRows = {}
@@ -218,7 +241,7 @@ local windowScale = new("UIScale", { Parent = window })
 
 local panels = {}
 local renderers = {}
-local TITLES = { bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏗️ My House", craft = "🔨 Workbench", spot = "➕ What to build here?", seeds = "🌱 Seed Stall", plant = "🌱 Plant" }
+local TITLES = { bag = "🎒 Bag", skills = "📊 Skills", tools = "🛠️ Tools", house = "🏗️ My House", craft = "🔨 Workbench", spot = "➕ What to build here?", seeds = "🌱 Seed Stall", plant = "🌱 Plant", combat = "⚔️ Combat", smithy = "⚔️ Smithy" }
 
 local function showPanel(name)
 	if openPanel == name or not name then
@@ -261,7 +284,7 @@ local function menuButton(name, icon, label, color, onClick)
 	menuButtons[name] = { button = b, stroke = st, icon = i, label = l, dot = dot, color = color }
 	return menuButtons[name]
 end
-for _, m in { { "bag", "🎒", "Bag" }, { "skills", "📊", "Skills" }, { "tools", "🛠️", "Tools" }, { "house", "🏗️", "House" } } do
+for _, m in { { "bag", "🎒", "Bag" }, { "skills", "📊", "Skills" }, { "tools", "🛠️", "Tools" }, { "house", "🏗️", "House" }, { "combat", "⚔️", "Combat" } } do
 	menuButton(m[1], m[2], m[3], ACCENT[m[1]], function()
 		showPanel(m[1])
 	end)
@@ -399,7 +422,11 @@ do
 	local p = scroller("skills")
 	hint(p, "Skills level up as you use them. Higher levels unlock better trees, rocks, fish and rooms.")
 	local rows = {}
-	for _, id in Skills.GATHERING do
+	local trained = table.clone(Skills.GATHERING)
+	for _, id in Skills.COMBAT do
+		table.insert(trained, id)
+	end
+	for _, id in trained do
 		local s = Skills.byId[id]
 		local row = new("Frame", { LayoutOrder = s.order, BackgroundColor3 = C.panel2, Size = UDim2.new(1, 0, 0, 62), ZIndex = 3, Parent = p }, { corner(12), pad(8) })
 		text({ Text = s.icon, Size = UDim2.fromOffset(46, 46), TextSize = 30, ZIndex = 3, Parent = row })
@@ -693,6 +720,94 @@ do
 	end
 end
 
+-- --- Combat ---
+local Combat = require(Shared.Combat)
+local function gearName(slot, t)
+	if t < 0 then
+		return slot == "weapon" and "Bare hands" or "No armour"
+	end
+	return Combat.METALS[t] .. (slot == "weapon" and " Sword" or " Armour")
+end
+do
+	local p = scroller("combat")
+	hint(p, "Walk up to a monster and tap Attack (F). Your hero fights on their own and eats food (crops) when hurt. Buy gear at the ⚔️ Smithy in Riverbend.")
+	local head = card(p, 0, "⚔️")
+	head.row.Name = "CombatHead"
+	head.go.Visible = false
+	local styleRows = {}
+	for i, st in Combat.STYLES do
+		local c = card(p, i, ({ "🎯", "💪", "🛡️", "⚖️" })[i])
+		c.row.Name = "Style_" .. st.id
+		c.row.Size = UDim2.new(1, 0, 0, 66)
+		c.title.Text = st.name
+		c.info.Text = st.desc
+		c.go.Name = "Pick_" .. st.id
+		c.go.Activated:Connect(function()
+			request("setStyle", st.id)
+		end)
+		styleRows[st.id] = c
+	end
+	local gearRow = card(p, 10, "🗡️")
+	gearRow.row.Name = "Gear"
+	gearRow.go.Visible = false
+	renderers.combat = function()
+		if not state then return end
+		local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		local lvl = Combat.combatLevel(state.skills)
+		head.title.Text = ("Combat level %d"):format(lvl)
+		head.info.Text = ("❤️ %d / %d HP  ·  %d monsters defeated"):format(hum and math.ceil(hum.Health) or 0, Combat.maxHp(state.skills), state.kills or 0)
+		head.detail.Text = lvl >= Combat.WILD_REQ and "☠️ The Wraith Caves are open to you – north, past the Ice Mountains. Other players can attack you there!"
+			or ("☠️ The Wraith Caves (PvP) open at combat level %d."):format(Combat.WILD_REQ)
+		local style = state.combat and state.combat.style or "accurate"
+		for id, c in styleRows do
+			setButton(c.go, id == style and "✔ Using" or "Use", id ~= style, Color3.fromRGB(80, 120, 230))
+			c.row.BackgroundColor3 = id == style and Color3.fromRGB(70, 60, 100) or C.panel2
+		end
+		local g = state.gear or { weapon = -1, armour = -1 }
+		local a = Combat.attackerStats(state)
+		gearRow.title.Text = gearName("weapon", g.weapon) .. "  ·  " .. gearName("armour", g.armour)
+		gearRow.info.Text = ("Max hit %d  ·  Armour %d"):format(a.maxHit, g.armour >= 0 and Combat.ARMOUR[g.armour] or 0)
+		gearRow.detail.Text = "Better gear: ⚔️ Smithy on the Riverbend plaza."
+	end
+end
+
+-- --- Smithy ---
+do
+	local p = scroller("smithy")
+	hint(p, "Each upgrade replaces what you wear. Swords need Attack, armour needs Defence.")
+	local rows = {}
+	for i, slot in { "weapon", "armour" } do
+		local c = card(p, i, slot == "weapon" and "🗡️" or "🛡️")
+		c.row.Name = "Smithy_" .. slot
+		c.go.Name = "Buy_" .. slot
+		c.go.Activated:Connect(function()
+			request("buyGear", slot)
+		end)
+		rows[slot] = c
+	end
+	renderers.smithy = function()
+		if not state then return end
+		local g = state.gear or { weapon = -1, armour = -1 }
+		for slot, c in rows do
+			local t = g[slot] + 1
+			local skill = slot == "weapon" and "attack" or "defence"
+			if t > Combat.GEAR_MAX then
+				c.title.Text = gearName(slot, g[slot])
+				c.info.Text = "The best there is!"
+				c.detail.Text = ""
+				setButton(c.go, "Max", false)
+			else
+				c.title.Text = gearName(slot, t)
+				c.info.Text = slot == "weapon" and ("+%d power  ·  needs Attack %d"):format(Combat.POWER[t], Combat.EQUIP_REQ[t]) or ("+%d armour  ·  needs Defence %d"):format(Combat.ARMOUR[t], Combat.EQUIP_REQ[t])
+				local cost = (slot == "weapon" and Combat.WEAPON_COST or Combat.ARMOUR_COST)[t]
+				c.detail.Text = "Now: " .. gearName(slot, g[slot]) .. "   " .. costText({}, cost)
+				local ok = XP.levelFromXp(state.skills[skill] or 0) >= Combat.EQUIP_REQ[t] and state.gold >= cost
+				setButton(c.go, "Buy", ok)
+			end
+		end
+	end
+end
+
 function UI.openPlant(i: number, kind: string)
 	plantPatch, plantKind = i, kind
 	showPanel(nil)
@@ -777,6 +892,30 @@ function UI.actionStop()
 		r.row.BackgroundTransparency = 1
 	end
 end
+
+-- ===== fight bar: who you are fighting and their health =====
+local fighting = false
+function UI.fightState(info)
+	if info.active then
+		fighting = true
+		action.Visible = true
+		actionIcon.Text = info.pvp and "☠️" or "⚔️"
+		actionText.Text = info.pvp and ("Fighting %s  ·  %d/%d"):format(info.name, math.ceil(info.hp), info.maxHp) or ("Fighting %s (Lv %d)  ·  %d/%d"):format(info.name, info.level, math.ceil(info.hp), info.maxHp)
+		if actionTween then actionTween:Cancel() end
+		actionFill.BackgroundColor3 = Color3.fromRGB(230, 70, 70)
+		TweenService:Create(actionFill, TweenInfo.new(0.2), { Size = UDim2.new(math.clamp(info.hp / info.maxHp, 0, 1), 0, 1, 0) }):Play()
+		action:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(230, 80, 80)
+	elseif fighting then
+		fighting = false
+		action.Visible = false
+		actionFill.BackgroundColor3 = C.bar
+		action:FindFirstChildOfClass("UIStroke").Color = C.good
+		if info.reason == "moved" then
+			UI.toast("You walked away from the fight.")
+		end
+	end
+end
+
 
 -- ===== floating gains, toasts, banners =====
 local floatHolder = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -96), Size = UDim2.fromOffset(320, 30), Parent = gui })
@@ -925,6 +1064,15 @@ function UI.setData(view)
 		r.lv.Text = "Lv " .. l
 		TweenService:Create(r.fill, TweenInfo.new(0.3), { Size = UDim2.new(frac, 0, 1, 0) }):Play()
 	end
+	local cl = view.caveLoot
+	local wildNow = false
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		wildNow = Zones.contains(Zones.byId.wild, hrp.Position.X, hrp.Position.Z)
+	end
+	lootBox.Visible = wildNow or (cl and cl.gold > 0)
+	lootText.Text = ("☠️ %s"):format(fmt(cl and cl.gold or 0))
 	refreshGoal()
 	refreshDots()
 	if openPanel and renderers[openPanel] then

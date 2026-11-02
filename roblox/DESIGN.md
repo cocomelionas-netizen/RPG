@@ -116,3 +116,17 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
 3. **Herblore** – žolelės → eliksyrai (boost'ai, tinka ir Robux parduotuvės „ne pay-to-win“ taisyklei).
 4. **Garden kambarys** – daugiau lysvių (kaip web žaidime PATCH_N pagal lygį).
 5. **Robux parduotuvė**.
+
+## Kova ir Wraith Caves (padaryta, 3 dalis)
+
+- Įgūdžiai Attack, Strength, Defence, Hitpoints (startas – 10 HP lygis). Kovos lygis = ((Att+Str)/2 + Def + HP) / 3.
+- Formulės iš web žaidimo: HP = 40 + 10 × Hitpoints; smūgio tikimybė 0,5 + (tikslumas − gynyba) × 0,02;
+  XP = 2,5 už žalos tašką (stiliaus įgūdžiui) + 0,83 Hitpoints.
+- Stiliai: Accurate (Attack), Aggressive (Strength), Defensive (Defence), Balanced (žemiausiam).
+- Priešai visose zonose (Slime, Rat → Dragon Knight), atsiranda po 12 s. Mūšis vyksta pats, maistas (daržovės) valgomas
+  automatiškai, kai HP < 40 %.
+- ⚔️ Smithy Riverbend aikštėje: kardai ir šarvai Bronze → Wyrmsteel (reikia Attack / Defence lygio).
+- ☠️ Wraith Caves – šiaurėje už Ice Mountains, nuo kovos lygio 40. PvP: „Attack“ ant kitų žaidėjų, auto-atsakymas.
+  Uždirbtas auksas ir Wraith Ether yra „urvo grobis“; išėjus – tavo, mirus – prarandi tik jį (žudikas pasiima).
+  Išėjus iš žaidimo kovos metu (15 s) grobis atitenka užpuolikui.
+- Balanso pastaba: Wraith Caves nuo 40 kovos lygio – ilgas kelias; jei per ilgas, mažinti `Combat.WILD_REQ`.

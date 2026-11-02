@@ -34,6 +34,7 @@ end
 
 -- skills that can be trained in this part of the Roblox version
 Skills.GATHERING = { "woodcutting", "mining", "fishing", "farming", "construction" }
-Skills.ACTIVE = { woodcutting = true, mining = true, fishing = true, farming = true, construction = true }
+Skills.COMBAT = { "attack", "strength", "defence", "hitpoints" }
+Skills.ACTIVE = { woodcutting = true, mining = true, fishing = true, farming = true, construction = true, attack = true, strength = true, defence = true, hitpoints = true }
 
 return Skills

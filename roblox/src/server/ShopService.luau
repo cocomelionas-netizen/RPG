@@ -11,6 +11,7 @@ local DataService = require(script.Parent.DataService)
 local GatherService = require(script.Parent.GatherService)
 local HomeService = require(script.Parent.HomeService)
 local FarmService = require(script.Parent.FarmService)
+local CombatService = require(script.Parent.CombatService)
 
 local ShopService = {}
 
@@ -57,7 +58,7 @@ local function sellAll(player: Player)
 	local gold, count = 0, 0
 	for id, n in data.inv do
 		local it = Items[id]
-		if it and (it.type == "Resources" or it.type == "Ores" or it.type == "Crops") then
+		if it and (it.type == "Resources" or it.type == "Ores" or it.type == "Loot") then
 			gold += worth(data, it, n)
 			count += n
 			data.inv[id] = nil
@@ -133,10 +134,20 @@ function ShopService.init()
 			upgrade(player, a)
 		elseif action == "stop" then
 			GatherService.stop(player, "player")
+			CombatService.stop(player, "player")
 		elseif action == "craft" then
 			HomeService.craft(player, a)
 		elseif action == "build" then
 			HomeService.build(player, a)
+		elseif action == "setStyle" then
+			CombatService.setStyle(player, a)
+		elseif action == "buyGear" then
+			CombatService.buyGear(player, a)
+		elseif action == "attackPlayer" then
+			local victim = type(a) == "number" and game:GetService("Players"):GetPlayerByUserId(a)
+			if victim then
+				CombatService.attackPlayer(player, victim)
+			end
 		elseif action == "buySeeds" then
 			buySeeds(player, a)
 		elseif action == "plant" then

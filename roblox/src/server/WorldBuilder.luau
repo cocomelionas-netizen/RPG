@@ -584,6 +584,38 @@ local function buildTown(folder)
 		cottage(folder, Vector3.new(s[1], 0, s[2]), s[3], hex(colors[(i - 1) % #colors + 1]))
 	end
 
+	-- the Smithy on the plaza: swords and armour
+	local smithy = Instance.new("Model")
+	smithy.Name = "Smithy"
+	local sb = CFrame.new(20, 0, -20) * CFrame.Angles(0, math.rad(-45), 0)
+	local anvilBase = part({ Name = "Anvil", Size = Vector3.new(2, 2, 3), CFrame = sb * CFrame.new(-2, 1, 1), Color = hex("#3a3a40"), Material = Enum.Material.Metal, Parent = smithy })
+	part({ Size = Vector3.new(2.4, 0.8, 4), CFrame = sb * CFrame.new(-2, 2.4, 1), Color = hex("#50545c"), Material = Enum.Material.Metal, Parent = smithy })
+	local rack = part({ Name = "Counter", Size = Vector3.new(8, 3, 3), CFrame = sb * CFrame.new(1, 1.5, -2), Color = hex("#5a3d22"), Material = Enum.Material.WoodPlanks, Parent = smithy })
+	for i = 0, 3 do
+		part({ Size = Vector3.new(0.3, 3.4, 0.6), CFrame = sb * CFrame.new(-1.6 + i * 1.6, 4.6, -2) * CFrame.Angles(0, 0, 0.15), Color = hex(({ "#b07a45", "#8a8f98", "#b8bec8", "#5a68b8" })[i + 1]), Material = Enum.Material.Metal, Parent = smithy })
+	end
+	local forge = part({ Size = Vector3.new(3, 3, 3), CFrame = sb * CFrame.new(4, 1.5, 2), Color = hex("#8a4a30"), Material = Enum.Material.Brick, Parent = smithy })
+	local fire = Instance.new("Fire")
+	fire.Size = 3
+	fire.Heat = 5
+	fire.Parent = forge
+	smithy.PrimaryPart = rack
+	local sprompt = Instance.new("ProximityPrompt")
+	sprompt.ActionText = "Shop"
+	sprompt.ObjectText = "Smithy"
+	sprompt.HoldDuration = 0
+	sprompt.MaxActivationDistance = 12
+	sprompt.RequiresLineOfSight = false
+	sprompt.KeyboardKeyCode = Enum.KeyCode.E
+	sprompt.Parent = rack
+	sprompt.Triggered:Connect(function(player)
+		Remotes.OpenCraft:FireClient(player, "smithy")
+	end)
+	local sbb = label(rack, "⚔️ Smithy", "Swords & armour", 70)
+	sbb.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
+	smithy.Parent = folder
+	local _ = anvilBase
+
 	-- the Seed Stall on the plaza: buy seeds and saplings
 	local stall = Instance.new("Model")
 	stall.Name = "SeedStall"
@@ -655,7 +687,7 @@ function WorldBuilder.build()
 			cliff(CFrame.new(r[1] - 2, h / 2, center.Z), Vector3.new(6, h, size.Z))
 			cliff(CFrame.new(r[3] + 2, h / 2, center.Z), Vector3.new(6, h, size.Z))
 			-- south wall with a cave mouth for the road at x = -210
-			local gap, gx = 30, -310
+			local gap, gx = 30, zone.mouthX or (r[1] + r[3]) / 2
 			cliff(CFrame.new((r[1] + gx - gap / 2) / 2, h / 2, r[4] + 2), Vector3.new(gx - gap / 2 - r[1], h, 6))
 			cliff(CFrame.new((gx + gap / 2 + r[3]) / 2, h / 2, r[4] + 2), Vector3.new(r[3] - gx - gap / 2, h, 6))
 			cliff(CFrame.new(gx, 34, r[4] + 2), Vector3.new(gap, 32, 6))
@@ -684,9 +716,9 @@ function WorldBuilder.build()
 			-- glowing crystal lamps hanging from the roof light the whole cave
 			for lx = r[1] + 40, r[3] - 20, 70 do
 				for lz = r[2] + 40, r[4] - 20, 70 do
-					local lamp = part({ Name = "CaveLamp", Size = Vector3.new(2.5, 5, 2.5), CFrame = CFrame.new(lx, 44, lz) * CFrame.Angles(0, rng:NextNumber(0, 3), 0), Color = hex("#c8a0ff"), Material = Enum.Material.Neon, CanCollide = false, Parent = folder })
+					local lamp = part({ Name = "CaveLamp", Size = Vector3.new(2.5, 5, 2.5), CFrame = CFrame.new(lx, 44, lz) * CFrame.Angles(0, rng:NextNumber(0, 3), 0), Color = th.ghostly and hex("#9fff9f") or hex("#c8a0ff"), Material = Enum.Material.Neon, CanCollide = false, Parent = folder })
 					local l = Instance.new("PointLight")
-					l.Color = Color3.fromRGB(225, 205, 255)
+					l.Color = th.ghostly and Color3.fromRGB(190, 255, 190) or Color3.fromRGB(225, 205, 255)
 					l.Range = 60
 					l.Brightness = 1.6
 					l.Shadows = false
@@ -771,8 +803,7 @@ function WorldBuilder.build()
 
 	-- the north gate: Wraith Caves (PvP) come later
 	local b = Zones.BOUNDS
-	archGate(roads, Vector3.new(0, 0, b.z0 + 8), false, "☠️ Wraith Caves", "PvP · Combat 40+ · coming soon")
-	part({ Name = "WraithMist", Size = Vector3.new(30, 18, 2), CFrame = CFrame.new(0, 9, b.z0 + 3), Color = hex("#2a1a3a"), Material = Enum.Material.Neon, Transparency = 0.4, Parent = roads })
+	archGate(roads, Vector3.new(0, 0, -392), false, "☠️ Wraith Caves", ("PvP zone · Combat %d+"):format(Zones.byId.wild.req))
 
 	-- invisible walls around the map
 	local function wall(cf, s)

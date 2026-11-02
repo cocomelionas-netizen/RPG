@@ -9,7 +9,9 @@ local NAMES = {
 	"Gathered", -- server -> client: one resource gathered (xp, item, level up)
 	"Offline", -- server -> client: offline progress summary
 	"Request", -- client -> server: (action, ...) sell / upgrade / stop / craft / build / buildAt / home
-	"OpenCraft", -- server -> client: the hero is at a workbench, show the recipe list
+	"OpenCraft", -- server -> client: open a window (workbench, house plans, seeds, smithy, plant)
+	"CombatState", -- server -> client: fighting { name, level, hp, maxHp } or stopped
+	"HitSplat", -- server -> all clients: (part, damage, "hit" | "miss" | "hurt" | "block")
 }
 
 local Remotes = {}

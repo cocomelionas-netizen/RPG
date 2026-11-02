@@ -98,6 +98,79 @@ BuildSpots.init(function(x, z)
 end)
 
 -- a station asks to open a window (workbench by default, the house plans from the Entrance Hall)
+-- ===== combat feedback =====
+Remotes.CombatState.OnClientEvent:Connect(function(info)
+	UI.fightState(info)
+end)
+
+-- damage numbers that pop up over whoever was hit
+local SPLAT = { hit = Color3.fromRGB(255, 80, 80), hurt = Color3.fromRGB(255, 160, 60), miss = Color3.fromRGB(120, 170, 255), block = Color3.fromRGB(120, 170, 255) }
+Remotes.HitSplat.OnClientEvent:Connect(function(target, dmg, kind)
+	if not target or not target.Parent then
+		return
+	end
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.fromOffset(70, 40)
+	bb.StudsOffsetWorldSpace = Vector3.new(math.random(-10, 10) / 10, 3, 0)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.Adornee = target
+	local t = Instance.new("TextLabel")
+	t.BackgroundTransparency = 1
+	t.Size = UDim2.fromScale(1, 1)
+	t.Font = Enum.Font.FredokaOne
+	t.TextScaled = true
+	t.TextColor3 = SPLAT[kind] or Color3.new(1, 1, 1)
+	t.TextStrokeTransparency = 0
+	t.Text = dmg > 0 and tostring(dmg) or (kind == "block" and "block" or "miss")
+	t.Parent = bb
+	bb.Parent = player:WaitForChild("PlayerGui")
+	local TweenService = game:GetService("TweenService")
+	TweenService:Create(bb, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { StudsOffsetWorldSpace = bb.StudsOffsetWorldSpace + Vector3.new(0, 3, 0) }):Play()
+	TweenService:Create(t, TweenInfo.new(0.9), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	game:GetService("Debris"):AddItem(bb, 1)
+end)
+
+-- PvP: an Attack prompt on other players while both of you are in the Wraith Caves
+local pvpPrompts = {}
+task.spawn(function()
+	local wild = Zones.byId.wild
+	local function inWild(char)
+		local r = char and char:FindFirstChild("HumanoidRootPart")
+		return r and Zones.contains(wild, r.Position.X, r.Position.Z)
+	end
+	while true do
+		local meIn = inWild(player.Character)
+		for _, other in Players:GetPlayers() do
+			if other ~= player then
+				local r = other.Character and other.Character:FindFirstChild("HumanoidRootPart")
+				local want = meIn and r and inWild(other.Character)
+				local pr = pvpPrompts[other]
+				if want and (not pr or pr.Parent ~= r) then
+					if pr then pr:Destroy() end
+					pr = Instance.new("ProximityPrompt")
+					pr.Name = "PvpPrompt"
+					pr.ActionText = "Attack"
+					pr.ObjectText = "☠️ " .. other.DisplayName
+					pr.HoldDuration = 0
+					pr.MaxActivationDistance = 12
+					pr.RequiresLineOfSight = false
+					pr.KeyboardKeyCode = Enum.KeyCode.F
+					pr.Triggered:Connect(function()
+						Remotes.Request:FireServer("attackPlayer", other.UserId)
+					end)
+					pr.Parent = r
+					pvpPrompts[other] = pr
+				elseif not want and pr then
+					pr:Destroy()
+					pvpPrompts[other] = nil
+				end
+			end
+		end
+		task.wait(0.5)
+	end
+end)
+
 Remotes.OpenCraft.OnClientEvent:Connect(function(panel, a, b)
 	if panel == "plant" then
 		UI.openPlant(a, b)
@@ -123,8 +196,8 @@ local function zoneLook(th)
 			ClockTime = th.clock,
 			-- caves: moody purple but bright enough to see every rock clearly
 			Brightness = th.cave and 1.2 or (th.lava and 1.4 or 2.2),
-			Ambient = th.cave and Color3.fromRGB(170, 155, 195) or sky:Lerp(Color3.new(0.5, 0.5, 0.5), 0.6),
-			OutdoorAmbient = th.cave and Color3.fromRGB(180, 165, 205) or sky2:Lerp(Color3.new(0.6, 0.6, 0.6), 0.4),
+			Ambient = th.ghostly and Color3.fromRGB(140, 175, 140) or th.cave and Color3.fromRGB(170, 155, 195) or sky:Lerp(Color3.new(0.5, 0.5, 0.5), 0.6),
+			OutdoorAmbient = th.ghostly and Color3.fromRGB(150, 185, 150) or th.cave and Color3.fromRGB(180, 165, 205) or sky2:Lerp(Color3.new(0.6, 0.6, 0.6), 0.4),
 			ExposureCompensation = th.cave and 0.7 or 0,
 		},
 		atmosphere = {
@@ -238,6 +311,8 @@ task.spawn(function()
 				target = myBench()
 			elseif goal.target == "stall" then
 				target = workspace:FindFirstChild("SeedStall", true)
+			elseif goal.target == "smithy" then
+				target = workspace:FindFirstChild("Smithy", true)
 			end
 		end
 		-- no arrow once the hero is already working right there
