@@ -540,7 +540,7 @@ local function cottage(parent, pos: Vector3, facing: number, color: Color3)
 end
 
 local function buildTown(folder)
-	local plaza = part({ Name = "Plaza", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 70, 70), CFrame = CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#b8a888"), Material = Enum.Material.Cobblestone, Parent = folder })
+	local plaza = part({ Name = "Plaza", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 56, 56), CFrame = CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#b8a888"), Material = Enum.Material.Cobblestone, Parent = folder })
 	plaza.CanCollide = true
 	-- fountain in the middle
 	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 14, 14), CFrame = CFrame.new(0, 1, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#9a9086"), Material = Enum.Material.Marble, Parent = folder })
@@ -578,7 +578,7 @@ local function buildTown(folder)
 	bb.Parent = post
 
 	local colors = { "#e8dcc0", "#d8e4f0", "#f0d8c8", "#dcecc8" }
-	local spots = { { -55, -60, 0 }, { 55, -60, 0 }, { -55, -150, math.pi / 2 }, { 55, -150, -math.pi / 2 }, { -60, 60, math.pi }, { -60, -210, 0 } }
+	local spots = { { -36, -50, 0 }, { 36, -50, 0 }, { -36, -110, math.pi / 2 }, { 36, -110, -math.pi / 2 }, { -36, 40, math.pi }, { 36, 40, math.pi } }
 	for i, s in spots do
 		cottage(folder, Vector3.new(s[1], 0, s[2]), s[3], hex(colors[(i - 1) % #colors + 1]))
 	end
@@ -624,7 +624,7 @@ function WorldBuilder.build()
 			cliff(CFrame.new(r[1] - 2, h / 2, center.Z), Vector3.new(6, h, size.Z))
 			cliff(CFrame.new(r[3] + 2, h / 2, center.Z), Vector3.new(6, h, size.Z))
 			-- south wall with a cave mouth for the road at x = -210
-			local gap, gx = 30, -210
+			local gap, gx = 30, -310
 			cliff(CFrame.new((r[1] + gx - gap / 2) / 2, h / 2, r[4] + 2), Vector3.new(gx - gap / 2 - r[1], h, 6))
 			cliff(CFrame.new((gx + gap / 2 + r[3]) / 2, h / 2, r[4] + 2), Vector3.new(r[3] - gx - gap / 2, h, 6))
 			cliff(CFrame.new(gx, 34, r[4] + 2), Vector3.new(gap, 32, 6))
@@ -674,14 +674,14 @@ function WorldBuilder.build()
 		local decorFn = DECOR[th.decor]
 		if decorFn then
 			local decorColor = th.decor == "rock" and Color3.new(1, 1, 1) or (th.decor == "stalag" and hex(th.far) or hex(th.ground):Lerp(hex("#2f6b45"), 0.5))
-			local count = math.floor(size.X * size.Z / (th.decor == "pine" and 4500 or 7000))
+			local count = math.floor(size.X * size.Z / (th.decor == "pine" and 3000 or 4500))
 			local placed, tries = 0, 0
 			while placed < count and tries < count * 6 do
 				tries += 1
 				local p = Vector3.new(rng:NextNumber(r[1] + 8, r[3] - 8), 0, rng:NextNumber(r[2] + 8, r[4] - 8))
 				local clear = not nearRoad(p, 10)
 				for _, c in zone.clusters or {} do
-					if (Vector3.new(p.X, 0, p.Z) - c).Magnitude < 75 then
+					if (Vector3.new(p.X, 0, p.Z) - c).Magnitude < 55 then
 						clear = false
 					end
 				end
@@ -694,10 +694,10 @@ function WorldBuilder.build()
 
 		-- flowers and bushes on the grass
 		if th.material == "Grass" then
-			local count = math.floor(size.X * size.Z / 3500)
+			local count = math.floor(size.X * size.Z / 2200)
 			for _ = 1, count do
 				local p = Vector3.new(rng:NextNumber(r[1] + 6, r[3] - 6), 0, rng:NextNumber(r[2] + 6, r[4] - 6))
-				if not nearRoad(p, 4) and not (zone.town and p.Magnitude < 45) then
+				if not nearRoad(p, 4) and not (zone.town and p.Magnitude < 34) then
 					decorFlowers(folder, p, rng)
 				end
 			end
@@ -731,12 +731,12 @@ function WorldBuilder.build()
 		local z = Zones.byId[id]
 		archGate(roads, pos, alongX, z.name, z.id == "meadow" and "Your journey begins" or z.id == "home" and "Build your house here" or ("Recommended Lv " .. z.req))
 	end
-	zoneArch("meadow", Vector3.new(0, 0, 104), false)
-	zoneArch("forest", Vector3.new(-104, 0, 0), true)
-	zoneArch("caves", Vector3.new(-210, 0, -264), false)
-	zoneArch("ice", Vector3.new(0, 0, -264), false)
-	zoneArch("dragon", Vector3.new(364, 0, -330), true)
-	zoneArch("home", Vector3.new(104, 0, 110), true)
+	zoneArch("meadow", Vector3.new(0, 0, 59), false)
+	zoneArch("forest", Vector3.new(-59, 0, 0), true)
+	zoneArch("caves", Vector3.new(-310, 0, -149), false)
+	zoneArch("ice", Vector3.new(0, 0, -149), false)
+	zoneArch("dragon", Vector3.new(204, 0, -190), true)
+	zoneArch("home", Vector3.new(59, 0, -8), true)
 
 	-- the north gate: Wraith Caves (PvP) come later
 	local b = Zones.BOUNDS

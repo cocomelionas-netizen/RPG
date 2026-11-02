@@ -1,4 +1,4 @@
--- The hero's house. Hometown (east of Riverbend) has 12 big plots; every player gets one while in the server.
+-- The hero's house. Hometown (east of Riverbend) has 9 plots; every player gets one while in the server.
 -- A plot holds an 8x8 grid of room cells (HouseGrid.luau): the player picks where the house starts (the Entrance Hall),
 -- then every room has to join the house side by side, door to door.
 -- Every room level adds one House Level, and each House Level gives +1% XP to every skill.
@@ -11,6 +11,7 @@ local HouseGrid = require(Shared.HouseGrid)
 local Items = require(Shared.Items)
 local XP = require(Shared.XP)
 local Zones = require(Shared.Zones)
+local G = require(Shared.Gathering)
 local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local GatherService = require(script.Parent.GatherService)
@@ -22,10 +23,12 @@ local CELL = HouseGrid.CELL
 local PLOT = HouseGrid.PLOT
 local BENCH_DIST = 14
 -- plot centres: three columns, each with a street on its west side, and four rows
-local PLOT_X = { 225, 430, 635 }
-local PLOT_Z = { -160, 20, 200, 380 }
+local PLOT_X = { 150, 295, 440 }
+local PLOT_Z = { -85, 70, 200 }
 
 local plots = {} -- array of { index, center, model, sign, rooms, owner }
+local makeWorkbenchModel -- defined with the plots, also used by the Workshop room
+HomeService.onSellAll = function(_player) end -- set by ShopService (it requires this module)
 local plotOf = {} -- [Player] = plot
 
 local function part(props)
@@ -85,7 +88,6 @@ local FURNITURE = {
 				part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(6, 1.2, 1.2), CFrame = cf * CFrame.new(-3, 1 + i * 1.05, -4 + j * 1.25 + i * 0.6), Color = hex("#a0703a"), Material = Enum.Material.Wood, Parent = f })
 			end
 		end
-		part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.6, 2.4, 2.4), CFrame = cf * CFrame.new(3.5, 1.2, 3) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#8a5a32"), Material = Enum.Material.Wood, Parent = f })
 	end,
 	workshop = function(f, cf)
 		part({ Size = Vector3.new(6, 0.5, 3), CFrame = cf * CFrame.new(-2, 3, -4), Color = hex("#a0703a"), Material = Enum.Material.WoodPlanks, Parent = f })
@@ -114,6 +116,95 @@ local FURNITURE = {
 		for i = 1, 7 do
 			part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 1.2, 1.2), CFrame = cf * CFrame.new(-2 + (i % 4), 0.6 + math.floor(i / 4) * 0.3, 2 + (i % 3) * 0.5) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#ffd24a"), Material = Enum.Material.Neon, CanCollide = false, Parent = f })
 		end
+	end,
+}
+
+-- something to do in every room: a prompt on a station
+local function stationPrompt(core: BasePart, action: string, object: string)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "StationPrompt"
+	prompt.ActionText = action
+	prompt.ObjectText = object
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.Parent = core
+	return prompt
+end
+
+-- a gathering node inside a room (the room's level picks the tier), worked like any node in the world
+local function roomNode(f, core: BasePart, skill: string, tier: number)
+	local node = Instance.new("Model")
+	node.Name = "RoomNode"
+	core.Parent = node
+	node.PrimaryPart = core
+	node:SetAttribute("Skill", skill)
+	node:SetAttribute("Tier", tier)
+	local info = G.node(skill, tier)
+	local prompt = stationPrompt(core, G.VERB[skill], ("%s (Lv %d)"):format(info.name, info.req))
+	prompt.Name = "GatherPrompt"
+	local chips = Instance.new("ParticleEmitter")
+	chips.Name = "Chips"
+	chips.Enabled = false
+	chips.Color = ColorSequence.new(core.Color)
+	chips.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
+	chips.Lifetime = NumberRange.new(0.4, 0.8)
+	chips.Speed = NumberRange.new(6, 12)
+	chips.SpreadAngle = Vector2.new(60, 60)
+	chips.Acceleration = Vector3.new(0, -30, 0)
+	chips.Parent = core
+	node.Parent = f
+	GatherService.attach(node)
+	return node
+end
+
+local CELLAR_ORE = { 0, 2, 3, 4, 5 } -- ore tier by Ore Cellar level
+local WOOD_COLOR = { [0] = "#e8d9b0", "#b08850", "#c0703a", "#7a5a30", "#8a5ab0" }
+
+-- the stations: what each room lets you do
+local STATIONS = {
+	entrance = function(f, cf, _level)
+		local board = part({ Name = "HouseBoard", Size = Vector3.new(3, 4, 0.4), CFrame = cf * CFrame.new(-5, 3.5, -6), Color = hex("#8a5a32"), Material = Enum.Material.Wood, Parent = f })
+		stationPrompt(board, "Open", "House plans").Triggered:Connect(function(player)
+			Remotes.OpenCraft:FireClient(player, "house")
+		end)
+	end,
+	workshop = function(f, cf, _level)
+		makeWorkbenchModel(f, (cf * CFrame.new(-3, 0.7, 4)).Position, 0)
+	end,
+	woodshed = function(f, cf, level)
+		local tier = math.clamp(level - 1, 0, 4)
+		local stump = part({ Name = "ChoppingBlock", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.4, 3, 3), CFrame = cf * CFrame.new(4, 1.9, 4) * CFrame.Angles(0, 0, math.rad(90)), Color = hex(WOOD_COLOR[tier]), Material = Enum.Material.Wood, Parent = f })
+		roomNode(f, stump, "woodcutting", tier)
+	end,
+	cellar = function(f, cf, level)
+		local tier = CELLAR_ORE[math.clamp(level, 1, 5)]
+		local vein = part({ Name = "OreVein", Size = Vector3.new(4, 3.4, 3.4), CFrame = cf * CFrame.new(4, 2.4, 4) * CFrame.Angles(0.1, 0.6, 0.1), Color = hex("#5e5a58"):Lerp(hex(G.ORES[tier].color), 0.35), Material = Enum.Material.Slate, Parent = f })
+		for i = 1, 4 do
+			part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1.2, 1.2, 1.2), CFrame = vein.CFrame * CFrame.new(math.cos(i * 1.6) * 1.8, 0.6, math.sin(i * 1.6) * 1.6), Color = hex(G.ORES[tier].color), Material = Enum.Material.Metal, CanCollide = false, Parent = f })
+		end
+		roomNode(f, vein, "mining", tier)
+	end,
+	pond = function(f, cf, level)
+		local tier = math.clamp(level - 1, 0, 4)
+		local ripple = part({ Name = "Ripple", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, 4, 4), CFrame = cf * CFrame.new(0, 1.85, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.new(1, 1, 1), Material = Enum.Material.Neon, Transparency = 0.6, CanCollide = false, Parent = f })
+		roomNode(f, ripple, "fishing", tier)
+	end,
+	treasury = function(f, cf, _level)
+		local counter = part({ Name = "Counter", Size = Vector3.new(5, 3, 2), CFrame = cf * CFrame.new(4, 2.2, 4), Color = hex("#8a5a32"), Material = Enum.Material.WoodPlanks, Parent = f })
+		stationPrompt(counter, "Sell all", "Treasury").Triggered:Connect(function(player)
+			HomeService.onSellAll(player)
+		end)
+	end,
+	bedroom = function(f, cf, _level)
+		local pillow = part({ Name = "Bed", Size = Vector3.new(4, 2, 6), CFrame = cf * CFrame.new(-3, 2.5, -2), Transparency = 1, CanCollide = false, CanQuery = false, Parent = f })
+		stationPrompt(pillow, "Rest", "Bed").Triggered:Connect(function(player)
+			local data = DataService.get(player)
+			if data then
+				Remotes.Notify:FireClient(player, ("💤 A good rest! While you are away your hero keeps working for up to %dh."):format(G.offlineCap(data.home.rooms) // 3600), "good")
+			end
+		end)
 	end,
 }
 
@@ -162,13 +253,13 @@ local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: str
 	for _, s in { -1, 1 } do
 		local w = Instance.new("WedgePart")
 		w.Anchored = true
-		w.Size = Vector3.new(CELL + 2, rise, half)
+		w.Size = Vector3.new(CELL, rise, half) -- no overhang along the ridge: neighbours' roofs would overlap and flicker
 		w.CFrame = cf * CFrame.new(0, top + rise / 2, s * half / 2) * CFrame.Angles(0, s > 0 and math.pi or 0, 0)
 		w.Color = roofColor
 		w.Material = Enum.Material.SmoothPlastic
 		w.Parent = f
 	end
-	part({ Name = "Ridge", Size = Vector3.new(CELL + 2.4, 0.6, 0.8), CFrame = cf * CFrame.new(0, top + rise, 0), Color = level >= 4 and hex("#ffd24a") or wood, Material = level >= 4 and Enum.Material.Neon or Enum.Material.Wood, Parent = f })
+	part({ Name = "Ridge", Size = Vector3.new(CELL - 0.1, 0.6, 0.8), CFrame = cf * CFrame.new(0, top + rise, 0), Color = level >= 4 and hex("#ffd24a") or wood, Material = level >= 4 and Enum.Material.Neon or Enum.Material.Wood, Parent = f })
 	local light = Instance.new("PointLight")
 	light.Color = Color3.fromRGB(255, 225, 170)
 	light.Range = 16
@@ -188,6 +279,9 @@ local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: str
 	end
 	if FURNITURE[id] then
 		FURNITURE[id](f, cf * CFrame.new(0, 0.7, 0))
+	end
+	if STATIONS[id] then
+		STATIONS[id](f, cf, level)
 	end
 	local bb = billboard(f:FindFirstChild("Ridge"), icon .. " " .. name, level > 0 and ("Level " .. level) or "", 80)
 	bb.StudsOffsetWorldSpace = Vector3.new(0, 3.5, 0)
@@ -209,7 +303,7 @@ local function buildRoom(parent, cf: CFrame, id: string, name: string, icon: str
 end
 
 -- ===================== plots =====================
-local function makeWorkbench(parent, pos: Vector3, facing: number)
+makeWorkbenchModel = function(parent, pos: Vector3, facing: number)
 	local model = Instance.new("Model")
 	model.Name = "Workbench"
 	local cf = CFrame.new(pos) * CFrame.Angles(0, facing, 0)
@@ -293,7 +387,7 @@ local function makePlot(parent, index: number)
 	sign.Size = UDim2.fromScale(16, 3.4)
 	sign.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
 	-- workbench just inside the gate
-	makeWorkbench(model, center + Vector3.new(-half + 7, 0, gate / 2 + 8), math.pi / 2)
+	makeWorkbenchModel(model, center + Vector3.new(-half + 7, 0, gate / 2 + 8), math.pi / 2)
 	local rooms = Instance.new("Folder")
 	rooms.Name = "Rooms"
 	rooms.Parent = model
@@ -366,8 +460,8 @@ function HomeService.buildTown(world: Instance)
 	for i = 1, #PLOT_X * #PLOT_Z do
 		table.insert(plots, makePlot(plotsFolder, i))
 	end
-	for _, x in { 122, 327, 532 } do
-		for z = -240, 460, 40 do
+	for _, x in { 67, 212, 357 } do
+		for z = -135, 255, 40 do
 			local p = Vector3.new(x + Zones.ROAD_WIDTH / 2 + 1, 0, z)
 			part({ Size = Vector3.new(0.5, 7, 0.5), CFrame = CFrame.new(p + Vector3.new(0, 3.5, 0)), Color = hex("#3a3a40"), Material = Enum.Material.Metal, Parent = folder })
 			local lamp = part({ Size = Vector3.new(1.2, 1.2, 1.2), CFrame = CFrame.new(p + Vector3.new(0, 7.4, 0)), Color = hex("#ffe6a0"), Material = Enum.Material.Neon, CanCollide = false, Parent = folder })
@@ -390,10 +484,12 @@ local function nearestBench(player: Player)
 	if not hrp then
 		return nil
 	end
+	-- the workbench in the garden, or the one in a Workshop room
 	for _, p in plots do
-		local bench = p.model:FindFirstChild("Workbench")
-		if bench and (bench.PrimaryPart.Position - hrp.Position).Magnitude <= BENCH_DIST then
-			found = bench
+		for _, bench in p.model:GetDescendants() do
+			if bench.Name == "Workbench" and bench:IsA("Model") and bench.PrimaryPart and (bench.PrimaryPart.Position - hrp.Position).Magnitude <= BENCH_DIST then
+				found = bench
+			end
 		end
 	end
 	return found

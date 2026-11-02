@@ -288,6 +288,16 @@ local function applyOffline(player: Player, data, seconds: number)
 	end)
 end
 
+-- hook up a node made after start (house rooms)
+function GatherService.attach(node: Model)
+	local prompt = node.PrimaryPart and node.PrimaryPart:FindFirstChild("GatherPrompt")
+	if prompt then
+		prompt.Triggered:Connect(function(player)
+			GatherService.start(player, node)
+		end)
+	end
+end
+
 function GatherService.init(nodes)
 	for _, node in nodes do
 		local prompt = node.PrimaryPart:FindFirstChild("GatherPrompt")

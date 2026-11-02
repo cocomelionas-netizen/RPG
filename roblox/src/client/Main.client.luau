@@ -96,8 +96,10 @@ BuildSpots.init(function(x, z)
 	UI.openSpot(x, z)
 end)
 
-Remotes.OpenCraft.OnClientEvent:Connect(function()
-	UI.showPanel("craft")
+-- a station asks to open a window (workbench by default, the house plans from the Entrance Hall)
+Remotes.OpenCraft.OnClientEvent:Connect(function(panel)
+	UI.showPanel(nil)
+	UI.showPanel(panel or "craft")
 end)
 
 Remotes.Offline.OnClientEvent:Connect(function(o)

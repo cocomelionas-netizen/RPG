@@ -50,7 +50,7 @@ Visa kita (renkimas, amatai, kova) maitina šias dvi.
 - **Žemėlapis kaip OSRS:** miestas Riverbend centre (fontanas, rodyklių stulpas), keliai į 4 puses su arkomis:
   pietūs – Green Meadow (startas), vakarai – Dark Forest, šiaurė – Ice Mountains ir Wraith Caves vartai,
   šiaurės vakarai – Shadow Caves, šiaurės rytai – Dragon's Lair, rytai – Hometown.
-- **Sklypas 160×160** su 8×8 kambarių tinkleliu (16 studų langelis). Žaidėjas pats pasirenka, kur pradeda namą
+- **Sklypas 120×120** su 5×5 kambarių tinkleliu (20 studų langelis), 9 sklypai Hometown. Žaidėjas pats pasirenka, kur pradeda namą
   (Entrance Hall bet kur), o kiekvienas kitas kambarys turi liestis su namu šonu („durys į duris“) – `HouseGrid.luau`.
   Statoma ant žemės: sklype šviečia ➕ vietos (pradžioje – visur, vėliau – tik šalia namo). Užlipus ant vietos
   (arba „Build here“) atsidaro „What to build here?“ su kambariais, kuriuos gali statyti; pirmas įperkamas pažymėtas ⭐.
@@ -89,3 +89,15 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
     Žaidžiant gaunami per Enchant Scrolls (retas drop'as), už Gems – iškart.
   - Namo kosmetika: ypatingi baldai, šviesos, stogai.
 - Visur rodoma aiški kaina ir ką gausi, pirkinius gali atšaukti prieš patvirtinant.
+
+### Veikla namuose (kaip OSRS namas)
+
+| Kambarys | Ką veikti |
+| --- | --- |
+| 🏡 Entrance Hall | House plans – atidaro House langą |
+| 🪓 Woodshed | Kirtimo kaladė: Birch → Elder pagal kambario lygį |
+| ⛏️ Ore Cellar | Rūdos gysla: Copper, Iron, Coal, Cobalt, Verdite pagal lygį |
+| 🎣 Fish Pond | Žvejybos vieta: Roach → Eel pagal lygį |
+| 🔨 Workshop | Dar vienas Workbench |
+| 🏦 Treasury | Sell all |
+| 🛏️ Bedroom | Rest – parodo offline laiką |

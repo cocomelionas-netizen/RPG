@@ -17,6 +17,7 @@ folder.Name = "BuildSpots"
 local onPick = function(_x: number, _z: number) end
 local lastKey = nil
 local lastView = nil
+local builtFor = nil -- layout + plot the pads were made for: pads are only remade when that changes (no flicker)
 
 local function myPlot()
 	local town = workspace:FindFirstChild("World") and workspace.World:FindFirstChild("Hometown")
@@ -113,15 +114,29 @@ local function makePad(center: Vector3, x: number, z: number, starting: boolean)
 	pad.Parent = folder
 end
 
--- rebuild the pads for the current layout
+local function layoutKey(plot, layout): string
+	local parts = { plot and plot.Name or "-" }
+	for id, c in layout do
+		table.insert(parts, ("%s@%d,%d"):format(id, c.x, c.z))
+	end
+	table.sort(parts)
+	return table.concat(parts, ";")
+end
+
+-- rebuild the pads for the current layout (only when it changed)
 function BuildSpots.refresh(view)
 	lastView = view or lastView
-	folder:ClearAllChildren()
 	local plot = myPlot()
+	local layout = lastView and lastView.layout or {}
+	local key = layoutKey(plot, layout)
+	if key == builtFor then
+		return
+	end
+	builtFor = key
+	folder:ClearAllChildren()
 	if not plot or not lastView then
 		return
 	end
-	local layout = lastView.layout or {}
 	if not anythingToBuild(layout) then
 		return
 	end

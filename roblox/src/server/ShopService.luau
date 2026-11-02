@@ -91,6 +91,7 @@ local function upgrade(player: Player, tool)
 end
 
 function ShopService.init()
+	HomeService.onSellAll = sellAll
 	Remotes.Request.OnServerEvent:Connect(function(player, action, a, b, c)
 		local now = os.clock()
 		if lastRequest[player] and now - lastRequest[player] < 0.1 then
