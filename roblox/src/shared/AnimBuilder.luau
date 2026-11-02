@@ -25,10 +25,19 @@ local PARENTS = {
 
 local REST = {}
 
--- one-handed slash, right hand only: the blade goes back over the shoulder, holds for a beat, then comes down hard
--- in front of the hero (low enough for a rat) and follows through across the body before settling
+-- the OSRS stance: upper arm by the side, forearm forward at the elbow, the blade up and ahead at about 55 degrees
+-- and a little out to the side, clear of the head. Only the right arm is keyed, so the legs and the other arm still
+-- walk and idle as the avatar does, while the sword stays put instead of swinging with the arm
+local HOLD = {
+	RightUpperArm = { 12, 0, 10 },
+	RightLowerArm = { 62, 0, 0 },
+	RightHand = { 4, -22, 0 },
+}
+
+-- one-handed slash, right hand only: from the stance the blade goes back over the shoulder, holds for a beat, then
+-- comes down hard in front of the hero (low enough for a rat), follows through across the body and returns
 local SLASH = {
-	{ 0, REST, "Out" },
+	{ 0, HOLD, "Out" },
 	{ 0.2, {
 		LowerTorso = { 0, -8, 0 },
 		UpperTorso = { 4, -26, 0 },
@@ -61,15 +70,17 @@ local SLASH = {
 		UpperTorso = { -12, 26, 0 },
 		RightUpperArm = { 28, 0, -38 },
 		RightLowerArm = { 10, 0, 0 },
-		RightHand = { -70, 0, 0 },
+		RightHand = { -55, 0, 0 },
 		LeftUpperArm = { -18, 0, -6 },
 		Head = { 4, -10, 0 },
 	}, "InOut" },
-	{ 0.8, REST, "InOut" },
+	{ 0.8, HOLD, "InOut" },
 }
 
+-- the hold is Action so it wins over any avatar's walk and idle; the slash sits above it
 AnimBuilder.MOVES = {
-	Slash = { keys = SLASH, priority = Enum.AnimationPriority.Action },
+	Hold = { keys = { { 0, HOLD, "Linear" }, { 1, HOLD, "Linear" } }, priority = Enum.AnimationPriority.Action, loop = true },
+	Slash = { keys = SLASH, priority = Enum.AnimationPriority.Action3 },
 }
 
 local EASING = {

@@ -1,9 +1,10 @@
 -- The longsword every hero carries, and how it is held and swung. It is built from parts around its grip so
--- the hand closes on the grip itself: the Handle is the leather grip, its long axis is the blade's line, and
--- Tool.Grip is measured against Roblox's RightGripAttachment (whose Y axis points forward out of a hanging fist
--- and which every avatar scales into the palm). Roblox's tool pose holds the arm straight out in front; that is
--- swapped for an empty clip so the arm hangs and swings as it does empty-handed, the sword pointing ahead and a
--- little down. Swings are one-handed and played on the server so everyone sees them.
+-- the hand closes on the grip itself. Every weapon model follows one rule: its Handle holds an Attachment
+-- "GripPoint" where the fist closes, with +Y pointing up the blade and +Z out of the cutting edge. Tool.Grip is
+-- worked out from that point, measured against Roblox's RightGripAttachment (which every avatar scales into its
+-- palm), so any model that follows the rule sits in every hand the same way. Roblox's arm-straight-out tool pose
+-- is swapped for our own OSRS stance, which holds only the right arm; swings are one-handed and played on the
+-- server so everyone sees them.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,7 +16,8 @@ local GRIP_LENGTH = 0.9
 local GUARD = Vector3.new(0.26, 0.18, 1.15)
 local BLADE = Vector3.new(0.08, 2.6, 0.3)
 local TIP = 0.45
-local HOLD_TILT = math.rad(20) -- the blade's tip dips this much below level while the arm hangs
+local HOLD_TILT = math.rad(20) -- the blade's tip dips this much below the line of the fist
+local HOLD_ROLL = math.rad(40) -- the blade turned on its own axis so the camera behind the hero sees its flat, not its edge
 
 local tracks = {} -- [Animator] = { [name] = AnimationTrack }
 
@@ -42,13 +44,21 @@ local function piece(tool: Tool, handle: BasePart, name: string, props: { [strin
 	return p
 end
 
+-- sets Tool.Grip from the model's GripPoint (see the top of this file)
+function Sword.fit(tool: Tool)
+	local handle = tool:FindFirstChild("Handle")
+	local point = handle and handle:FindFirstChild("GripPoint")
+	if point and point:IsA("Attachment") then
+		tool.Grip = point.CFrame * CFrame.Angles(HOLD_TILT, 0, 0) * CFrame.Angles(0, HOLD_ROLL, 0)
+	end
+end
+
 function Sword.make(): Tool
 	local cfg = Config.SWORD
 	local tool = Instance.new("Tool")
 	tool.Name = cfg.name
 	tool.ToolTip = cfg.name
 	tool.CanBeDropped = false
-	tool.Grip = CFrame.Angles(HOLD_TILT, 0, 0)
 
 	local handle = Instance.new("Part")
 	handle.Name = "Handle"
@@ -99,6 +109,12 @@ function Sword.make(): Tool
 	trail.LightEmission = 0.4
 	trail.Enabled = false
 	trail.Parent = handle
+
+	-- the fist closes on the middle of the grip
+	local point = Instance.new("Attachment")
+	point.Name = "GripPoint"
+	point.Parent = handle
+	Sword.fit(tool)
 	return tool
 end
 
@@ -118,7 +134,7 @@ local function track(animator: Animator, name: string, id: number)
 			return nil
 		end
 		t = loaded
-		t.Priority = Enum.AnimationPriority.Action
+		t.Priority = Enum.AnimationPriority.Action3 -- above the Action hold
 		tracks[animator][name] = t
 	end
 	return t
@@ -143,7 +159,7 @@ local function equip(player: Player, char: Model)
 	if not hum then
 		return
 	end
-	-- the relaxed hold: Roblox's Animate script picks up the changed animation
+	-- the OSRS stance in place of Roblox's tool pose: the Animate script picks up the changed animation
 	task.spawn(function()
 		local animate = char:WaitForChild("Animate", 10)
 		local none = animate and animate:WaitForChild("toolnone", 10)
@@ -161,6 +177,18 @@ local function equip(player: Player, char: Model)
 		end
 		none.ChildAdded:Connect(relax)
 	end)
+	-- an avatar that changes size after spawning (a new outfit or body scale) moves its grip point; the hand's weld
+	-- follows it so the sword stays in the fist
+	local hand = char:WaitForChild("RightHand", 10)
+	local point = hand and hand:WaitForChild("RightGripAttachment", 10) :: Attachment?
+	if point then
+		point:GetPropertyChangedSignal("CFrame"):Connect(function()
+			local weld = hand:FindFirstChild("RightGrip")
+			if weld and weld:IsA("Weld") then
+				weld.C0 = point.CFrame
+			end
+		end)
+	end
 	local tool = Sword.make()
 	tool.Parent = player:WaitForChild("Backpack")
 	hum:EquipTool(tool)

@@ -6,8 +6,8 @@ Config.TICK = 0.6
 
 -- the hero's one-handed moves: our own uploaded animations (0 = not uploaded yet, Roblox's sword slash stands in)
 Config.ANIM = {
-	Hold = 122117143323639, -- an empty clip: replaces Roblox's arm-straight-out tool pose, the arm hangs relaxed
-	Slash = 123933592551985, -- AnimBuilder's Slash: over the shoulder, down in front, follow-through
+	Hold = 71244894888144, -- AnimBuilder's Hold: the OSRS stance, in place of Roblox's arm-straight-out tool pose
+	Slash = 92915599436003, -- AnimBuilder's Slash: from the stance over the shoulder, down in front, follow-through
 	RobloxSlash = 522635514, -- Roblox's own R15 tool slash
 }
 Config.CONTACT = 0.33 -- seconds from the start of a swing to the blade landing (the Slash's "Hit" marker)
