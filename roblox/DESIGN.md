@@ -169,3 +169,11 @@ Jokių atsitiktinių mokamų daiktų (loot box) – visada aiškiai matai, ką p
   veiksmai: 4 kardo smūgiai (įstrižas kirtis, kirtis iš viršaus, dūris, platus mostas – parenkami atsitiktinai, du kartus
   iš eilės tas pats nesikartoja), kirvio kirtis į šoną, kirtiklio smūgis iš viršaus, meškerės užmetimas, pjūklo stūmis.
 - `HeroMotion` groja jas serveryje, todėl mato visi žaidėjai; laikymas prasideda paėmus įrankį ir baigiasi jį padėjus.
+
+## Įrankių laikymas (atnaujinta)
+
+- Įrankiai – gatavi Creator Store modeliai (`AssetPacks.Tools`), ne sugeneruoti. Laikoma kaip kituose Roblox žaidimuose:
+  ranka nuleista, kardas prie šono ašmenimis žemyn į priekį, kirvis ir kirtiklis stačiai prie peties, meškerė virš vandens.
+- Roblox'o numatyta „ranka į priekį“ poza išjungta (tuščia `toolnone`), ranka eina ir kvėpuoja kartu su kūnu.
+- Smūgio metu įrankis persijungia į „tiesiai iš dilbio“ laikymą (`ActGrip`), po smūgio grįžta – kaip Roblox ClassicSword.
+- Metalo lygis (bronza, geležis, plienas...) matomas kardo ašmenų ir kirtiklio galvos spalva; kirvis kol kas be atspalvio.

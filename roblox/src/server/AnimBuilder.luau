@@ -22,12 +22,6 @@ local function with(base, extra)
 end
 
 -- ===== sword =====
-DEFS.SwordHold = { loop = true, priority = "Action", keys = {
-	{ 0, SWORD_GUARD },
-	{ 1.2, with(SWORD_GUARD, { RightUpperArm = { 5, 0, 12 }, RightLowerArm = { 11, 0, 0 }, RightHand = { 34, 0, 0 } }) },
-	{ 2.4, SWORD_GUARD },
-} }
-
 -- 1: diagonal slash from over the right shoulder down across the body
 DEFS.SwordSlash = { priority = "Action2", keys = {
 	{ 0, SWORD_GUARD },
@@ -66,7 +60,6 @@ DEFS.SwordSweep = { priority = "Action2", keys = {
 
 -- ===== axe: rest it on the shoulder, chop sideways into the trunk =====
 local AXE_REST = { RightUpperArm = { 25, 0, 10 }, RightLowerArm = { 120, 0, 0 }, RightHand = { 0, 0, 0 }, LeftUpperArm = { 10, 0, -8 }, LeftLowerArm = { 20, 0, 0 } }
-DEFS.AxeHold = { loop = true, priority = "Action", keys = { { 0, AXE_REST }, { 1.5, with(AXE_REST, { RightLowerArm = { 115, 0, 0 } }) }, { 3, AXE_REST } } }
 DEFS.AxeChop = { priority = "Action2", keys = {
 	{ 0, AXE_REST },
 	{ 0.3, { UpperTorso = { 0, -40, 0 }, LowerTorso = { 0, -12, 0 }, RightUpperArm = { 95, 0, 70 }, RightLowerArm = { 40, 0, 0 }, RightHand = { 0, 0, 0 }, LeftUpperArm = { 80, 0, 10 }, LeftLowerArm = { 50, 0, 0 } } },
@@ -77,7 +70,6 @@ DEFS.AxeChop = { priority = "Action2", keys = {
 
 -- ===== pickaxe: both hands up over the head, swing down onto the rock =====
 local PICK_REST = { RightUpperArm = { 35, 0, 10 }, RightLowerArm = { 70, 0, 0 }, RightHand = { 0, 0, 0 }, LeftUpperArm = { 35, 0, 15 }, LeftLowerArm = { 70, 0, 0 } }
-DEFS.PickHold = { loop = true, priority = "Action", keys = { { 0, PICK_REST }, { 1.5, with(PICK_REST, { RightUpperArm = { 38, 0, 10 } }) }, { 3, PICK_REST } } }
 DEFS.PickSwing = { priority = "Action2", keys = {
 	{ 0, PICK_REST },
 	{ 0.32, { UpperTorso = { 12, 0, 0 }, LowerTorso = { 4, 0, 0 }, RightUpperArm = { 150, 0, 10 }, RightLowerArm = { 40, 0, 0 }, RightHand = { 0, 0, 0 }, LeftUpperArm = { 145, 0, 20 }, LeftLowerArm = { 40, 0, 0 } } },
@@ -88,11 +80,6 @@ DEFS.PickSwing = { priority = "Action2", keys = {
 
 -- ===== fishing rod: hold it out over the water with a gentle bob; cast when a fish is caught =====
 local ROD_HOLD = { RightUpperArm = { 18, 0, 8 }, RightLowerArm = { 10, 0, 0 }, RightHand = { 0, 0, 0 }, LeftUpperArm = { 25, 0, 20 }, LeftLowerArm = { 45, 0, 0 } }
-DEFS.RodHold = { loop = true, priority = "Action", keys = {
-	{ 0, ROD_HOLD },
-	{ 1, with(ROD_HOLD, { RightUpperArm = { 21, 0, 8 }, RightHand = { -5, 0, 0 } }) },
-	{ 2, ROD_HOLD },
-} }
 DEFS.RodCast = { priority = "Action2", keys = {
 	{ 0, ROD_HOLD },
 	{ 0.3, { UpperTorso = { 10, -10, 0 }, RightUpperArm = { 140, 0, 10 }, RightLowerArm = { 40, 0, 0 }, RightHand = { 0, 0, 0 }, LeftUpperArm = { 60, 0, 20 }, LeftLowerArm = { 50, 0, 0 } } },
@@ -102,13 +89,17 @@ DEFS.RodCast = { priority = "Action2", keys = {
 
 -- ===== saw at the workbench: push and pull =====
 local SAW_REST = { RightUpperArm = { 45, 0, 5 }, RightLowerArm = { 55, 0, 0 }, RightHand = { 0, 0, 0 }, LeftUpperArm = { 30, 0, 20 }, LeftLowerArm = { 70, 0, 0 }, UpperTorso = { -10, 0, 0 } }
-DEFS.SawHold = { loop = true, priority = "Action", keys = { { 0, SAW_REST }, { 2, SAW_REST } } }
 DEFS.SawPush = { priority = "Action2", keys = {
 	{ 0, SAW_REST },
 	{ 0.25, with(SAW_REST, { RightUpperArm = { 75, 0, 5 }, RightLowerArm = { 10, 0, 0 }, UpperTorso = { -16, 0, 0 } }) },
 	{ 0.5, with(SAW_REST, { RightUpperArm = { 35, 0, 5 }, RightLowerArm = { 80, 0, 0 } }) },
 	{ 0.8, SAW_REST },
 } }
+
+-- ===== holding any tool =====
+-- Roblox's own "toolnone" pose holds the tool arm straight out in front. This one moves nothing, so the arm keeps
+-- hanging and swinging with the hero's idle and walk (HeroMotion puts it in place of Roblox's).
+DEFS.ToolNone = { loop = true, priority = "Idle", keys = { { 0, {} }, { 1, {} } } }
 
 -- ===== build =====
 local PARENT = {

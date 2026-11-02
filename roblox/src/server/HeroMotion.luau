@@ -1,5 +1,8 @@
--- Plays the hero's tool animations (Shared.Anims) on the server, so every player sees them: a hold pose for as long
--- as one of our tools is in the hero's hand, and an action (a sword stroke, a chop, a swing, a cast) on request.
+-- Plays the hero's tool animations (Shared.Anims) on the server, so every player sees them: an action (a sword stroke,
+-- a chop, a swing, a cast) on request. Holding a tool is no pose of its own: Roblox's Animate script would hold it with
+-- the arm straight out in front ("toolnone"), so that is swapped for an empty animation and the arm hangs and swings
+-- as it does empty-handed; the tools are gripped for that relaxed hand (ToolFactory). A swing switches the tool to its
+-- "ActGrip", straight out of the forearm as the swings were made for, and back to its "HoldGrip" once it is over.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -38,19 +41,6 @@ local function track(animator: Animator, name: string)
 	return t
 end
 
--- stop every hold pose on the animator, whoever started it (the tracks list, not our cache, is the truth)
-local HOLD_IDS = {}
-for _, name in Anims.HOLD do
-	HOLD_IDS["rbxassetid://" .. (Anims.IDS[name] or 0)] = true
-end
-local function stopHolds(animator: Animator)
-	for _, t in animator:GetPlayingAnimationTracks() do
-		if t.Animation and HOLD_IDS[t.Animation.AnimationId] then
-			t:Stop(0.2)
-		end
-	end
-end
-
 -- an action for the tool in hand; false when there is no animation for it (the caller falls back to Roblox's)
 function HeroMotion.act(char: Model?, kind: string): boolean
 	local animator = animatorOf(char)
@@ -67,47 +57,51 @@ function HeroMotion.act(char: Model?, kind: string): boolean
 		return false
 	end
 	last[animator] = name
-	t:Play(0.08, 1, rng:NextNumber(0.95, 1.08))
-	-- the blade's trail shows while it moves
-	for _, c in char:GetChildren() do
-		local trail = c:IsA("Tool") and c:FindFirstChild("Handle") and c.Handle:FindFirstChildOfClass("Trail")
-		if trail then
-			trail.Enabled = true
-			task.delay(0.5, function()
-				trail.Enabled = false
+	local speed = rng:NextNumber(0.95, 1.08)
+	t:Play(0.08, 1, speed)
+	local length = (t.Length > 0 and t.Length or 0.9) / speed
+	for _, tool in char:GetChildren() do
+		if tool:IsA("Tool") and tool:GetAttribute("ActGrip") then
+			-- held for the swing; back to the relaxed hold a moment after the last swing ends
+			local until_ = os.clock() + length + 0.3
+			tool:SetAttribute("ActUntil", until_)
+			tool.Grip = tool:GetAttribute("ActGrip")
+			task.delay(length + 0.35, function()
+				if tool.Parent and tool:GetAttribute("ActUntil") == until_ then
+					tool.Grip = tool:GetAttribute("HoldGrip")
+				end
 			end)
+			-- the blade's trail shows while it moves
+			local trail = tool:FindFirstChild("Trail", true)
+			if trail then
+				trail.Enabled = true
+				task.delay(0.5, function()
+					trail.Enabled = false
+				end)
+			end
 		end
 	end
 	return true
 end
 
--- hold poses follow whatever tool of ours is in the hero's hand
 local function watch(char: Model)
-	local function update()
-		local animator = animatorOf(char)
-		if not animator then
+	-- the Animate script picks up the change (it listens to its animations), so set it on the server once
+	task.spawn(function()
+		local animate = char:WaitForChild("Animate", 10)
+		local none = animate and animate:WaitForChild("toolnone", 10)
+		if not none then
 			return
 		end
-		stopHolds(animator)
-		for _, c in char:GetChildren() do
-			if c:IsA("Tool") and c:GetAttribute("Kind") then
-				local t = track(animator, Anims.HOLD[c:GetAttribute("Kind")])
-				if t then
-					t.Looped = true
-					t:Play(0.25)
-				end
+		local id = "rbxassetid://" .. Anims.TOOL_NONE
+		local function relax(a: Instance)
+			if a:IsA("Animation") and a.AnimationId ~= id then
+				a.AnimationId = id
 			end
 		end
-	end
-	char.ChildAdded:Connect(function(c)
-		if c:IsA("Tool") then
-			update()
+		for _, a in none:GetChildren() do
+			relax(a)
 		end
-	end)
-	char.ChildRemoved:Connect(function(c)
-		if c:IsA("Tool") then
-			update()
-		end
+		none.ChildAdded:Connect(relax)
 	end)
 	char.Destroying:Connect(function()
 		local animator = animatorOf(char)
