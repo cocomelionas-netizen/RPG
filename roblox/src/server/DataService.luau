@@ -11,6 +11,7 @@ local XP = require(Shared.XP)
 local Items = require(Shared.Items)
 local Construction = require(Shared.Construction)
 local Goals = require(Shared.Goals)
+local HouseGrid = require(Shared.HouseGrid)
 local Remotes = require(Shared.Remotes)
 
 local DataService = {}
@@ -52,7 +53,7 @@ local function defaultData()
 		inv = {},
 		gold = 0,
 		tools = { axe = 0, pick = 0, rod = 0 },
-		home = { rooms = {} }, -- [roomId] = level 1..5
+		home = { rooms = {}, layout = {} }, -- rooms: [roomId] = level 1..5; layout: [roomId] = { x, z } cell on the plot
 		activity = nil, -- { skill, tier } while gathering: used for offline progress
 		lastSeen = 0,
 		created = os.time(),
@@ -95,6 +96,15 @@ local function reconcile(data)
 			data.home.rooms[id] = nil
 		end
 	end
+	if type(data.home.layout) ~= "table" then
+		data.home.layout = {}
+	end
+	for id, c in data.home.layout do
+		local known = id == HouseGrid.START or (Construction.byId[id] and (data.home.rooms[id] or 0) > 0)
+		if not known or type(c) ~= "table" or not HouseGrid.inside(c.x or -1, c.z or -1) then
+			data.home.layout[id] = nil
+		end
+	end
 	for k, v in def.stats do
 		if data.stats[k] == nil then
 			data.stats[k] = v
@@ -128,7 +138,7 @@ end
 -- client view of the save (no lock / internal fields)
 function DataService.view(data)
 	return {
-		skills = data.skills, inv = data.inv, gold = data.gold, tools = data.tools, rooms = data.home.rooms,
+		skills = data.skills, inv = data.inv, gold = data.gold, tools = data.tools, rooms = data.home.rooms, layout = data.home.layout,
 		stats = { sold = data.stats.sold, homeTrips = data.stats.homeTrips, made = data.stats.made }, goal = data.goal,
 		memoryOnly = memoryOnly,
 	}
@@ -172,6 +182,10 @@ local function setupLeaderstats(player: Player, data)
 	gold.Name = "Gold"
 	gold.Value = data.gold
 	gold.Parent = ls
+	local house = Instance.new("IntValue")
+	house.Name = "House"
+	house.Value = HouseGrid.houseLevel(data.home.rooms)
+	house.Parent = ls
 	ls.Parent = player
 end
 
@@ -181,6 +195,7 @@ function DataService.refreshLeaderstats(player: Player)
 	if data and ls then
 		ls["Total Lv"].Value = totalLevel(data)
 		ls.Gold.Value = data.gold
+		ls.House.Value = HouseGrid.houseLevel(data.home.rooms)
 	end
 end
 
@@ -197,7 +212,9 @@ local function load(player: Player)
 			store:UpdateAsync(key, function(old)
 				local data = reconcile(old)
 				local lock = data.lock
-				if lock and lock.jobId ~= jobId() and os.time() - (lock.time or 0) < LOCK_EXPIRE then
+				-- a lock left by an earlier Studio test (stopping Play can cut the last save short) never blocks Studio
+				local studioLeftover = RunService:IsStudio() and type(lock) == "table" and tostring(lock.jobId):sub(1, 7) == "studio-"
+				if lock and not studioLeftover and lock.jobId ~= jobId() and os.time() - (lock.time or 0) < LOCK_EXPIRE then
 					lockedBy = lock.jobId
 					return nil -- leave the save untouched: another server still has it open
 				end

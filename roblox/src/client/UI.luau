@@ -13,6 +13,7 @@ local G = require(Shared.Gathering)
 local Construction = require(Shared.Construction)
 local Goals = require(Shared.Goals)
 local Tiers = require(Shared.Tiers)
+local Zones = require(Shared.Zones)
 
 local player = Players.LocalPlayer
 local UI = {}
@@ -272,9 +273,9 @@ task.spawn(function()
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
-			travelGoesHome = hrp.Position.X > 0
-			travel.icon.Text = travelGoesHome and "🏡" or "🛣️"
-			travel.label.Text = travelGoesHome and "Go home" or "To road"
+			travelGoesHome = Zones.indexAt(hrp.Position.X, hrp.Position.Z) ~= Zones.byId.home.index
+			travel.icon.Text = travelGoesHome and "🏡" or "⛲"
+			travel.label.Text = travelGoesHome and "Go home" or "To town"
 		end
 		task.wait(0.5)
 	end
@@ -473,14 +474,30 @@ local function roomAffordable(r, t)
 end
 do
 	local p = scroller("house")
-	hint(p, "Make 🟫 planks and 📌 nails at the 🔨 workbench in your plot, then build rooms. Every room makes your hero better.")
+	hint(p, "Make 🟫 planks and 📌 nails at the 🔨 workbench in your plot, then build rooms next to your house. Every room level is +1 House Level = +1% XP on every skill.")
+	-- house level and the Entrance Hall (where the house starts)
+	local head = card(p, 0, "🏡")
+	head.row.Name = "HouseHead"
+	head.row.BackgroundColor3 = Color3.fromRGB(70, 60, 40)
+	head.go.Name = "StartHouse"
+	head.go.Activated:Connect(function()
+		UI.onPlace("entrance")
+	end)
 	local rows = {}
 	for _, r in Construction.ROOMS do
 		local c = card(p, r.order, r.icon)
+		c.row.Name = "Room_" .. r.id
 		c.go.Name = "Build_" .. r.id
 		c.go.Activated:Connect(function()
 			request("build", r.id)
 		end)
+		-- second, smaller button: place a built room, or move it
+		c.place = button({ Name = "Place_" .. r.id, Text = "Place", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -148, 0.5, 0), Size = UDim2.fromOffset(74, 40), TextSize = 15, BackgroundColor3 = Color3.fromRGB(230, 170, 40), ZIndex = 3, Parent = c.row }, function()
+			UI.onPlace(r.id)
+		end)
+		c.title.Size = UDim2.new(1, -300, 0, 24)
+		c.info.Size = UDim2.new(1, -300, 0, 18)
+		c.detail.Size = UDim2.new(1, -300, 0, 26)
 		rows[r.id] = c
 	end
 	local function bonusText(r, t)
@@ -495,9 +512,26 @@ do
 	renderers.house = function()
 		if not state then return end
 		local lvl = XP.levelFromXp(state.skills.construction or 0)
+		local layout = state.layout or {}
+		local houseLevel = 0
+		for _, t in state.rooms or {} do
+			houseLevel += t
+		end
+		head.title.Text = ("House Level %d"):format(houseLevel)
+		head.info.Text = ("+%d%% XP on every skill"):format(houseLevel)
+		if layout.entrance then
+			head.detail.Text = "Your Entrance Hall stands. New rooms must join the house side by side."
+			setButton(head.go, "Move house start", true, Color3.fromRGB(120, 110, 150))
+		else
+			head.detail.Text = "First pick where your house starts on your plot."
+			setButton(head.go, "Start my house", true, C.good)
+		end
 		for _, r in Construction.ROOMS do
 			local c, t = rows[r.id], state.rooms and state.rooms[r.id] or 0
 			c.title.Text = r.name .. (t > 0 and ("  ·  Lv " .. t) or "")
+			c.place.Visible = t > 0 and layout.entrance ~= nil
+			c.place.Text = layout[r.id] and "Move" or "Place"
+			c.place.BackgroundColor3 = layout[r.id] and Color3.fromRGB(120, 110, 150) or Color3.fromRGB(230, 170, 40)
 			if t >= Construction.ROOM_MAX then
 				c.info.Text = "Now: " .. bonusText(r, t)
 				c.detail.Text = "Fully built!"
@@ -708,9 +742,12 @@ end)
 -- ===== data refresh =====
 local function refreshDots()
 	if not state then return end
-	local canBuild = false
+	-- something to do in the house: a room to build, a built room still to place, or the house not started
+	local layout = state.layout or {}
+	local canBuild = not layout.entrance
 	for _, r in Construction.ROOMS do
 		if roomAffordable(r, (state.rooms[r.id] or 0) + 1) then canBuild = true end
+		if (state.rooms[r.id] or 0) > 0 and not layout[r.id] then canBuild = true end
 	end
 	menuButtons.house.dot.Visible = canBuild
 	local canUpgrade = false
@@ -744,6 +781,9 @@ end
 function UI.getData()
 	return state
 end
+
+-- set by Main: start placing a room (or the Entrance Hall) on the player's plot
+UI.onPlace = function() end
 
 function UI.setRequest(fn)
 	request = fn

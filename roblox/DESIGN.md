@@ -47,8 +47,14 @@ Visa kita (renkimas, amatai, kova) maitina šias dvi.
   | 🎣 Fish Pond | Fishing +5…25 % | 7/27/47/67/87 |
   | 🛏️ Bedroom | Offline limitas +2/4/6/9/12 h | 10/30/50/70/90 |
   | 🏦 Treasury | Pardavimas +3/6/10/13/16 % aukso | 15/35/55/75/95 |
-- Pastatyti kambariai matosi sklype kaip namo dalys (spalva ir dydis pagal lygį).
-- Mygtukas **🏠 Home** nukelia namo, **🛣️ Road** – atgal į kelią.
+- **Žemėlapis kaip OSRS:** miestas Riverbend centre (fontanas, rodyklių stulpas), keliai į 4 puses su arkomis:
+  pietūs – Green Meadow (startas), vakarai – Dark Forest, šiaurė – Ice Mountains ir Wraith Caves vartai,
+  šiaurės vakarai – Shadow Caves, šiaurės rytai – Dragon's Lair, rytai – Hometown.
+- **Sklypas 160×160** su 8×8 kambarių tinkleliu (16 studų langelis). Žaidėjas pats pasirenka, kur pradeda namą
+  (Entrance Hall bet kur), o kiekvienas kitas kambarys turi liestis su namu šonu („durys į duris“) – `HouseGrid.luau`.
+  Statant kamera pakyla virš sklypo, galimi langeliai šviečia žaliai. Kambarius galima perkelti (Move).
+- **House Level** = visų kambarių lygių suma, kiekvienas lygis +1 % XP visiems įgūdžiams. Rodomas lentelėje prie vartų
+  ir lyderių lentelėje (House).
 
 ## 3 dalis: kova ir Wraith Caves
 

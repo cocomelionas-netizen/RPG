@@ -10,6 +10,7 @@ local Items = require(Shared.Items)
 local Skills = require(Shared.Skills)
 local XP = require(Shared.XP)
 local Remotes = require(Shared.Remotes)
+local HouseGrid = require(Shared.HouseGrid)
 local DataService = require(script.Parent.DataService)
 local ToolFactory = require(script.Parent.ToolFactory)
 
@@ -123,7 +124,9 @@ local function grant(player: Player, st)
 		end
 	end
 	local out = info.out or 1
-	local before, after = DataService.addXp(player, st.skill, info.xp)
+	-- every House Level adds 1% XP
+	local xp = info.xp * HouseGrid.xpMultiplier(data.home.rooms)
+	local before, after = DataService.addXp(player, st.skill, xp)
 	DataService.addItem(player, info.item, out)
 	data.stats.actions += 1
 	if info.inputs then
@@ -133,7 +136,7 @@ local function grant(player: Player, st)
 	Remotes.Gathered:FireClient(player, {
 		node = st.node,
 		skill = st.skill,
-		xp = info.xp,
+		xp = math.floor(xp + 0.5),
 		item = info.item,
 		count = out,
 		levelUp = after > before and after or nil,
@@ -263,7 +266,8 @@ local function applyOffline(player: Player, data, seconds: number)
 	end
 	local out = n * (info.out or 1)
 	local before = XP.levelFromXp(data.skills[act.skill])
-	data.skills[act.skill] = math.min(data.skills[act.skill] + n * info.xp, 200000000)
+	local xp = math.floor(n * info.xp * HouseGrid.xpMultiplier(data.home.rooms))
+	data.skills[act.skill] = math.min(data.skills[act.skill] + xp, 200000000)
 	local after = XP.levelFromXp(data.skills[act.skill])
 	data.inv[info.item] = (data.inv[info.item] or 0) + out
 	data.stats.actions += n
@@ -276,7 +280,7 @@ local function applyOffline(player: Player, data, seconds: number)
 			Remotes.Offline:FireClient(player, {
 				seconds = seconds, counted = counted, cap = cap,
 				skill = act.skill, verb = G.VERB_ING[act.skill], node = info.name,
-				actions = out, xp = n * info.xp, item = info.item, itemName = Items[info.item].name,
+				actions = out, xp = xp, item = info.item, itemName = Items[info.item].name,
 				levelBefore = before, levelAfter = after,
 				ranOut = info.inputs ~= nil and n < math.floor(counted / each),
 			})

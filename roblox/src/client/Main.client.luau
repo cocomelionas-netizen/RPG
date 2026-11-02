@@ -11,6 +11,7 @@ local Skills = require(Shared.Skills)
 local Items = require(Shared.Items)
 local Zones = require(Shared.Zones)
 local UI = require(script.Parent:WaitForChild("UI"))
+local Builder = require(script.Parent:WaitForChild("Builder"))
 
 local player = Players.LocalPlayer
 
@@ -89,6 +90,40 @@ Remotes.Gathered.OnClientEvent:Connect(function(g)
 	end
 end)
 
+-- ===== placing rooms on the plot =====
+-- the hero is taken home first when needed, so the plot is loaded (the place streams far parts out)
+local function startPlacing(roomId)
+	UI.showPanel(nil)
+	local function plotReady()
+		local town = workspace:FindFirstChild("World") and workspace.World:FindFirstChild("Hometown")
+		for _, plot in town and town.Plots:GetChildren() or {} do
+			if plot:GetAttribute("Owner") == player.UserId and plot:FindFirstChild("Lawn") then
+				return true
+			end
+		end
+		return false
+	end
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp or Zones.indexAt(hrp.Position.X, hrp.Position.Z) ~= Zones.byId.home.index or not plotReady() then
+		Remotes.Request:FireServer("home", "home")
+		for _ = 1, 30 do
+			task.wait(0.1)
+			if plotReady() then break end
+		end
+		task.wait(0.3)
+	end
+	Builder.start(roomId, UI.getData(), function(action, ...)
+		Remotes.Request:FireServer(action, ...)
+	end)
+end
+UI.onPlace = function(roomId)
+	task.spawn(startPlacing, roomId)
+end
+Remotes.PlaceRoom.OnClientEvent:Connect(function(roomId)
+	task.spawn(startPlacing, roomId)
+end)
+
 Remotes.OpenCraft.OnClientEvent:Connect(function()
 	UI.showPanel("craft")
 end)
@@ -131,7 +166,7 @@ local function applyZone(i, instant)
 	TweenService:Create(Lighting, ti, look.lighting):Play()
 	TweenService:Create(atmosphere, ti, look.atmosphere):Play()
 	if not instant then
-		UI.zone(zone.name, i == 1 and "Where every adventurer starts out" or ("Recommended Lv " .. zone.req))
+		UI.zone(zone.name, (zone.town or zone.home or zone.req <= 1) and zone.desc or ("Recommended Lv " .. zone.req))
 	end
 end
 
@@ -140,7 +175,7 @@ task.spawn(function()
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
-			local i = Zones.indexAt(hrp.Position.X)
+			local i = Zones.indexAt(hrp.Position.X, hrp.Position.Z)
 			if i ~= zoneIndex then
 				applyZone(i, zoneIndex == 0)
 				zoneIndex = i

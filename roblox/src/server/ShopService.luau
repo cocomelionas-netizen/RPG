@@ -91,7 +91,7 @@ local function upgrade(player: Player, tool)
 end
 
 function ShopService.init()
-	Remotes.Request.OnServerEvent:Connect(function(player, action, a, b)
+	Remotes.Request.OnServerEvent:Connect(function(player, action, a, b, c)
 		local now = os.clock()
 		if lastRequest[player] and now - lastRequest[player] < 0.1 then
 			return
@@ -109,6 +109,8 @@ function ShopService.init()
 			HomeService.craft(player, a)
 		elseif action == "build" then
 			HomeService.build(player, a)
+		elseif action == "place" then
+			HomeService.place(player, a, b, c)
 		elseif action == "home" then
 			HomeService.teleport(player, a == "road" and "road" or "home")
 		end

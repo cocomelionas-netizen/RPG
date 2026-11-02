@@ -1,4 +1,4 @@
--- Builds the road, the five zones, their scenery and the resource nodes out of plain Parts.
+-- Builds the world map (Zones.luau): zone grounds, roads with arches, the town, scenery and the resource nodes, out of plain Parts.
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -10,7 +10,7 @@ local Tiers = require(Shared.Tiers)
 local WorldBuilder = {}
 
 local hex = Color3.fromHex
-local L, W, RW = Zones.LENGTH, Zones.WIDTH, Zones.ROAD_WIDTH
+local RW = Zones.ROAD_WIDTH
 
 local function part(props)
 	local p = Instance.new("Part")
@@ -401,16 +401,8 @@ local function torch(parent, pos)
 	fire.Parent = flame
 end
 
-local function gate(parent, index)
-	local zone = Zones.LIST[index]
-	local x = Zones.startX(index)
-	local stone = hex("#8a7f70")
-	for _, z in { -(RW / 2 + 2), RW / 2 + 2 } do
-		part({ Name = "Pillar", Size = Vector3.new(3, 16, 3), CFrame = CFrame.new(x, 8, z), Color = stone, Material = Enum.Material.Cobblestone, Parent = parent })
-	end
-	part({ Name = "Beam", Size = Vector3.new(3, 2.5, RW + 9), CFrame = CFrame.new(x, 16, 0), Color = stone, Material = Enum.Material.Cobblestone, Parent = parent })
-	local board = part({ Name = "Sign", Size = Vector3.new(RW + 2, 4.5, 0.6), CFrame = CFrame.new(x, 12.2, 0) * CFrame.Angles(0, math.rad(90), 0), Color = hex("#5a3d22"), Material = Enum.Material.Wood, CanCollide = false, Parent = parent })
-	local function face(normal, title, sub)
+local function signBoard(board, title, sub)
+	for _, normal in { Enum.NormalId.Front, Enum.NormalId.Back } do
 		local sg = Instance.new("SurfaceGui")
 		sg.Face = normal
 		sg.CanvasSize = Vector2.new(400, 100)
@@ -418,7 +410,7 @@ local function gate(parent, index)
 		local t = Instance.new("TextLabel")
 		t.BackgroundTransparency = 1
 		t.Size = UDim2.new(1, 0, 0.62, 0)
-		t.Font = Enum.Font.GothamBlack
+		t.Font = Enum.Font.FredokaOne
 		t.TextScaled = true
 		t.TextColor3 = Color3.fromRGB(255, 240, 200)
 		t.Text = title
@@ -432,40 +424,69 @@ local function gate(parent, index)
 		s.Parent = sg
 		sg.Parent = board
 	end
-	face(Enum.NormalId.Front, zone.name, index == 1 and "Your journey begins" or ("Recommended Lv " .. zone.req))
-	if index > 1 then
-		face(Enum.NormalId.Back, "← " .. Zones.LIST[index - 1].name, "")
+end
+
+-- a stone arch over a road where it enters a zone; alongX: the road runs along X
+local function archGate(parent, pos: Vector3, alongX: boolean, title: string, sub: string)
+	local stone = hex("#8a7f70")
+	local rot = alongX and CFrame.Angles(0, math.rad(90), 0) or CFrame.new()
+	local base = CFrame.new(pos) * rot
+	for _, x in { -(RW / 2 + 2), RW / 2 + 2 } do
+		part({ Name = "Pillar", Size = Vector3.new(3, 16, 3), CFrame = base * CFrame.new(x, 8, 0), Color = stone, Material = Enum.Material.Cobblestone, Parent = parent })
 	end
+	part({ Name = "Beam", Size = Vector3.new(RW + 9, 2.5, 3), CFrame = base * CFrame.new(0, 16, 0), Color = stone, Material = Enum.Material.Cobblestone, Parent = parent })
+	local board = part({ Name = "Sign", Size = Vector3.new(RW + 2, 4.5, 0.6), CFrame = base * CFrame.new(0, 12.2, 0), Color = hex("#5a3d22"), Material = Enum.Material.Wood, CanCollide = false, Parent = parent })
+	signBoard(board, title, sub)
+end
+
+local function road(parent, a: Vector3, b: Vector3, color: Color3)
+	local d = b - a
+	local len = d.Magnitude
+	local mid = (a + b) / 2
+	local cf = CFrame.lookAt(Vector3.new(mid.X, -0.4, mid.Z), Vector3.new(b.X, -0.4, b.Z))
+	part({ Name = "Road", Size = Vector3.new(RW, 1, len + RW), CFrame = cf, Color = color, Material = Enum.Material.Ground, Parent = parent })
+end
+
+-- distance from point p to the segment a-b on the ground plane
+local function segDist(p: Vector3, a: Vector3, b: Vector3): number
+	local ab = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+	local ap = Vector3.new(p.X - a.X, 0, p.Z - a.Z)
+	local t = math.clamp(ap:Dot(ab) / math.max(ab:Dot(ab), 1e-6), 0, 1)
+	return (ap - ab * t).Magnitude
+end
+
+local function nearRoad(p: Vector3, margin: number): boolean
+	for _, r in Zones.ROADS do
+		if segDist(p, r[1], r[2]) < RW / 2 + margin then
+			return true
+		end
+	end
+	return false
 end
 
 -- nodes go into parent, the pond they stand on into scenery
-local function placeNodes(parent, scenery, index, rng)
-	local zone = Zones.LIST[index]
-	local x0 = Zones.startX(index)
+local function placeNodes(parent, scenery, zone, rng)
 	local nodes = {}
-	-- woodcutting on the left (-Z), mining on the right (+Z), fishing at a pond further right
-	local layout = {
-		woodcutting = { zMin = -50, zMax = -16, per = 3, make = makeTree },
-		mining = { zMin = 16, zMax = 48, per = 3, make = makeRock },
-	}
-	for skill, cfg in layout do
+	-- trees and rocks: one column of three per tier, lower tiers on the left (west)
+	for skill, make in { woodcutting = makeTree, mining = makeRock } do
 		local tiers = zone.res[skill]
-		if tiers then
-			local slot = (L - 60) / #tiers
+		local c = zone.clusters and zone.clusters[skill]
+		if tiers and c then
 			for i, tier in tiers do
-				for j = 1, cfg.per do
-					local x = x0 + 30 + slot * (i - 1) + slot * (j - 0.5) / cfg.per + rng:NextNumber(-3, 3)
-					local z = rng:NextNumber(cfg.zMin, cfg.zMax)
-					table.insert(nodes, cfg.make(parent, Vector3.new(x, 0, z), tier, rng))
+				local x = c.X + (i - (#tiers + 1) / 2) * 34
+				for _, o in { Vector2.new(-8, -9), Vector2.new(8, -9), Vector2.new(0, 9) } do
+					local pos = Vector3.new(x + o.X + rng:NextNumber(-2, 2), 0, c.Z + o.Y + rng:NextNumber(-2, 2))
+					table.insert(nodes, make(parent, pos, tier, rng))
 				end
 			end
 		end
 	end
 	local fish = zone.res.fishing
-	if fish then
-		local pondX, pondLen = x0 + L / 2, math.min(L - 80, 70 * #fish + 40)
+	local c = zone.clusters and zone.clusters.fishing
+	if fish and c then
+		local pondLen = 70 * #fish + 40
 		local pond = part({
-			Name = "Pond", Size = Vector3.new(pondLen, 1, 34), CFrame = CFrame.new(pondX, -0.35, 80),
+			Name = "Pond", Size = Vector3.new(pondLen, 1, 34), CFrame = CFrame.new(c.X, -0.35, c.Z),
 			Color = zone.th.snow and hex("#7fb6d8") or hex("#3d8fd0"), Material = zone.th.snow and Enum.Material.Ice or Enum.Material.Glass,
 			Transparency = 0.15, Reflectance = 0.1, Parent = scenery,
 		})
@@ -473,17 +494,82 @@ local function placeNodes(parent, scenery, index, rng)
 		local slot = pondLen / #fish
 		for i, tier in fish do
 			for j = 1, 2 do
-				local x = pondX - pondLen / 2 + slot * (i - 1) + slot * (j - 0.5) / 2
-				table.insert(nodes, makeFishSpot(parent, Vector3.new(x, 0, 66 + rng:NextNumber(0, 4)), tier))
+				local x = c.X - pondLen / 2 + slot * (i - 1) + slot * (j - 0.5) / 2
+				table.insert(nodes, makeFishSpot(parent, Vector3.new(x, 0, c.Z - 14 + rng:NextNumber(0, 4)), tier))
 			end
 		end
 	end
 	return nodes
 end
 
--- ===================== the whole road =====================
--- westX: where the world starts (Hometown lies between westX and 0)
-function WorldBuilder.build(westX: number)
+-- ===================== Riverbend =====================
+local function cottage(parent, pos: Vector3, facing: number, color: Color3)
+	local cf = CFrame.new(pos) * CFrame.Angles(0, facing, 0)
+	part({ Size = Vector3.new(16, 10, 14), CFrame = cf * CFrame.new(0, 5, 0), Color = color, Material = Enum.Material.Plaster, Parent = parent })
+	local roof = Instance.new("WedgePart")
+	roof.Anchored = true
+	roof.Size = Vector3.new(17, 5, 7.5)
+	roof.Color = hex("#8a3a2a")
+	roof.Material = Enum.Material.Slate
+	for _, s in { -1, 1 } do
+		local w = roof:Clone()
+		w.CFrame = cf * CFrame.new(0, 12.5, s * 3.75) * CFrame.Angles(0, s > 0 and math.pi or 0, 0)
+		w.Parent = parent
+	end
+	roof:Destroy()
+	part({ Size = Vector3.new(3, 6, 0.4), CFrame = cf * CFrame.new(0, 3, -7.1), Color = hex("#4a321c"), Material = Enum.Material.Wood, Parent = parent })
+	for _, x in { -5, 5 } do
+		part({ Size = Vector3.new(2.5, 2.5, 0.3), CFrame = cf * CFrame.new(x, 6, -7.1), Color = hex("#ffe6a0"), Material = Enum.Material.Neon, Transparency = 0.3, Parent = parent })
+	end
+end
+
+local function buildTown(folder)
+	local plaza = part({ Name = "Plaza", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 70, 70), CFrame = CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#b8a888"), Material = Enum.Material.Cobblestone, Parent = folder })
+	plaza.CanCollide = true
+	-- fountain in the middle
+	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 14, 14), CFrame = CFrame.new(0, 1, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#9a9086"), Material = Enum.Material.Marble, Parent = folder })
+	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 12, 12), CFrame = CFrame.new(0, 1.9, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = hex("#4aa8e0"), Material = Enum.Material.Glass, Transparency = 0.2, CanCollide = false, Parent = folder })
+	local spout = part({ Size = Vector3.new(1.4, 6, 1.4), CFrame = CFrame.new(0, 4, 0), Color = hex("#9a9086"), Material = Enum.Material.Marble, Parent = folder })
+	local water = Instance.new("ParticleEmitter")
+	water.Color = ColorSequence.new(hex("#bfe8ff"))
+	water.Size = NumberSequence.new(0.4)
+	water.Lifetime = NumberRange.new(0.8, 1.2)
+	water.Rate = 30
+	water.Speed = NumberRange.new(8, 10)
+	water.SpreadAngle = Vector2.new(25, 25)
+	water.Acceleration = Vector3.new(0, -30, 0)
+	water.EmissionDirection = Enum.NormalId.Top
+	water.Parent = spout
+
+	-- a signpost so every direction is named
+	local post = part({ Name = "Signpost", Size = Vector3.new(0.8, 9, 0.8), CFrame = CFrame.new(14, 4.5, 14), Color = hex("#5a3d22"), Material = Enum.Material.Wood, Parent = folder })
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.fromOffset(260, 150)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
+	bb.MaxDistance = 90
+	bb.LightInfluence = 0
+	local t = Instance.new("TextLabel")
+	t.BackgroundColor3 = Color3.fromRGB(24, 22, 38)
+	t.BackgroundTransparency = 0.2
+	t.Size = UDim2.fromScale(1, 1)
+	t.Font = Enum.Font.FredokaOne
+	t.TextSize = 18
+	t.TextColor3 = Color3.new(1, 1, 1)
+	t.Text = "⬆️ North: Ice Mountains (45+)\n⬅️ West: Dark Forest (10+)\n➡️ East: Hometown – your house\n⬇️ South: Green Meadow (start)"
+	t.Parent = bb
+	local corner = Instance.new("UICorner")
+	corner.Parent = t
+	bb.Parent = post
+
+	local colors = { "#e8dcc0", "#d8e4f0", "#f0d8c8", "#dcecc8" }
+	local spots = { { -55, -60, 0 }, { 55, -60, 0 }, { -55, -150, math.pi / 2 }, { 55, -150, -math.pi / 2 }, { -60, 60, math.pi }, { -60, -210, 0 } }
+	for i, s in spots do
+		cottage(folder, Vector3.new(s[1], 0, s[2]), s[3], hex(colors[(i - 1) % #colors + 1]))
+	end
+end
+
+-- ===================== the whole map =====================
+function WorldBuilder.build()
 	for _, name in { "Baseplate", "SpawnLocation", "World" } do
 		local old = Workspace:FindFirstChild(name)
 		while old do
@@ -502,53 +588,92 @@ function WorldBuilder.build(westX: number)
 	for index, zone in Zones.LIST do
 		local th = zone.th
 		local folder = Instance.new("Folder")
-		folder.Name = zone.name
+		folder.Name = "Zone_" .. zone.id -- "Hometown" itself is the plots folder (HomeService)
 		folder.Parent = world
-		local cx = Zones.centerX(index)
 		local rng = Random.new(1000 + index)
+		local r = zone.rect
+		local size = Vector3.new(r[3] - r[1], 4, r[4] - r[2])
+		local center = Zones.center(zone)
 
-		part({ Name = "Ground", Size = Vector3.new(L, 4, W), CFrame = CFrame.new(cx, -2, 0), Color = hex(th.ground), Material = Enum.Material[th.material], Parent = folder })
-		part({ Name = "Road", Size = Vector3.new(L, 1, RW), CFrame = CFrame.new(cx, -0.4, 0), Color = hex(th.dirt), Material = Enum.Material.Ground, Parent = folder })
-		gate(folder, index)
-
+		part({ Name = "Ground", Size = size, CFrame = CFrame.new(center.X, -2, center.Z), Color = hex(th.ground), Material = Enum.Material[th.material], Parent = folder })
 		if th.cave then
-			part({ Name = "Ceiling", Size = Vector3.new(L, 4, W), CFrame = CFrame.new(cx, 47, 0), Color = darker(hex(th.ground), 0.6), Material = Enum.Material.Slate, Parent = folder })
+			part({ Name = "Ceiling", Size = size, CFrame = CFrame.new(center.X, 47, center.Z), Color = darker(hex(th.ground), 0.6), Material = Enum.Material.Slate, Parent = folder })
 		end
-		if th.cave or th.lava then
-			for x = Zones.startX(index) + 15, Zones.startX(index) + L - 5, 30 do
-				torch(folder, Vector3.new(x, 0, RW / 2 + 1.5))
-				torch(folder, Vector3.new(x + 15, 0, -(RW / 2 + 1.5)))
+		if zone.town then
+			buildTown(folder)
+		end
+
+		-- scenery, kept off the roads and away from the resource clusters
+		local decorFn = DECOR[th.decor]
+		if decorFn then
+			local decorColor = th.decor == "rock" and Color3.new(1, 1, 1) or (th.decor == "stalag" and hex(th.far) or hex(th.ground):Lerp(hex("#2f6b45"), 0.5))
+			local count = math.floor(size.X * size.Z / (th.decor == "pine" and 4500 or 7000))
+			local placed, tries = 0, 0
+			while placed < count and tries < count * 6 do
+				tries += 1
+				local p = Vector3.new(rng:NextNumber(r[1] + 8, r[3] - 8), 0, rng:NextNumber(r[2] + 8, r[4] - 8))
+				local clear = not nearRoad(p, 10)
+				for _, c in zone.clusters or {} do
+					if (Vector3.new(p.X, 0, p.Z) - c).Magnitude < 75 then
+						clear = false
+					end
+				end
+				if clear then
+					decorFn(folder, p, rng, decorColor)
+					placed += 1
+				end
 			end
 		end
 
-		local decorFn = DECOR[th.decor]
-		local decorColor = th.decor == "rock" and Color3.new(1, 1, 1) or (th.decor == "stalag" and hex(th.far) or hex(th.ground):Lerp(hex("#2f6b45"), 0.5))
-		for _ = 1, 45 do
-			local side = rng:NextNumber() < 0.6 and -1 or 1
-			local z = side < 0 and rng:NextNumber(-W / 2 + 6, -62) or rng:NextNumber(102, W / 2 - 6)
-			local x = Zones.startX(index) + rng:NextNumber(6, L - 6)
-			decorFn(folder, Vector3.new(x, 0, z), rng, decorColor)
-		end
-
-		for _, n in placeNodes(nodesFolder, folder, index, rng) do
+		for _, n in placeNodes(nodesFolder, folder, zone, rng) do
 			table.insert(allNodes, n)
 		end
 	end
 
-	-- invisible walls around the playable road
-	local total = L * #Zones.LIST
-	local function wall(cf, size)
-		part({ Name = "Wall", Size = size, CFrame = cf, Transparency = 1, CanCollide = true, Parent = world })
+	-- roads, and torches along them in the dark zones
+	local roads = Instance.new("Folder")
+	roads.Name = "Roads"
+	roads.Parent = world
+	for _, seg in Zones.ROADS do
+		road(roads, seg[1], seg[2], hex("#8a7258"))
+		local len = (seg[2] - seg[1]).Magnitude
+		local dir = (seg[2] - seg[1]).Unit
+		local side = Vector3.new(-dir.Z, 0, dir.X)
+		for d = 15, len, 32 do
+			local p = seg[1] + dir * d
+			local zone = Zones.LIST[Zones.indexAt(p.X, p.Z)]
+			if zone.th.cave or zone.th.lava then
+				torch(roads, p + side * (RW / 2 + 1.5))
+			end
+		end
 	end
-	local span = total - westX
-	wall(CFrame.new(westX + span / 2, 40, -W / 2), Vector3.new(span, 90, 2))
-	wall(CFrame.new(westX + span / 2, 40, W / 2), Vector3.new(span, 90, 2))
-	wall(CFrame.new(westX - 1, 40, 0), Vector3.new(2, 90, W))
-	wall(CFrame.new(total + 1, 40, 0), Vector3.new(2, 90, W))
 
-	-- end of the road (for now)
-	local endSign = part({ Name = "RoadEnd", Size = Vector3.new(1, 8, RW + 4), CFrame = CFrame.new(total - 3, 4, 0), Color = hex("#5a3d22"), Material = Enum.Material.Wood, Parent = world })
-	label(endSign, "The road goes on...", "More zones coming soon", 80)
+	-- arches where the roads enter each zone
+	local function zoneArch(id, pos, alongX)
+		local z = Zones.byId[id]
+		archGate(roads, pos, alongX, z.name, z.id == "meadow" and "Your journey begins" or z.id == "home" and "Build your house here" or ("Recommended Lv " .. z.req))
+	end
+	zoneArch("meadow", Vector3.new(0, 0, 104), false)
+	zoneArch("forest", Vector3.new(-104, 0, 0), true)
+	zoneArch("caves", Vector3.new(-210, 0, -264), false)
+	zoneArch("ice", Vector3.new(0, 0, -264), false)
+	zoneArch("dragon", Vector3.new(364, 0, -330), true)
+	zoneArch("home", Vector3.new(104, 0, 110), true)
+
+	-- the north gate: Wraith Caves (PvP) come later
+	local b = Zones.BOUNDS
+	archGate(roads, Vector3.new(0, 0, b.z0 + 8), false, "☠️ Wraith Caves", "PvP · Combat 40+ · coming soon")
+	part({ Name = "WraithMist", Size = Vector3.new(30, 18, 2), CFrame = CFrame.new(0, 9, b.z0 + 3), Color = hex("#2a1a3a"), Material = Enum.Material.Neon, Transparency = 0.4, Parent = roads })
+
+	-- invisible walls around the map
+	local function wall(cf, s)
+		part({ Name = "Wall", Size = s, CFrame = cf, Transparency = 1, CanCollide = true, Parent = world })
+	end
+	local w, d = b.x1 - b.x0, b.z1 - b.z0
+	wall(CFrame.new(b.x0 + w / 2, 40, b.z0 - 1), Vector3.new(w, 90, 2))
+	wall(CFrame.new(b.x0 + w / 2, 40, b.z1 + 1), Vector3.new(w, 90, 2))
+	wall(CFrame.new(b.x0 - 1, 40, b.z0 + d / 2), Vector3.new(2, 90, d))
+	wall(CFrame.new(b.x1 + 1, 40, b.z0 + d / 2), Vector3.new(2, 90, d))
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "SpawnLocation"
@@ -556,7 +681,7 @@ function WorldBuilder.build(westX: number)
 	spawn.Neutral = true
 	spawn.Duration = 0
 	spawn.Size = Vector3.new(8, 1, 8)
-	spawn.CFrame = CFrame.new(14, 0, 0)
+	spawn.CFrame = CFrame.new(Zones.SPAWN.X, 0.2, Zones.SPAWN.Z)
 	spawn.Color = hex("#c9b27a")
 	spawn.Material = Enum.Material.Cobblestone
 	spawn.TopSurface = Enum.SurfaceType.Smooth

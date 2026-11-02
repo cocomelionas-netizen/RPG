@@ -8,7 +8,7 @@ local GatherService = require(script.Parent.GatherService)
 local HomeService = require(script.Parent.HomeService)
 local ShopService = require(script.Parent.ShopService)
 
-local nodes = WorldBuilder.build(-HomeService.TOWN_LENGTH)
+local nodes = WorldBuilder.build()
 HomeService.buildTown(workspace.World)
 GatherService.init(nodes)
 HomeService.init()
