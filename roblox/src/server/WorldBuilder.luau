@@ -263,7 +263,7 @@ local function makeRock(parent, pos, tier, rng)
 	local ore = G.ORES[tier]
 	local oreColor = hex(ore.color)
 	local size = 1 + tier * 0.07
-	local rockColor = hex("#7d7a78"):Lerp(oreColor, 0.15)
+	local rockColor = hex("#5e5a58"):Lerp(oreColor, 0.18) -- dark stone so light ores (tin) still stand out
 	local base = part({
 		Name = "Rock", Size = Vector3.new(5.5, 3.6, 5) * size,
 		CFrame = CFrame.new(pos + Vector3.new(0, 1.6 * size, 0)) * CFrame.Angles(math.rad(rng:NextNumber(-8, 8)), rng:NextNumber(0, math.pi * 2), math.rad(rng:NextNumber(-8, 8))),
@@ -278,7 +278,7 @@ local function makeRock(parent, pos, tier, rng)
 	local count = form == "crystals" and 6 or 6 + tier
 	for i = 1, count do
 		local a = (i / count) * math.pi * 2
-		local at = base.CFrame * CFrame.new(math.cos(a) * 2.4 * size, rng:NextNumber(0.2, 1.6), math.sin(a) * 2.1 * size)
+		local at = base.CFrame * CFrame.new(math.cos(a) * 2.6 * size, rng:NextNumber(0.6, 1.9), math.sin(a) * 2.4 * size)
 		if form == "crystals" then
 			local hgt = rng:NextNumber(1.6, 3.2)
 			part({ Name = "Ore" .. i, Size = Vector3.new(0.7, hgt, 0.7), CFrame = at * CFrame.new(0, hgt / 2, 0) * CFrame.Angles(rng:NextNumber(-0.5, 0.5), rng:NextNumber(0, 3), rng:NextNumber(-0.5, 0.5)), Color = oreColor, Material = Enum.Material.Neon, Transparency = 0.1, CanCollide = false, Parent = model })
@@ -289,7 +289,7 @@ local function makeRock(parent, pos, tier, rng)
 			local s = rng:NextNumber(1, 1.5)
 			part({ Name = "Ore" .. i, Size = Vector3.new(s, s * 0.7, s), CFrame = at * CFrame.Angles(rng:NextNumber(0, 1), rng:NextNumber(0, 1), 0), Color = oreColor, Material = Enum.Material.Slate, CanCollide = false, Parent = model })
 		else
-			local s = rng:NextNumber(0.9, 1.4)
+			local s = rng:NextNumber(1.4, 1.9)
 			part({ Name = "Ore" .. i, Shape = Enum.PartType.Ball, Size = Vector3.new(s, s, s), CFrame = at, Color = oreColor, Material = Enum.Material.Metal, Reflectance = 0.15, CanCollide = false, Parent = model })
 		end
 	end
@@ -386,6 +386,22 @@ local function decorSpike(parent, pos, rng, _color)
 end
 
 local DECOR = { tree = decorTree, pine = decorPine, stalag = decorStalag, rock = decorRock, spike = decorSpike }
+
+-- flower patches and bushes for the grassy zones
+local FLOWERS = { "#ff7aa8", "#ffd84a", "#b07aff", "#ffffff", "#ff8a4a" }
+local function decorFlowers(parent, pos, rng)
+	if rng:NextNumber() < 0.4 then
+		local s = rng:NextNumber(3, 6)
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(s, s * 0.7, s), CFrame = CFrame.new(pos + Vector3.new(0, s * 0.25, 0)), Color = hex("#4a8f38"), Material = Enum.Material.Grass, CanCollide = false, Parent = parent })
+		return
+	end
+	local col = hex(FLOWERS[rng:NextInteger(1, #FLOWERS)])
+	for _ = 1, rng:NextInteger(5, 9) do
+		local o = Vector3.new(rng:NextNumber(-3, 3), 0, rng:NextNumber(-3, 3))
+		part({ Size = Vector3.new(0.2, 1, 0.2), CFrame = CFrame.new(pos + o + Vector3.new(0, 0.5, 0)), Color = hex("#3f8f3a"), Material = Enum.Material.Grass, CanCollide = false, Parent = parent })
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.8, 0.8, 0.8), CFrame = CFrame.new(pos + o + Vector3.new(0, 1.1, 0)), Color = col, Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = parent })
+	end
+end
 
 local function torch(parent, pos)
 	part({ Size = Vector3.new(0.5, 5, 0.5), CFrame = CFrame.new(pos + Vector3.new(0, 2.5, 0)), Color = hex("#4a321c"), Material = Enum.Material.Wood, Parent = parent })
@@ -544,7 +560,7 @@ local function buildTown(folder)
 	-- a signpost so every direction is named
 	local post = part({ Name = "Signpost", Size = Vector3.new(0.8, 9, 0.8), CFrame = CFrame.new(14, 4.5, 14), Color = hex("#5a3d22"), Material = Enum.Material.Wood, Parent = folder })
 	local bb = Instance.new("BillboardGui")
-	bb.Size = UDim2.fromOffset(260, 150)
+	bb.Size = UDim2.fromScale(20, 11)
 	bb.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
 	bb.MaxDistance = 90
 	bb.LightInfluence = 0
@@ -553,7 +569,7 @@ local function buildTown(folder)
 	t.BackgroundTransparency = 0.2
 	t.Size = UDim2.fromScale(1, 1)
 	t.Font = Enum.Font.FredokaOne
-	t.TextSize = 18
+	t.TextScaled = true
 	t.TextColor3 = Color3.new(1, 1, 1)
 	t.Text = "⬆️ North: Ice Mountains (45+)\n⬅️ West: Dark Forest (10+)\n➡️ East: Hometown – your house\n⬇️ South: Green Meadow (start)"
 	t.Parent = bb
@@ -597,7 +613,46 @@ function WorldBuilder.build()
 
 		part({ Name = "Ground", Size = size, CFrame = CFrame.new(center.X, -2, center.Z), Color = hex(th.ground), Material = Enum.Material[th.material], Parent = folder })
 		if th.cave then
-			part({ Name = "Ceiling", Size = size, CFrame = CFrame.new(center.X, 47, center.Z), Color = darker(hex(th.ground), 0.6), Material = Enum.Material.Slate, Parent = folder })
+			-- a mountain block: rock walls all round with an opening where the road comes in, and a roof
+			local rock = darker(hex(th.ground), 0.75)
+			part({ Name = "Ceiling", Size = size + Vector3.new(8, 4, 8), CFrame = CFrame.new(center.X, 49, center.Z), Color = rock, Material = Enum.Material.Rock, Parent = folder })
+			local h = 50
+			local function cliff(cf, s)
+				part({ Name = "Cliff", Size = s, CFrame = cf, Color = rock, Material = Enum.Material.Rock, Parent = folder })
+			end
+			cliff(CFrame.new(center.X, h / 2, r[2] - 2), Vector3.new(size.X + 8, h, 6))
+			cliff(CFrame.new(r[1] - 2, h / 2, center.Z), Vector3.new(6, h, size.Z))
+			cliff(CFrame.new(r[3] + 2, h / 2, center.Z), Vector3.new(6, h, size.Z))
+			-- south wall with a cave mouth for the road at x = -210
+			local gap, gx = 30, -210
+			cliff(CFrame.new((r[1] + gx - gap / 2) / 2, h / 2, r[4] + 2), Vector3.new(gx - gap / 2 - r[1], h, 6))
+			cliff(CFrame.new((gx + gap / 2 + r[3]) / 2, h / 2, r[4] + 2), Vector3.new(r[3] - gx - gap / 2, h, 6))
+			cliff(CFrame.new(gx, 34, r[4] + 2), Vector3.new(gap, 32, 6))
+			-- break up the box: rough boulders along the outside of every wall and peaks on the roof
+			local function boulder(pos, w, hh)
+				part({
+					Name = "Crag", Size = Vector3.new(w, hh, w * rng:NextNumber(0.7, 1.1)),
+					CFrame = CFrame.new(pos + Vector3.new(0, hh / 2 - 4, 0)) * CFrame.Angles(rng:NextNumber(-0.25, 0.25), rng:NextNumber(0, 3), rng:NextNumber(-0.25, 0.25)),
+					Color = rock:Lerp(Color3.fromRGB(110, 100, 120), rng:NextNumber(0, 0.4)), Material = Enum.Material.Rock, Parent = folder,
+				})
+			end
+			for x = r[1], r[3], 26 do
+				if math.abs(x - gx) > 34 then
+					boulder(Vector3.new(x + rng:NextNumber(-6, 6), 0, r[4] + 8), rng:NextNumber(16, 30), rng:NextNumber(26, 62))
+				end
+				boulder(Vector3.new(x + rng:NextNumber(-6, 6), 0, r[2] - 8), rng:NextNumber(16, 30), rng:NextNumber(26, 62))
+			end
+			for zc = r[2], r[4], 26 do
+				boulder(Vector3.new(r[1] - 8, 0, zc + rng:NextNumber(-6, 6)), rng:NextNumber(16, 30), rng:NextNumber(26, 62))
+				boulder(Vector3.new(r[3] + 8, 0, zc + rng:NextNumber(-6, 6)), rng:NextNumber(16, 30), rng:NextNumber(26, 62))
+			end
+			for _ = 1, 40 do
+				local p = Vector3.new(rng:NextNumber(r[1], r[3]), 51, rng:NextNumber(r[2], r[4]))
+				boulder(p, rng:NextNumber(30, 70), rng:NextNumber(14, 40))
+			end
+			-- a lit cave mouth
+			torch(folder, Vector3.new(gx - 12, 0, r[4] + 10))
+			torch(folder, Vector3.new(gx + 12, 0, r[4] + 10))
 		end
 		if zone.town then
 			buildTown(folder)
@@ -621,6 +676,17 @@ function WorldBuilder.build()
 				if clear then
 					decorFn(folder, p, rng, decorColor)
 					placed += 1
+				end
+			end
+		end
+
+		-- flowers and bushes on the grass
+		if th.material == "Grass" then
+			local count = math.floor(size.X * size.Z / 3500)
+			for _ = 1, count do
+				local p = Vector3.new(rng:NextNumber(r[1] + 6, r[3] - 6), 0, rng:NextNumber(r[2] + 6, r[4] - 6))
+				if not nearRoad(p, 4) and not (zone.town and p.Magnitude < 45) then
+					decorFlowers(folder, p, rng)
 				end
 			end
 		end

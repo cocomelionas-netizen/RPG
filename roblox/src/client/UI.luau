@@ -153,7 +153,7 @@ local wgui = new("ScreenGui", {
 local left = new("Frame", {
 	Name = "Left", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 10, 1, -10),
 	Size = UDim2.fromOffset(330, 300), Parent = gui,
-}, { new("UIListLayout", { Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Bottom, SortOrder = Enum.SortOrder.LayoutOrder }) })
+}, { new("UIListLayout", { Name = "List", Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Bottom, SortOrder = Enum.SortOrder.LayoutOrder }) })
 
 local goalCard = new("Frame", {
 	Name = "Goal", LayoutOrder = 1, BackgroundColor3 = C.bg, BackgroundTransparency = 0.08,
@@ -185,17 +185,17 @@ for _, id in Skills.GATHERING do
 	local s = Skills.byId[id]
 	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 32), Parent = hud })
 	text({ Text = s.icon, Size = UDim2.fromOffset(28, 32), TextSize = 20, Parent = row })
-	text({ Text = s.name, Position = UDim2.fromOffset(32, 0), Size = UDim2.new(1, -90, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, Font = BOLD, TextSize = 14, Parent = row })
+	local name = text({ Text = s.name, Position = UDim2.fromOffset(32, 0), Size = UDim2.new(1, -90, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, Font = BOLD, TextSize = 14, Parent = row })
 	local lv = text({ Text = "1", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(56, 18), TextXAlignment = Enum.TextXAlignment.Right, Font = TITLE, TextSize = 16, TextColor3 = C.gold, Parent = row })
 	local _, fill = bar(row, { Position = UDim2.fromOffset(32, 21), Size = UDim2.new(1, -32, 0, 8) })
-	hudRows[id] = { lv = lv, fill = fill, row = row }
+	hudRows[id] = { lv = lv, fill = fill, row = row, name = name }
 end
 
 -- ===== right side: menu buttons =====
 local menu = new("Frame", {
 	Name = "Menu", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
 	Size = UDim2.fromOffset(70, 5 * 70 + 4 * 8), Parent = gui,
-}, { new("UIListLayout", { Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }) })
+}, { new("UIListLayout", { Name = "List", Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Center, HorizontalAlignment = Enum.HorizontalAlignment.Right, SortOrder = Enum.SortOrder.LayoutOrder }) })
 local menuButtons = {}
 local menuCount = 0
 
@@ -794,15 +794,71 @@ function UI.zone(name, sub)
 	UI.banner(name, sub, Color3.fromRGB(255, 240, 200))
 end
 
--- ===== screen size: phones get a bigger window and a smaller HUD =====
+-- ===== screen size =====
+-- On phones Roblox puts the thumbstick bottom-left and the jump button bottom-right, so the HUD moves to the top:
+-- goal, gold and skills top-left (skills without names), the menu as a row top-right. Windows nearly fill the screen.
+local function layout(phone: boolean)
+	local list = left:FindFirstChild("List")
+	if phone then
+		left.AnchorPoint, left.Position = Vector2.new(0, 0), UDim2.fromOffset(8, 4)
+		list.VerticalAlignment = Enum.VerticalAlignment.Top
+		list.Padding = UDim.new(0, 5)
+	else
+		left.AnchorPoint, left.Position = Vector2.new(0, 1), UDim2.new(0, 10, 1, -10)
+		list.VerticalAlignment = Enum.VerticalAlignment.Bottom
+		list.Padding = UDim.new(0, 8)
+	end
+	goalCard.Size = UDim2.fromOffset(phone and 290 or 330, phone and 62 or 76)
+	goalText.TextSize = phone and 14 or 15
+	for _, f in top:GetChildren() do
+		if f:IsA("Frame") then
+			f.Size = UDim2.fromOffset(phone and 120 or 150, phone and 34 or 38)
+		end
+	end
+	hud.Size = UDim2.fromOffset(phone and 150 or 240, phone and (4 * 24 + 12) or (4 * 36 + 16))
+	for _, r in hudRows do
+		r.name.Visible = not phone
+		r.row.Size = UDim2.new(1, 0, 0, phone and 20 or 32)
+		r.fill.Parent.Position = UDim2.fromOffset(32, phone and 6 or 21)
+		r.fill.Parent.Size = UDim2.new(1, phone and -80 or -32, 0, 8)
+	end
+
+	local mlist = menu:FindFirstChild("List")
+	local n = 0
+	for _, mb in menuButtons do
+		n += 1
+		mb.button.Size = UDim2.fromOffset(phone and 58 or 70, phone and 58 or 70)
+		mb.label.TextSize = phone and 11 or 13
+	end
+	if phone then
+		menu.AnchorPoint, menu.Position = Vector2.new(1, 0), UDim2.new(1, -8, 0, 4)
+		menu.Size = UDim2.fromOffset(n * 58 + (n - 1) * 6, 58)
+		mlist.FillDirection = Enum.FillDirection.Horizontal
+		mlist.Padding = UDim.new(0, 6)
+	else
+		menu.AnchorPoint, menu.Position = Vector2.new(1, 0.5), UDim2.new(1, -10, 0.5, 0)
+		menu.Size = UDim2.fromOffset(70, n * 70 + (n - 1) * 8)
+		mlist.FillDirection = Enum.FillDirection.Vertical
+		mlist.Padding = UDim.new(0, 8)
+	end
+	action.Size = UDim2.fromOffset(phone and 340 or 400, 66)
+	-- toasts sit under the menu row on phones
+	toasts.Position = UDim2.new(0.5, 0, 0, phone and 70 or 8)
+	toasts.Size = UDim2.fromOffset(phone and 380 or 440, 200)
+
+	window.Size = phone and UDim2.new(0.94, 0, 0.92, 0) or UDim2.new(0.6, 0, 0.74, 0)
+	window.Position = phone and UDim2.fromScale(0.5, 0.5) or UDim2.fromScale(0.5, 0.52)
+end
+
 local function rescale()
 	local cam = workspace.CurrentCamera
 	local v = cam and cam.ViewportSize or Vector2.new(1280, 720)
-	isPhone = v.Y < 500 or v.X < 700
-	scale.Scale = math.clamp(v.Y / 720, 0.8, 1.2)
-	window.Size = isPhone and UDim2.new(0.9, 0, 0.9, 0) or UDim2.new(0.6, 0, 0.74, 0)
-	window.Position = isPhone and UDim2.fromScale(0.5, 0.5) or UDim2.fromScale(0.5, 0.52)
+	-- ForcePhone: a test switch to preview the phone layout on a PC
+	isPhone = gui:GetAttribute("ForcePhone") == true or v.Y < 500 or v.X < 700
+	scale.Scale = isPhone and 0.72 or math.clamp(v.Y / 720, 0.8, 1.2)
+	layout(isPhone)
 end
+gui:GetAttributeChangedSignal("ForcePhone"):Connect(rescale)
 rescale()
 task.spawn(function()
 	while not workspace.CurrentCamera do

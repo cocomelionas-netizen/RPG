@@ -1,11 +1,11 @@
--- The house grid: each plot holds an 8x8 grid of room cells.
+-- The house grid: each plot holds a 7x7 grid of room cells.
 -- The player picks where the house starts (the Entrance Hall goes on any cell); after that every room must touch
 -- the house side by side, through a doorway, so the house always stays in one piece.
 -- Shared so the client can show green/red while placing and the server checks the same rules.
 local HouseGrid = {}
 
-HouseGrid.SIZE = 8 -- cells per side
-HouseGrid.CELL = 16 -- studs per cell
+HouseGrid.SIZE = 7 -- cells per side
+HouseGrid.CELL = 20 -- studs per cell
 HouseGrid.PLOT = 160 -- studs per plot side (grid plus a garden margin)
 HouseGrid.START = "entrance" -- the first room, free, placed anywhere
 

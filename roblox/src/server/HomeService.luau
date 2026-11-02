@@ -45,7 +45,7 @@ end
 local function billboard(parent, title, sub, dist)
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "Label"
-	bb.Size = UDim2.fromOffset(230, 50)
+	bb.Size = UDim2.fromScale(11, 2.4)
 	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
 	bb.MaxDistance = dist or 60
 	bb.LightInfluence = 0
@@ -204,9 +204,18 @@ local function makePlot(parent, index: number)
 	model:SetAttribute("PlotIndex", index)
 	local half = PLOT / 2
 	part({ Name = "Lawn", Size = Vector3.new(PLOT, 0.4, PLOT), CFrame = CFrame.new(center + Vector3.new(0, 0.05, 0)), Color = hex("#74b850"), Material = Enum.Material.Grass, Parent = model })
-	-- the foundation shows where rooms can go
-	local grid = HouseGrid.SIZE * CELL
-	part({ Name = "Foundation", Size = Vector3.new(grid + 2, 0.3, grid + 2), CFrame = CFrame.new(center + Vector3.new(0, 0.2, 0)), Color = hex("#b8ab95"), Material = Enum.Material.Concrete, Parent = model })
+	-- a few flower beds and bushes along the fence so an empty plot still looks like a garden
+	local rng = Random.new(index * 7)
+	for i = 1, 10 do
+		local side = i % 4
+		local t = rng:NextNumber(-half + 10, half - 10)
+		local off = side == 0 and Vector3.new(t, 0, -half + 4) or side == 1 and Vector3.new(t, 0, half - 4) or side == 2 and Vector3.new(half - 4, 0, t) or Vector3.new(t, 0, half - 4)
+		local flower = ({ "#ff7aa8", "#ffd84a", "#b07aff", "#ff8a4a" })[i % 4 + 1]
+		part({ Shape = Enum.PartType.Ball, Size = Vector3.new(4, 3, 4), CFrame = CFrame.new(center + off + Vector3.new(0, 1.2, 0)), Color = hex("#4f9a3c"), Material = Enum.Material.Grass, CanCollide = false, Parent = model })
+		for k = 1, 3 do
+			part({ Shape = Enum.PartType.Ball, Size = Vector3.new(0.9, 0.9, 0.9), CFrame = CFrame.new(center + off + Vector3.new(rng:NextNumber(-1.5, 1.5), 2.6, rng:NextNumber(-1.5, 1.5))), Color = hex(flower), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = model })
+		end
+	end
 	-- fence with a gate on the west side, facing the street
 	local fence = hex("#f0ece4")
 	part({ Size = Vector3.new(PLOT, 2.4, 0.5), CFrame = CFrame.new(center + Vector3.new(0, 1.2, -half)), Color = fence, Material = Enum.Material.Wood, Parent = model })
@@ -223,7 +232,7 @@ local function makePlot(parent, index: number)
 	-- the sign by the gate
 	local post = part({ Name = "SignPost", Size = Vector3.new(0.6, 7, 0.6), CFrame = CFrame.new(center + Vector3.new(-half - 2, 3.5, -gate / 2 - 3)), Color = hex("#8a6a44"), Material = Enum.Material.Wood, Parent = model })
 	local sign = billboard(post, "For rent", "A free plot", 120)
-	sign.Size = UDim2.fromOffset(280, 60)
+	sign.Size = UDim2.fromScale(16, 3.4)
 	sign.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
 	-- workbench just inside the gate
 	makeWorkbench(model, center + Vector3.new(-half + 7, 0, gate / 2 + 8), math.pi / 2)
@@ -256,7 +265,7 @@ local function renderHouse(plot)
 		-- nothing built yet: say how to start
 		local marker = part({ Name = "StartHint", Size = Vector3.new(1, 1, 1), Transparency = 1, CanCollide = false, CFrame = CFrame.new(plot.center + Vector3.new(0, 4, 0)), Parent = plot.rooms })
 		local bb = billboard(marker, "🏗️ Your empty plot", "Open House and tap Start my house", 90)
-		bb.Size = UDim2.fromOffset(300, 64)
+		bb.Size = UDim2.fromScale(26, 5)
 	end
 	local lvl = HouseGrid.houseLevel(data.home.rooms)
 	plot.sign.Title.Text = plot.owner.DisplayName .. "'s Home"
