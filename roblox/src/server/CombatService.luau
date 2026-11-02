@@ -403,6 +403,44 @@ local function enemyLoop(e)
 end
 
 -- ===================== enemy models =====================
+-- Monster models live in ServerStorage.AssetPacks.Monsters (saved in the place, not in git): Roblox's own Wolf and
+-- meshes made with Roblox's mesh generator. The wraiths of the Wraith Caves reuse them as see-through ghosts.
+-- Without a model an enemy is built from plain parts as before.
+local ServerStorage = game:GetService("ServerStorage")
+local MODEL_OF = { revimp = "imp", revgob = "goblin", revknight = "drakeknight", revdragon = "dragon" }
+local HEIGHT = { blob = 3, quad = 3.2, humanoid = 6, flyer = 3, dragon = 8 }
+
+local function monsterModel(def, pos: Vector3)
+	local packs = ServerStorage:FindFirstChild("AssetPacks")
+	local src = packs and packs:FindFirstChild("Monsters") and packs.Monsters:FindFirstChild(MODEL_OF[def.id] or def.id)
+	if not src then
+		return nil
+	end
+	local c = src:Clone()
+	for _, d in c:GetDescendants() do
+		if d:IsA("LuaSourceContainer") or d:IsA("Humanoid") then
+			d:Destroy()
+		end
+	end
+	for _, d in c:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanTouch = false
+			if def.ghost then
+				d.Transparency = math.max(d.Transparency, 0.4)
+			end
+		end
+	end
+	local h = (HEIGHT[def.shape] or 5) * def.size
+	c:ScaleTo(c:GetScale() * h / math.max(c:GetExtentsSize().Y, 0.1))
+	local lift = def.shape == "flyer" and 3.5 or 0
+	local box, size = c:GetBoundingBox()
+	local bottom = box.Position - Vector3.new(0, size.Y / 2, 0)
+	c:PivotTo(c:GetPivot() + (pos + Vector3.new(0, lift, 0) - bottom))
+	return c, h, lift
+end
+
 local function buildEnemy(def, pos: Vector3, folder: Folder)
 	local s = def.size
 	local model = Instance.new("Model")
@@ -412,7 +450,13 @@ local function buildEnemy(def, pos: Vector3, folder: Folder)
 	local tr = def.ghost and 0.35 or 0
 	local cf = CFrame.new(pos)
 	local root
-	if def.shape == "blob" then
+	local asset, assetH, lift = monsterModel(def, pos)
+	if asset then
+		-- an invisible box around the model carries the label, the prompt and the taps
+		root = part({ Name = "Root", Size = Vector3.new(3.5 * s, assetH, 3.5 * s), CFrame = cf * CFrame.new(0, lift + assetH / 2, 0), Transparency = 1, Parent = model })
+		asset.Name = "Look"
+		asset.Parent = model
+	elseif def.shape == "blob" then
 		root = part({ Name = "Root", Shape = Enum.PartType.Ball, Size = Vector3.new(3, 2.4, 3) * s, CFrame = cf * CFrame.new(0, 1.2 * s, 0), Color = color, Material = Enum.Material.Glass, Transparency = 0.2, Parent = model })
 	elseif def.shape == "quad" then
 		root = part({ Name = "Root", Size = Vector3.new(2, 2, 4) * s * 1.4, CFrame = cf * CFrame.new(0, 2 * s, 0), Color = color, Material = mat, Transparency = tr, Parent = model })
@@ -454,7 +498,7 @@ local function buildEnemy(def, pos: Vector3, folder: Folder)
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "EnemyLabel"
 	bb.Size = UDim2.fromScale(7, 1.8)
-	bb.StudsOffsetWorldSpace = Vector3.new(0, 3.5 * s + 2, 0)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, (asset and assetH / 2 or 3.5 * s) + 2, 0)
 	bb.MaxDistance = 70
 	bb.LightInfluence = 0
 	local t = Instance.new("TextLabel")

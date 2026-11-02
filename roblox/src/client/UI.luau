@@ -12,6 +12,7 @@ local Items = require(Shared.Items)
 local G = require(Shared.Gathering)
 local Construction = require(Shared.Construction)
 local Goals = require(Shared.Goals)
+local Icons = require(Shared.Icons)
 local Tiers = require(Shared.Tiers)
 local Zones = require(Shared.Zones)
 
@@ -86,12 +87,42 @@ local function shine(amount)
 	})
 end
 
+-- a label that holds just one emoji shows the matching Noto 3D picture instead (Icons.luau), also when its text changes
+local function iconize(label: TextLabel)
+	local img = nil
+	local shown = label.TextTransparency
+	local function update()
+		local id = Icons.get(label.Text)
+		if id then
+			if not img then
+				local px = math.max(16, label.TextSize * 1.3)
+				img = new("ImageLabel", {
+					Name = "Icon", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromOffset(px, px), ScaleType = Enum.ScaleType.Fit, ZIndex = label.ZIndex, Parent = label,
+				})
+			end
+			img.Image = id
+			img.Visible = true
+			label.TextTransparency = 1
+		else
+			if img then
+				img.Visible = false
+			end
+			label.TextTransparency = shown
+		end
+	end
+	update()
+	label:GetPropertyChangedSignal("Text"):Connect(update)
+end
+
 local function text(props, children)
 	props.BackgroundTransparency = props.BackgroundTransparency or 1
 	props.Font = props.Font or FONT
 	props.TextColor3 = props.TextColor3 or C.text
 	props.TextSize = props.TextSize or 16
-	return new("TextLabel", props, children)
+	local label = new("TextLabel", props, children)
+	iconize(label)
+	return label
 end
 
 -- buttons squash a little when pressed so every tap feels answered

@@ -38,4 +38,9 @@ Pasaulis (kelias, 5 zonos, medžiai, uolos, tvenkiniai) sukuriamas kodu paleidus
 - `ServerStorage.AssetPacks.SyntyNature` – oficialus Roblox „Synty Nature Pack“ (asset 6933438443, nemokamas, licencijuotas
   visiems Roblox žaidimams). Jis yra **place faile, ne git'e** (Rojo jo neliečia). Įkeltas per Studio MCP `insert_asset`.
 - `WorldBuilder.prop()` klonuoja modelius, **ištrina visus skriptus** ir pastato; jei paketo nėra, lieka paprastos detalės.
+- `ServerStorage.AssetPacks.Monsters` – monstrų modeliai (taip pat place faile): vilkas iš Roblox (asset 1989724206),
+  kiti sugeneruoti Roblox mesh generatoriumi. `CombatService.monsterModel()` juos klonuoja, ištrina skriptus ir Humanoid,
+  pritaiko dydį; Wraith Caves monstrai – tie patys modeliai, permatomi. Jei modelio nėra (pvz. Will-o'-Wisp), lieka detalės.
+- UI ikonos – Google „Noto Emoji“ 3D paveikslėliai (Apache License 2.0), įkelti į Roblox; ID sąrašas `src/shared/Icons.luau`.
+  `UI.luau` `iconize()` pakeičia etiketę su vienu emoji tokiu paveikslėliu.
 - Naujus modelius imti tik iš patvirtintų kūrėjų (geriausia „Roblox“), botų keliamuose dažnai būna kenkėjiškų skriptų.
